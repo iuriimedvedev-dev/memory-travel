@@ -1,0 +1,91 @@
+:root {
+  --bg: #03040c;
+  --ink: #dfe7ff;
+  --dim: #8b96b8;
+  --glass: rgba(10, 14, 32, 0.82);
+  --line: rgba(120, 150, 255, 0.16);
+  --accent: #7df3ff;
+  --gold: #ffd166;
+}
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  overflow: hidden;
+}
+.app { position: fixed; inset: 0; }
+.canvaswrap { position: absolute; inset: 0; }
+.canvaswrap.hidden { display: none; }
+
+.topbar {
+  position: absolute; top: 0; left: 0; right: 0;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 16px; z-index: 20; pointer-events: none;
+}
+.topbar nav { pointer-events: auto; display: flex; gap: 8px; align-items: center; }
+.brand { letter-spacing: 0.18em; font-size: 13px; text-shadow: 0 0 12px rgba(125, 243, 255, 0.6); }
+.dim { color: var(--dim); }
+.doclink { font-size: 11px; color: var(--dim); text-decoration: none; border: 1px solid var(--line); padding: 4px 8px; border-radius: 20px; }
+
+button, select, input[type="text"], input.search {
+  font: inherit; color: var(--ink);
+  background: rgba(20, 28, 60, 0.85);
+  border: 1px solid var(--line); border-radius: 8px;
+  padding: 6px 10px; cursor: pointer;
+}
+button:hover, select:hover { border-color: var(--accent); }
+button.primary { border-color: var(--gold); box-shadow: 0 0 14px rgba(255, 209, 102, 0.25); }
+button.on, .dot.on { background: rgba(125, 243, 255, 0.18); border-color: var(--accent); }
+button:disabled { opacity: 0.4; cursor: default; }
+
+.panel {
+  position: absolute; top: 56px; left: 12px; bottom: 12px; width: 348px;
+  background: var(--glass); backdrop-filter: blur(8px);
+  border: 1px solid var(--line); border-radius: 14px;
+  padding: 14px 16px; overflow-y: auto; z-index: 10;
+}
+.travel .panel { width: 380px; }
+.panel h1 { font-size: 20px; margin: 0 0 4px; letter-spacing: 0.06em; text-shadow: 0 0 16px rgba(125, 243, 255, 0.5); }
+.panel h4 { margin: 10px 0 4px; font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.08em; }
+.sub { font-size: 12.5px; color: var(--dim); line-height: 1.45; }
+.loading { color: var(--gold); font-size: 12px; }
+.search { width: 100%; margin-top: 8px; }
+.results { list-style: none; margin: 6px 0; padding: 0; }
+.results button { width: 100%; text-align: left; margin-bottom: 4px; font-size: 12.5px; }
+.nodecard { border: 1px solid var(--gold); border-radius: 10px; padding: 8px 10px; margin-top: 10px; font-size: 12.5px; }
+.nodecard h3 { margin: 0 0 2px; font-size: 14px; }
+.hover { font-size: 12px; color: var(--accent); }
+.row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.hint { font-size: 11px; color: var(--dim); margin-top: 10px; }
+.q { font-style: italic; border-left: 2px solid var(--gold); padding-left: 8px; }
+.metarow { font-size: 12px; margin: 3px 0; }
+.meta { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 6px; }
+
+.hits { list-style: none; margin: 6px 0; padding: 0; font-size: 12px; max-height: 46vh; overflow-y: auto; }
+.hits li { margin-bottom: 5px; }
+.hits button { width: 100%; text-align: left; font-size: 12px; display: block; }
+.rank { color: var(--gold); margin-right: 4px; }
+.bar { display: inline-block; width: 90px; height: 7px; background: rgba(255,255,255,0.08); border-radius: 4px; margin: 0 6px; vertical-align: middle; overflow: hidden; }
+.bar span { display: block; height: 100%; border-radius: 4px; box-shadow: 0 0 8px currentColor; }
+.cols { display: flex; gap: 10px; }
+.cols > div { flex: 1; }
+.cols ol { font-size: 11.5px; padding-left: 18px; margin: 4px 0; }
+li.moved { color: var(--gold); }
+.ctx { font-size: 12.5px; }
+.ctx ul { padding-left: 16px; margin: 4px 0; }
+.ref { color: var(--accent); font-family: monospace; font-size: 11.5px; }
+.bullet { border-left: 2px solid var(--accent); padding-left: 8px; margin: 8px 0; }
+
+.timeline {
+  position: absolute; left: 372px; right: 12px; bottom: 12px; z-index: 10;
+  background: var(--glass); backdrop-filter: blur(8px);
+  border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px;
+}
+.caption { font-size: 13px; line-height: 1.5; min-height: 44px; }
+.caption b { color: var(--gold); }
+.scrub { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+.scrub input[type="range"] { flex: 1; accent-color: var(--accent); }
+.dots { display: flex; gap: 4px; }
+.dot { width: 26px; height: 26px; border-radius: 50%; font-size: 11px; padding: 0; }
