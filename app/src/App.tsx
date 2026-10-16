@@ -23,7 +23,7 @@ export default function App() {
   const [progress, setProgress] = useState<string | null>("loading index…");
   const [dataError, setDataError] = useState<string | null>(null);
   const [canvasError, setCanvasError] = useState<string | null>(null);
-  const [mode2D, setMode2D] = useState(false);
+  const [renderMode, setRenderMode] = useState<string | null>(null);
   const [modeDismissed, setModeDismissed] = useState(false);
   const [xyByIdx, setXyByIdx] = useState<([number, number] | null)[] | null>(null);
   const [chunkXy, setChunkXy] = useState<Record<string, [number, number]>>({});
@@ -103,7 +103,7 @@ export default function App() {
   }, []);
 
   const onMode = useCallback((m: RenderMode) => {
-    if (m === "canvas2d") setMode2D(true);
+    setRenderMode(m);
   }, []);
 
   // ---- live question: recall -> compile (same path as fixtures) -> play + highlight
@@ -202,6 +202,7 @@ export default function App() {
           loading={progress}
           onTour={() => setTab("travel")}
           focusNode={focusNode}
+          mode={renderMode}
         />
       )}
       {tab === "travel" && <TravelView cosmos={cosmosTravel} manifest={manifest} liveTrace={liveTrace} />}
@@ -220,7 +221,7 @@ export default function App() {
           detail={canvasError}
         />
       )}
-      {!dataError && !canvasError && mode2D && !modeDismissed && (
+      {!dataError && !canvasError && renderMode === "canvas2d" && !modeDismissed && (
         <div className="modebadge" role="status">
           <span>
             <b>2D fallback mode</b> — WebGPU is unavailable here, so the graph renders on canvas2D
