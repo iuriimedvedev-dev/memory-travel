@@ -1,28 +1,30 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import CosmosCanvas from "./components/CosmosCanvas";
+import { useCallback, useEffect, useRef, useState } from "react";
+import CosmosCanvas, { type RenderMode } from "./components/CosmosCanvas";
 import CosmosView from "./components/CosmosView";
 import ErrorOverlay from "./components/ErrorOverlay";
 import QueryBar from "./components/QueryBar";
 import TravelView from "./components/TravelView";
 import { SparkIcon } from "./components/icons";
-import { INK, toWorld, type Cosmos, type RGBA } from "./lib/cosmos";
+import { INK, toWorld, type RGBA } from "./lib/cosmos";
+import type { AnyCosmos } from "./lib/cosmos2d";
 import { compileLiveTrace } from "./lib/compileLive";
 import { loadChunkCoords, loadEntityCoords, loadGraph, loadManifest, loadNodeIndex } from "./lib/data";
 import { memoryRecallLive } from "./lib/live";
 import type { CosmosGraph, TraceManifestEntry, TravelTrace } from "./lib/types";
-import { WEBGPU_BROWSERS, hasWebGPU } from "./lib/webgpu";
+import { SWIFTSHADER_HINT } from "./lib/webgpu";
 
 export default function App() {
   const [tab, setTab] = useState<"cosmos" | "travel">("cosmos");
-  const [cosmosFull, setCosmosFull] = useState<Cosmos | null>(null);
-  const [cosmosTravel, setCosmosTravel] = useState<Cosmos | null>(null);
+  const [cosmosFull, setCosmosFull] = useState<AnyCosmos | null>(null);
+  const [cosmosTravel, setCosmosTravel] = useState<AnyCosmos | null>(null);
   const [graph, setGraph] = useState<CosmosGraph | null>(null);
   const [names, setNames] = useState<string[] | null>(null);
   const [manifest, setManifest] = useState<TraceManifestEntry[] | null>(null);
   const [progress, setProgress] = useState<string | null>("loading index…");
   const [dataError, setDataError] = useState<string | null>(null);
   const [canvasError, setCanvasError] = useState<string | null>(null);
-  const [dismissedGate, setDismissedGate] = useState(false);
+  const [mode2D, setMode2D] = useState(false);
+  const [modeDismissed, setModeDismissed] = useState(false);
   const [xyByIdx, setXyByIdx] = useState<([number, number] | null)[] | null>(null);
   const [chunkXy, setChunkXy] = useState<Record<string, [number, number]>>({});
 
@@ -32,8 +34,6 @@ export default function App() {
   const [askError, setAskError] = useState<string | null>(null);
   const [askNote, setAskNote] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-
-  const noWebGPU = useMemo(() => !hasWebGPU(), []);
 
   useEffect(() => {
     let dead = false;
@@ -102,6 +102,10 @@ export default function App() {
     setCanvasError(e.message);
   }, []);
 
+  const onMode = useCallback((m: RenderMode) => {
+    if (m === "canvas2d") setMode2D(true);
+  }, []);
+
   // ---- live question: recall -> compile (same path as fixtures) -> play + highlight
   const liveReady = graph !== null && names !== null && xyByIdx !== null;
 
@@ -144,7 +148,7 @@ export default function App() {
             `live answer in Travel (${((performance.now() - t0) / 1000).toFixed(1)}s via ${endpoint === "/api/memory" ? "dev proxy" : "direct"}); ${hits.length} hit nodes lit in Cosmos`,
           );
         } else if (!cosmosFull) {
-          setAskNote("live answer in Travel; Cosmos canvas unavailable (WebGPU), so no highlight");
+          setAskNote("live answer in Travel; Cosmos canvas unavailable (no renderer), so no highlight");
         } else {
           setAskNote("live answer in Travel; no graph hits to highlight");
         }
@@ -169,10 +173,10 @@ export default function App() {
   return (
     <div className="app">
       <div className={tab === "cosmos" ? "canvaswrap" : "canvaswrap hidden"}>
-        <CosmosCanvas label="cosmos" onCosmos={setCosmosFull} onSelect={() => {}} onHover={() => {}} onError={onCanvasError} />
+        <CosmosCanvas label="cosmos" onCosmos={setCosmosFull} onSelect={() => {}} onHover={() => {}} onError={onCanvasError} onMode={onMode} />
       </div>
       <div className={tab === "travel" ? "canvaswrap" : "canvaswrap hidden"}>
-        <CosmosCanvas label="travel" onCosmos={setCosmosTravel} onSelect={() => {}} onHover={() => {}} onError={onCanvasError} />
+        <CosmosCanvas label="travel" onCosmos={setCosmosTravel} onSelect={() => {}} onHover={() => {}} onError={onCanvasError} onMode={onMode} />
       </div>
 
       <header className="topbar">
@@ -211,17 +215,19 @@ export default function App() {
       )}
       {!dataError && canvasError && (
         <ErrorOverlay
-          title="3D initialisation failed"
-          body="The canvas could not start. On a WebGPU-less browser this is expected — the text panels stay readable. Otherwise check GPU drivers / hardware acceleration."
+          title="Canvas initialisation failed"
+          body="Neither the WebGPU renderer nor the Canvas2D fallback could start — this browser cannot provide any 2D canvas. The text panels stay readable. (On any browser from the last decade this path should be unreachable.)"
           detail={canvasError}
         />
       )}
-      {!dataError && !canvasError && noWebGPU && !dismissedGate && (
-        <ErrorOverlay
-          title="WebGPU unavailable — 3D views cannot render"
-          body={`This browser exposes no WebGPU (navigator.gpu is missing), and the graph renderer is WebGPU-only. ${WEBGPU_BROWSERS}`}
-          onDismiss={() => setDismissedGate(true)}
-        />
+      {!dataError && !canvasError && mode2D && !modeDismissed && (
+        <div className="modebadge" role="status">
+          <span>
+            <b>2D fallback mode</b> — WebGPU is unavailable here, so the graph renders on canvas2D
+            (same data, same journey). {SWIFTSHADER_HINT}
+          </span>
+          <button onClick={() => setModeDismissed(true)} title="dismiss">got it</button>
+        </div>
       )}
     </div>
   );

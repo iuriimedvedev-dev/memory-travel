@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
-import type { Cosmos } from "../lib/cosmos";
 import type { CosmosGraph } from "../lib/types";
+import type { AnyCosmos } from "../lib/cosmos2d";
 import { CompassIcon, SparkIcon } from "./icons";
 
 interface Props {
-  cosmos: Cosmos | null;
+  cosmos: AnyCosmos | null;
   graph: CosmosGraph | null;
   names: string[] | null;
   loading: string | null;
@@ -100,7 +100,7 @@ function SelectBridge({
   select,
   setHover,
 }: {
-  cosmos: Cosmos | null;
+  cosmos: AnyCosmos | null;
   graph: CosmosGraph | null;
   select: (i: number) => void;
   setHover: (n: string | null) => void;

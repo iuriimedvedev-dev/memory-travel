@@ -14,6 +14,13 @@ export const WEBGPU_BROWSERS =
   "Chrome / Edge 113+, Safari 18+ (macOS), or Firefox Nightly with dom.webgpu.enabled. " +
   "Firefox stable on Linux has no WebGPU and cannot render the 3D views.";
 
+/** Software-WebGPU escape hatch (Chrome 139+ gates SwiftShader behind it). */
+export const SWIFTSHADER_HINT =
+  "If this machine has no real GPU (or its driver is blocklisted), Chrome can " +
+  "still do WebGPU in software: enable chrome://flags/#enable-unsafe-swiftshader, " +
+  "or relaunch with --enable-unsafe-swiftshader. " +
+  "Otherwise the app keeps working in its automatic 2D fallback mode.";
+
 export function webgpuMissingError(): Error {
   return new Error(
     "WebGPU is unavailable in this browser (navigator.gpu is missing), " +
@@ -27,6 +34,8 @@ export function webgpuInitFailedError(detail: string): Error {
     `WebGPU initialisation failed (${detail}). The GPU adapter or device ` +
       `request was refused — try updating GPU drivers, enabling hardware ` +
       "acceleration, or switching browser. " +
-      WEBGPU_BROWSERS,
+      WEBGPU_BROWSERS +
+      " " +
+      SWIFTSHADER_HINT,
   );
 }

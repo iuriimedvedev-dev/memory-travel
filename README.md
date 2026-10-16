@@ -50,7 +50,8 @@ itself needs none of it.
 
 ## What works vs what's stubbed/honest-approximation
 
-- WORKS: full-graph cosmos render (GraphGPU/WebGPU), search + node info,
+- WORKS: full-graph cosmos render (WebGPU primary, automatic Canvas2D
+  fallback — verified with screenshots in `docs/screenshots/`), search + node info,
   all 8 travel stages with real scores/latencies/ids, camera flights, trace
   picker, autoplay + scrubber, `tsc` + `vite build` clean.
 - APPROXIMATIONS (all labelled in-UI):

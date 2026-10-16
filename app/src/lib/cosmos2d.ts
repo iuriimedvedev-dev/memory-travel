@@ -1,0 +1,504 @@
+// Canvas2D fallback for Memory Travel — API-compatible with Cosmos (lib/cosmos.ts).
+//
+// Auto-switch rule (see components/CosmosCanvas.tsx): the app tries WebGPU
+// first; when navigator.gpu is missing or GraphGPU init fails, it constructs
+// this class on the SAME canvas instead. Travellers of the Cosmos/Cosmos2D
+// union only touch the shared surface below, so Travel/Cosmos views work
+// unchanged on either path.
+//
+// Performance principles (this is what keeps 47k nodes interactive in 2D):
+// - Static frames only: every state change sets a dirty flag; one rAF
+//   coalesces redraws. No per-frame loop, no physics.
+// - Nodes are batched by fill color (one fillStyle per group) and drawn as
+//   1-2px rects at overview zoom — no per-node shadowBlur (the perf killer).
+// - Full edge draw (54k segments, one stroked path, low alpha) happens on
+//   idle static frames; while the user is actively panning/zooming and the
+//   edge count is large, edges are skipped and repainted ~150ms after the
+//   gesture ends.
+// - DPR-aware backing store; pan/zoom/click-select with mouse reusing the
+//   same world mapping as the WebGPU path (toWorld / WORLD_SCALE in cosmos.ts).
+import { WORLD_SCALE, toWorld, type RGBA, type SelectedNode } from "./cosmos";
+import type { CosmosGraph } from "./types";
+
+function css(c: RGBA): string {
+  const [r, g, b, a] = c;
+  return `rgba(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)},${a})`;
+}
+
+interface Marker {
+  id: number;
+  label: string;
+  x: number;
+  y: number;
+  size: number;
+  color: RGBA;
+}
+
+const BG = "#03040c";
+/** World-unit -> px factor for node rects. Tuned so base nodes are 1-2px at fit zoom. */
+const NODE_K = 0.06;
+/** Above this many edges, skip edges while a pan/zoom gesture is active. */
+const EDGE_INTERACTION_CUTOFF = 5000;
+
+export class Cosmos2D {
+  private canvas: HTMLCanvasElement | null = null;
+  private ctx: CanvasRenderingContext2D | null = null;
+  private ro: ResizeObserver | null = null;
+  private dpr = 1;
+
+  // graph data (world coords)
+  private n = 0;
+  private wx = new Float32Array(0);
+  private wy = new Float32Array(0);
+  private baseSize = new Float32Array(0);
+  private baseCss: string[] = [];
+  private edges: [number, number][] = [];
+  private edgeAlpha = 0.09;
+  private names: string[] = [];
+
+  // highlight state
+  private paints = new Map<number, { color: RGBA; size?: number }>();
+  private paintsResetAll = true; // paint(null) was last called / default
+  private spot: Set<number> | null = null;
+
+  private markers = new Map<number, Marker>();
+  private nextMarker = 1;
+
+  // camera: world center + px-per-world-unit
+  private cx = 0;
+  private cy = 0;
+  private scale = 5;
+
+  private dirty = false;
+  private raf = 0;
+  private interacting = false;
+  private interactTimer = 0;
+  private flyRaf = 0;
+
+  onSelect: ((s: SelectedNode | null) => void) | null = null;
+  onHover: ((s: SelectedNode | null) => void) | null = null;
+
+  private hoverRaf = 0;
+
+  get ready(): boolean {
+    return this.canvas !== null;
+  }
+
+  get linksLoaded(): number {
+    return this.edges.length;
+  }
+
+  async init(canvas: HTMLCanvasElement): Promise<void> {
+    if (!canvas) throw new Error("cosmos2d init failed at stage=canvas: no canvas element");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("cosmos2d init failed at stage=context2d: 2D context unavailable");
+    this.canvas = canvas;
+    this.ctx = ctx;
+    this.dpr = Math.min(2, window.devicePixelRatio || 1);
+    this.resize();
+    this.ro = new ResizeObserver(() => {
+      this.resize();
+      this.requestDraw();
+    });
+    this.ro.observe(canvas);
+    canvas.addEventListener("pointerdown", this.onDown);
+    canvas.addEventListener("wheel", this.onWheel, { passive: false });
+    canvas.addEventListener("click", this.onClick);
+    canvas.addEventListener("pointermove", this.onMove);
+    canvas.style.touchAction = "none";
+    canvas.style.cursor = "grab";
+    this.requestDraw();
+  }
+
+  /** Load the graph at UMAP positions. Same signature as Cosmos.load. */
+  async load(
+    graph: CosmosGraph,
+    xyByIdx: ([number, number] | null)[],
+    onProgress?: (done: number, total: number) => void,
+  ): Promise<void> {
+    if (!this.canvas) throw new Error("cosmos2d not initialised");
+    const n = graph.nodes.length;
+    this.n = n;
+    this.wx = new Float32Array(n);
+    this.wy = new Float32Array(n);
+    this.baseSize = new Float32Array(n);
+    this.baseCss = new Array(n);
+    this.names = graph.nodes.map((nd) => nd.id);
+    for (let i = 0; i < n; i++) {
+      const nd = graph.nodes[i];
+      const xy = xyByIdx[i];
+      const [x, y] = xy ? toWorld(xy) : [(Math.random() - 0.5) * WORLD_SCALE, (Math.random() - 0.5) * WORLD_SCALE];
+      this.wx[i] = x;
+      this.wy[i] = y;
+      const size = 3.2 + Math.min(9, Math.sqrt(nd.deg) * 1.6);
+      this.baseSize[i] = size;
+      const bright = nd.deg > 12;
+      this.baseCss[i] = bright ? "#526bab" : "#33456e";
+      if (onProgress && i % 8000 === 0) {
+        onProgress(i, n);
+        await new Promise((r) => setTimeout(r, 0));
+      }
+    }
+    onProgress?.(n, n);
+    this.edges = graph.edges.filter(([s, t]) => s >= 0 && t >= 0 && s < n && t < n);
+    this.paints.clear();
+    this.paintsResetAll = true;
+    this.spot = null;
+    this.fit(0.12);
+  }
+
+  clear(): void {
+    this.n = 0;
+    this.wx = new Float32Array(0);
+    this.wy = new Float32Array(0);
+    this.baseSize = new Float32Array(0);
+    this.baseCss = [];
+    this.edges = [];
+    this.names = [];
+    this.paints.clear();
+    this.paintsResetAll = true;
+    this.spot = null;
+    this.markers.clear();
+    this.requestDraw();
+  }
+
+  addMarker(label: string, x: number, y: number, size: number, color: RGBA): number {
+    const id = this.nextMarker++;
+    this.markers.set(id, { id, label, x, y, size, color });
+    this.requestDraw();
+    return id;
+  }
+
+  moveMarker(id: number, x: number, y: number): void {
+    const m = this.markers.get(id);
+    if (!m) return;
+    m.x = x;
+    m.y = y;
+    this.requestDraw();
+  }
+
+  removeMarker(id: number): void {
+    if (this.markers.delete(id)) this.requestDraw();
+  }
+
+  paint(paints: Map<number, { color: RGBA; size?: number }> | null): void {
+    if (paints === null) {
+      this.paints.clear();
+      this.paintsResetAll = true;
+    } else {
+      this.paintsResetAll = false;
+      for (const [idx, p] of paints) this.paints.set(idx, p);
+    }
+    this.requestDraw();
+  }
+
+  spotlight(keep: Set<number> | null): void {
+    this.spot = keep;
+    this.requestDraw();
+  }
+
+  setEdgeOpacity(v: number): void {
+    this.edgeAlpha = v;
+    this.requestDraw();
+  }
+
+  /** Eased camera flight (lerped center + zoom via rAF — no physics). */
+  flyTo(x: number, y: number, zoom: number, ms = 1400): void {
+    cancelAnimationFrame(this.flyRaf);
+    const fromX = this.cx;
+    const fromY = this.cy;
+    const fromZ = this.scale;
+    const toZ = Math.max(0.05, zoom);
+    const t0 = performance.now();
+    const step = (t: number) => {
+      const p = Math.min(1, (t - t0) / ms);
+      const e = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+      this.cx = fromX + (x - fromX) * e;
+      this.cy = fromY + (y - fromY) * e;
+      this.scale = fromZ + (toZ - fromZ) * e;
+      this.requestDraw();
+      if (p < 1) this.flyRaf = requestAnimationFrame(step);
+    };
+    this.flyRaf = requestAnimationFrame(step);
+  }
+
+  fit(padding = 0.12): void {
+    if (!this.canvas || this.n === 0) return;
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (let i = 0; i < this.n; i++) {
+      const x = this.wx[i];
+      const y = this.wy[i];
+      if (x < x0) x0 = x;
+      if (y < y0) y0 = y;
+      if (x > x1) x1 = x;
+      if (y > y1) y1 = y;
+    }
+    const w = this.canvas.clientWidth || 1;
+    const h = this.canvas.clientHeight || 1;
+    const bw = Math.max(1e-6, x1 - x0);
+    const bh = Math.max(1e-6, y1 - y0);
+    this.scale = Math.min(w / bw, h / bh) * (1 - padding);
+    this.cx = (x0 + x1) / 2;
+    this.cy = (y0 + y1) / 2;
+    this.requestDraw();
+  }
+
+  currentZoom(): number {
+    return this.scale;
+  }
+
+  destroy(): void {
+    cancelAnimationFrame(this.raf);
+    cancelAnimationFrame(this.flyRaf);
+    cancelAnimationFrame(this.hoverRaf);
+    window.clearTimeout(this.interactTimer);
+    this.ro?.disconnect();
+    this.ro = null;
+    if (this.canvas) {
+      this.canvas.removeEventListener("pointerdown", this.onDown);
+      this.canvas.removeEventListener("wheel", this.onWheel);
+      this.canvas.removeEventListener("click", this.onClick);
+      this.canvas.removeEventListener("pointermove", this.onMove);
+    }
+    this.canvas = null;
+    this.ctx = null;
+  }
+
+  // ---- coordinate mapping (screen <-> world) ----
+  private toScreen(x: number, y: number): [number, number] {
+    const c = this.canvas!;
+    const w = c.clientWidth || 1;
+    const h = c.clientHeight || 1;
+    return [(x - this.cx) * this.scale + w / 2, (y - this.cy) * this.scale + h / 2];
+  }
+
+  // ---- interaction ----
+  private drag: { px: number; py: number; moved: number } | null = null;
+
+  private onDown = (e: PointerEvent) => {
+    this.drag = { px: e.clientX, py: e.clientY, moved: 0 };
+    this.canvas?.setPointerCapture(e.pointerId);
+    if (this.canvas) this.canvas.style.cursor = "grabbing";
+    const up = (ev: PointerEvent) => {
+      this.drag = null;
+      if (this.canvas) this.canvas.style.cursor = "grab";
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      this.endInteractSoon();
+      void ev;
+    };
+    const move = (ev: PointerEvent) => {
+      if (!this.drag) return;
+      const dx = ev.clientX - this.drag.px;
+      const dy = ev.clientY - this.drag.py;
+      this.drag.px = ev.clientX;
+      this.drag.py = ev.clientY;
+      this.drag.moved += Math.abs(dx) + Math.abs(dy);
+      this.cx -= dx / this.scale;
+      this.cy -= dy / this.scale;
+      this.beginInteract();
+      this.requestDraw();
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+
+  private onWheel = (e: WheelEvent) => {
+    e.preventDefault();
+    const c = this.canvas;
+    if (!c) return;
+    const rect = c.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const factor = Math.exp(-e.deltaY * 0.0015);
+    const next = Math.min(4000, Math.max(0.05, this.scale * factor));
+    // zoom to cursor: keep the world point under the cursor fixed
+    const w = c.clientWidth || 1;
+    const h = c.clientHeight || 1;
+    const wx = this.cx + (mx - w / 2) / this.scale;
+    const wy = this.cy + (my - h / 2) / this.scale;
+    this.scale = next;
+    this.cx = wx - (mx - w / 2) / next;
+    this.cy = wy - (my - h / 2) / next;
+    this.beginInteract();
+    this.requestDraw();
+  };
+
+  private onClick = (e: MouseEvent) => {
+    if (this.drag && this.drag.moved > 6) return; // was a drag, not a click
+    const idx = this.pick(e.clientX, e.clientY);
+    if (idx === null || !this.onSelect) return;
+    this.onSelect({ gpuId: idx, graphIdx: idx, name: this.names[idx] ?? `#${idx}` });
+  };
+
+  private onMove = (e: PointerEvent) => {
+    if (this.drag || !this.onHover) return;
+    if (this.hoverRaf) return;
+    const cx = e.clientX;
+    const cy = e.clientY;
+    this.hoverRaf = requestAnimationFrame(() => {
+      this.hoverRaf = 0;
+      const idx = this.pick(cx, cy);
+      this.onHover?.(
+        idx === null ? null : { gpuId: idx, graphIdx: idx, name: this.names[idx] ?? `#${idx}` },
+      );
+    });
+  };
+
+  /** Nearest node within 12px of the cursor (47k scan per click is <5ms). */
+  private pick(clientX: number, clientY: number): number | null {
+    const c = this.canvas;
+    if (!c || this.n === 0) return null;
+    const rect = c.getBoundingClientRect();
+    const mx = clientX - rect.left;
+    const my = clientY - rect.top;
+    const R = 12;
+    let best = -1;
+    let bestD = R * R;
+    for (let i = 0; i < this.n; i++) {
+      const [sx, sy] = this.toScreen(this.wx[i], this.wy[i]);
+      const dx = sx - mx;
+      const dy = sy - my;
+      const d = dx * dx + dy * dy;
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    }
+    return best >= 0 ? best : null;
+  }
+
+  private beginInteract(): void {
+    this.interacting = true;
+    window.clearTimeout(this.interactTimer);
+  }
+
+  private endInteractSoon(): void {
+    window.clearTimeout(this.interactTimer);
+    this.interactTimer = window.setTimeout(() => {
+      this.interacting = false;
+      this.requestDraw(); // repaint with edges now the gesture ended
+    }, 150);
+  }
+
+  // ---- drawing ----
+  private resize(): void {
+    const c = this.canvas;
+    if (!c) return;
+    const w = c.clientWidth || 1;
+    const h = c.clientHeight || 1;
+    c.width = Math.round(w * this.dpr);
+    c.height = Math.round(h * this.dpr);
+  }
+
+  private requestDraw(): void {
+    if (!this.canvas || this.dirty) return;
+    this.dirty = true;
+    this.raf = requestAnimationFrame(() => {
+      this.dirty = false;
+      this.draw();
+    });
+  }
+
+  private draw(): void {
+    const c = this.canvas;
+    const ctx = this.ctx;
+    if (!c || !ctx) return;
+    const w = c.clientWidth || 1;
+    const h = c.clientHeight || 1;
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.fillStyle = BG;
+    ctx.fillRect(0, 0, w, h);
+    if (this.n === 0) return;
+
+    const showEdges = this.edgeAlpha > 0.001 && !(this.interacting && this.edges.length > EDGE_INTERACTION_CUTOFF);
+    if (showEdges && this.edges.length > 0) {
+      ctx.strokeStyle = `rgba(120,150,255,${this.edgeAlpha})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let k = 0; k < this.edges.length; k++) {
+        const [s, t] = this.edges[k];
+        const ax = (this.wx[s] - this.cx) * this.scale + w / 2;
+        const ay = (this.wy[s] - this.cy) * this.scale + h / 2;
+        // cheap viewport cull on the segment start (ends may still cross in)
+        if (ax < -50 || ay < -50 || ax > w + 50 || ay > h + 50) {
+          const bx = (this.wx[t] - this.cx) * this.scale + w / 2;
+          const by = (this.wy[t] - this.cy) * this.scale + h / 2;
+          if (bx < -50 || by < -50 || bx > w + 50 || by > h + 50) continue;
+          ctx.moveTo(ax, ay);
+          ctx.lineTo(bx, by);
+        } else {
+          ctx.moveTo(ax, ay);
+          ctx.lineTo((this.wx[t] - this.cx) * this.scale + w / 2, (this.wy[t] - this.cy) * this.scale + h / 2);
+        }
+      }
+      ctx.stroke();
+    }
+
+    // Nodes, batched by fill color: one fillStyle per group, fillRect each.
+    const groups = new Map<string, number[]>();
+    const dim = "rgba(18,23,42,1)";
+    const push = (color: string, i: number) => {
+      const g = groups.get(color);
+      if (g) g.push(i);
+      else groups.set(color, [i]);
+    };
+    if (this.paintsResetAll && this.spot === null) {
+      for (let i = 0; i < this.n; i++) push(this.baseCss[i], i);
+    } else {
+      for (let i = 0; i < this.n; i++) {
+        if (this.spot && !this.spot.has(i)) {
+          push(dim, i);
+          continue;
+        }
+        const p = this.paints.get(i);
+        push(p ? css(p.color) : this.baseCss[i], i);
+      }
+    }
+    for (const [color, idxs] of groups) {
+      ctx.fillStyle = color;
+      for (let k = 0; k < idxs.length; k++) {
+        const i = idxs[k];
+        const p = this.paintsResetAll ? undefined : this.paints.get(i);
+        const want = p?.size ?? this.baseSize[i];
+        let s = want * this.scale * NODE_K;
+        if (s < 1) s = 1;
+        else if (s > 26) s = 26;
+        const x = (this.wx[i] - this.cx) * this.scale + w / 2;
+        const y = (this.wy[i] - this.cy) * this.scale + h / 2;
+        if (x < -30 || y < -30 || x > w + 30 || y > h + 30) continue;
+        ctx.fillRect(x - s / 2, y - s / 2, s, s);
+      }
+    }
+
+    // Markers (query point, chunk hits): glowing-ish dot via layered circles + label.
+    for (const m of this.markers.values()) {
+      const [sx, sy] = this.toScreen(m.x, m.y);
+      if (sx < -60 || sy < -60 || sx > w + 60 || sy > h + 60) continue;
+      let r = m.size * this.scale * NODE_K;
+      if (r < 4) r = 4;
+      else if (r > 30) r = 30;
+      const col = css(m.color);
+      ctx.fillStyle = col;
+      ctx.globalAlpha = 0.25;
+      ctx.beginPath();
+      ctx.arc(sx, sy, r * 1.9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.arc(sx, sy, r * 0.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.font = `${Math.max(10, Math.min(14, r + 4))}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(m.label, sx, sy - r - 9);
+    }
+  }
+}
+
+/** Either renderer. Structural union — both expose the same surface. */
+export type AnyCosmos = import("./cosmos").Cosmos | Cosmos2D;

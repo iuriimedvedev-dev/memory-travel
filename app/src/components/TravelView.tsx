@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Cosmos, INK, toWorld, type RGBA } from "../lib/cosmos";
+import { INK, toWorld, type RGBA } from "../lib/cosmos";
+import type { AnyCosmos } from "../lib/cosmos2d";
 import { loadTrace } from "../lib/data";
 import { STAGES } from "../lib/stages";
 import type { ChunkHit, CosmosGraph, TraceManifestEntry, TravelTrace } from "../lib/types";
 import { AlertIcon, ChevronLeftIcon, ChevronRightIcon, PauseIcon, PlayIcon } from "./icons";
 
 interface Props {
-  cosmos: Cosmos | null;
+  cosmos: AnyCosmos | null;
   manifest: TraceManifestEntry[] | null;
   liveTrace: TravelTrace | null;
 }
@@ -26,7 +27,7 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
   const baseZoom = useRef(1);
   const traceRef = useRef<TravelTrace | null>(null);
   traceRef.current = trace;
-  const cosmosRef = useRef<Cosmos | null>(null);
+  const cosmosRef = useRef<AnyCosmos | null>(null);
   cosmosRef.current = cosmos;
 
   // name -> entity-space xy (raw UMAP units) for the loaded subgraph
@@ -103,7 +104,7 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
         setStage(0);
         setPlaying(false);
         if (!cosmos) {
-          setStatus("3D canvas unavailable (WebGPU) — telemetry text below stays readable.");
+          setStatus("Canvas unavailable (WebGPU + 2D fallback both failed) — telemetry text below stays readable.");
           setStatusErr(true);
           return;
         }
