@@ -18,6 +18,7 @@
 // - DPR-aware backing store; pan/zoom/click-select with mouse reusing the
 //   same world mapping as the WebGPU path (toWorld / WORLD_SCALE in cosmos.ts).
 import { WORLD_SCALE, toWorld, type RGBA, type SelectedNode } from "./cosmos";
+import { colorForType, familyOf } from "./palette";
 import type { CosmosGraph } from "./types";
 
 function css(c: RGBA): string {
@@ -52,6 +53,7 @@ export class Cosmos2D {
   private wy = new Float32Array(0);
   private baseSize = new Float32Array(0);
   private baseCss: string[] = [];
+  private types: string[] = [];
   private edges: [number, number][] = [];
   private edgeAlpha = 0.09;
   private names: string[] = [];
@@ -60,6 +62,8 @@ export class Cosmos2D {
   private paints = new Map<number, { color: RGBA; size?: number }>();
   private paintsResetAll = true; // paint(null) was last called / default
   private spot: Set<number> | null = null;
+  /** entity families switched off in the legend — drawn near-invisible, unpickable */
+  private hidden: Set<string> = new Set();
 
   private markers = new Map<number, Marker>();
   private nextMarker = 1;
@@ -123,6 +127,7 @@ export class Cosmos2D {
     this.wy = new Float32Array(n);
     this.baseSize = new Float32Array(n);
     this.baseCss = new Array(n);
+    this.types = new Array(n);
     this.names = graph.nodes.map((nd) => nd.id);
     for (let i = 0; i < n; i++) {
       const nd = graph.nodes[i];
@@ -132,8 +137,8 @@ export class Cosmos2D {
       this.wy[i] = y;
       const size = 3.2 + Math.min(9, Math.sqrt(nd.deg) * 1.6);
       this.baseSize[i] = size;
-      const bright = nd.deg > 12;
-      this.baseCss[i] = bright ? "#526bab" : "#33456e";
+      this.baseCss[i] = colorForType(nd.t); // colour IS the entity family (legend parity)
+      this.types[i] = nd.t;
       if (onProgress && i % 8000 === 0) {
         onProgress(i, n);
         await new Promise((r) => setTimeout(r, 0));
@@ -153,12 +158,22 @@ export class Cosmos2D {
     this.wy = new Float32Array(0);
     this.baseSize = new Float32Array(0);
     this.baseCss = [];
+    this.types = [];
     this.edges = [];
     this.names = [];
     this.paints.clear();
     this.paintsResetAll = true;
     this.spot = null;
     this.markers.clear();
+    this.requestDraw();
+  }
+
+  /**
+   * Legend toggles: families here draw near-invisible and stop answering picks.
+   * Explicit highlights (paint/spotlight) still win over hiding.
+   */
+  setHiddenTypes(types: Set<string>): void {
+    this.hidden = types;
     this.requestDraw();
   }
 
@@ -169,11 +184,12 @@ export class Cosmos2D {
     return id;
   }
 
-  moveMarker(id: number, x: number, y: number): void {
+  moveMarker(id: number, x: number, y: number, size?: number): void {
     const m = this.markers.get(id);
     if (!m) return;
     m.x = x;
     m.y = y;
+    if (size !== undefined) m.size = size;
     this.requestDraw();
   }
 
@@ -359,6 +375,7 @@ export class Cosmos2D {
     let best = -1;
     let bestD = R * R;
     for (let i = 0; i < this.n; i++) {
+      if (this.hidden.has(familyOf(this.types[i]))) continue; // legend-hidden: unpickable
       const [sx, sy] = this.toScreen(this.wx[i], this.wy[i]);
       const dx = sx - mx;
       const dy = sy - my;
@@ -441,13 +458,16 @@ export class Cosmos2D {
     // Nodes, batched by fill color: one fillStyle per group, fillRect each.
     const groups = new Map<string, number[]>();
     const dim = "rgba(18,23,42,1)";
+    const ghost = "rgba(30,36,58,0.18)"; // legend-hidden family: barely-there ghost
     const push = (color: string, i: number) => {
       const g = groups.get(color);
       if (g) g.push(i);
       else groups.set(color, [i]);
     };
     if (this.paintsResetAll && this.spot === null) {
-      for (let i = 0; i < this.n; i++) push(this.baseCss[i], i);
+      for (let i = 0; i < this.n; i++) {
+        push(this.hidden.has(familyOf(this.types[i])) ? ghost : this.baseCss[i], i);
+      }
     } else {
       for (let i = 0; i < this.n; i++) {
         if (this.spot && !this.spot.has(i)) {
@@ -455,7 +475,7 @@ export class Cosmos2D {
           continue;
         }
         const p = this.paints.get(i);
-        push(p ? css(p.color) : this.baseCss[i], i);
+        push(p ? css(p.color) : this.hidden.has(familyOf(this.types[i])) ? ghost : this.baseCss[i], i);
       }
     }
     for (const [color, idxs] of groups) {
@@ -491,11 +511,23 @@ export class Cosmos2D {
       ctx.beginPath();
       ctx.arc(sx, sy, r * 0.8, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = "#fff";
+      // label on a dark pill so it stays crisp over the starfield
       ctx.font = `${Math.max(10, Math.min(14, r + 4))}px system-ui, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(m.label, sx, sy - r - 9);
+      const tw = ctx.measureText(m.label).width;
+      const ly = sy - r - 10;
+      ctx.fillStyle = "rgba(3,4,12,0.78)";
+      ctx.beginPath();
+      ctx.roundRect(sx - tw / 2 - 5, ly - 8, tw + 10, 16, 8);
+      ctx.fill();
+      ctx.strokeStyle = col;
+      ctx.globalAlpha = 0.55;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = "#eef4ff";
+      ctx.fillText(m.label, sx, ly);
     }
   }
 }

@@ -6,6 +6,7 @@
 // (the lib only exposes instant setView).
 import { GraphGPU } from "graphgpu";
 import type { CosmosGraph } from "./types";
+import { colorForType, familyOf, hexToRGBA } from "./palette";
 import { hasWebGPU, webgpuInitFailedError, webgpuMissingError } from "./webgpu";
 
 export type RGBA = [number, number, number, number];
@@ -29,19 +30,6 @@ export const INK: Record<string, RGBA> = {
   query: [1.0, 0.3, 0.5, 1],
 };
 
-const TYPE_TINT: Record<string, string> = {
-  document: "#3d5a99",
-  tool: "#2f8f9d",
-  model: "#7a5fd0",
-  concept: "#4a7ab5",
-  phase: "#8f6fb5",
-  person: "#5fa08f",
-};
-
-export function tintFor(type: string): string {
-  return TYPE_TINT[type] ?? "#33456e";
-}
-
 export interface SelectedNode {
   gpuId: number;
   graphIdx: number;
@@ -54,6 +42,8 @@ export class Cosmos {
   private idxOf = new Map<number, number>(); // gpu node id -> graphIdx
   private baseSize: number[] = [];
   private baseColor: RGBA[] = [];
+  private types: string[] = [];
+  private hidden = new Set<string>(); // legend-off families (see setHiddenTypes)
   private linkBatch: number[] = [];
   private raf = 0;
   onSelect: ((s: SelectedNode | null) => void) | null = null;
@@ -157,7 +147,7 @@ export class Cosmos {
       const nd = graph.nodes[i];
       const xy = xyByIdx[i];
       const size = 3.2 + Math.min(9, Math.sqrt(nd.deg) * 1.6);
-      const base: RGBA = nd.deg > 12 ? [0.32, 0.42, 0.66, 1] : [0.2, 0.26, 0.44, 1];
+      const base = hexToRGBA(colorForType(nd.t)); // colour IS the entity family (legend parity)
       const id = g.put(nd.t || "node", nd.id, {}, {
         x: xy ? xy[0] * S : (Math.random() - 0.5) * S,
         y: xy ? -xy[1] * S : (Math.random() - 0.5) * S,
@@ -168,6 +158,7 @@ export class Cosmos {
       this.idxOf.set(id, i);
       this.baseSize[i] = size;
       this.baseColor[i] = base;
+      this.types[i] = nd.t;
       if (onProgress && i % 8000 === 0) {
         onProgress(i, n);
         await new Promise((r) => setTimeout(r, 0));
@@ -199,8 +190,27 @@ export class Cosmos {
     this.idxOf.clear();
     this.baseSize = [];
     this.baseColor = [];
+    this.types = [];
     this.linkBatch = [];
     this.nameOf = [];
+  }
+
+  /**
+   * Legend toggles: families here get repainted to a near-invisible ghost.
+   * Explicit paint() highlights re-apply on top; paint(null) respects hiding.
+   */
+  setHiddenTypes(types: Set<string>): void {
+    this.hidden = types;
+    const g = this.g;
+    if (!g) return;
+    const gg = g.getGraph() as unknown as { setNodeColor(id: number, c: RGBA): void };
+    try {
+      const ghost: RGBA = [0.13, 0.15, 0.24, 0.22];
+      for (let i = 0; i < this.gpuOf.length; i++) {
+        if (this.hidden.has(familyOf(this.types[i]))) gg.setNodeColor(this.gpuOf[i], ghost);
+      }
+      g.markDirty();
+    } catch { /* noop */ }
   }
 
   /** Add an ad-hoc marker node (query point, chunk hit). Returns gpu id. */
@@ -211,10 +221,14 @@ export class Cosmos {
     return g.put("marker", label, {}, { x, y, size, color: hex });
   }
 
-  moveMarker(gpuId: number, x: number, y: number): void {
+  moveMarker(gpuId: number, x: number, y: number, size?: number): void {
     try {
-      (this.g?.getGraph() as unknown as { setNodePosition(id: number, x: number, y: number): void })
-        ?.setNodePosition(gpuId, x, y);
+      const gg = this.g?.getGraph() as unknown as {
+        setNodePosition(id: number, x: number, y: number): void;
+        setNodeSize(id: number, s: number): void;
+      } | undefined;
+      gg?.setNodePosition(gpuId, x, y);
+      if (size !== undefined) gg?.setNodeSize(gpuId, size);
     } catch { /* noop */ }
   }
 
@@ -237,6 +251,13 @@ export class Cosmos {
         for (let i = 0; i < this.gpuOf.length; i++) {
           gg.setNodeColor(this.gpuOf[i], this.baseColor[i]);
           gg.setNodeSize(this.gpuOf[i], this.baseSize[i]);
+        }
+        // re-ghost legend-hidden families after a reset
+        if (this.hidden.size) {
+          const ghost: RGBA = [0.13, 0.15, 0.24, 0.22];
+          for (let i = 0; i < this.gpuOf.length; i++) {
+            if (this.hidden.has(familyOf(this.types[i]))) gg.setNodeColor(this.gpuOf[i], ghost);
+          }
         }
       } else {
         for (const [idx, p] of paints) {
