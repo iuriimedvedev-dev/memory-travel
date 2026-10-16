@@ -70,7 +70,8 @@ const TYPE_FAMILY: Record<string, string> = {
 };
 
 export function familyOf(type: string): string {
-  return TYPE_FAMILY[type.toLowerCase()] ?? "other";
+  // "" guard: draw can run while a load() is still filling the types array
+  return TYPE_FAMILY[(type ?? "").toLowerCase()] ?? "other";
 }
 
 export function colorForType(type: string): string {

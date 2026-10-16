@@ -129,3 +129,12 @@ export function PauseIcon(p: IconProps) {
     </Base>
   );
 }
+
+export function ClockIcon(p: IconProps) {
+  return (
+    <Base {...p}>
+      <circle cx="12" cy="12" r="9" />
+      <polyline points="12,7 12,12 15.5,14" />
+    </Base>
+  );
+}

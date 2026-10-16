@@ -410,7 +410,6 @@ export class Cosmos2D {
     c.width = Math.round(w * this.dpr);
     c.height = Math.round(h * this.dpr);
   }
-
   private requestDraw(): void {
     if (!this.canvas || this.dirty) return;
     this.dirty = true;
@@ -512,6 +511,7 @@ export class Cosmos2D {
       ctx.arc(sx, sy, r * 0.8, 0, Math.PI * 2);
       ctx.fill();
       // label on a dark pill so it stays crisp over the starfield
+      if (!m.label.trim()) continue;
       ctx.font = `${Math.max(10, Math.min(14, r + 4))}px system-ui, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";

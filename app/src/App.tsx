@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import CosmosCanvas, { type RenderMode } from "./components/CosmosCanvas";
 import CosmosView from "./components/CosmosView";
+import AboutModal from "./components/AboutModal";
 import ErrorOverlay from "./components/ErrorOverlay";
-import QueryBar from "./components/QueryBar";
+import QueryBar, { type HistoryEntry } from "./components/QueryBar";
 import TravelView from "./components/TravelView";
-import { SparkIcon } from "./components/icons";
+import { SparkIcon, XIcon } from "./components/icons";
 import { INK, toWorld, type RGBA } from "./lib/cosmos";
 import type { AnyCosmos } from "./lib/cosmos2d";
 import { compileLiveTrace } from "./lib/compileLive";
@@ -12,6 +13,25 @@ import { loadChunkCoords, loadEntityCoords, loadGraph, loadManifest, loadNodeInd
 import { memoryRecallLive } from "./lib/live";
 import type { CosmosGraph, TraceManifestEntry, TravelTrace } from "./lib/types";
 import { SWIFTSHADER_HINT } from "./lib/webgpu";
+
+const HISTORY_KEY = "mt.history.v1";
+const HISTORY_MAX = 8;
+
+function loadHistory(): HistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? (parsed as HistoryEntry[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory(h: HistoryEntry[]): void {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, HISTORY_MAX)));
+  } catch { /* private mode etc — history just won't persist */ }
+}
 
 export default function App() {
   const [tab, setTab] = useState<"cosmos" | "travel">("cosmos");
@@ -33,7 +53,21 @@ export default function App() {
   const [asking, setAsking] = useState(false);
   const [askError, setAskError] = useState<string | null>(null);
   const [askNote, setAskNote] = useState<string | null>(null);
+  const [elapsedS, setElapsedS] = useState(0);
+  const [history, setHistory] = useState<HistoryEntry[]>(loadHistory);
+  const [about, setAbout] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const startedAtRef = useRef(0);
+
+  // elapsed-seconds ticker for the honest phase hints while a recall runs
+  useEffect(() => {
+    if (!asking) return;
+    setElapsedS(0);
+    const id = window.setInterval(() => {
+      setElapsedS((performance.now() - startedAtRef.current) / 1000);
+    }, 100);
+    return () => window.clearInterval(id);
+  }, [asking]);
 
   useEffect(() => {
     let dead = false;
@@ -115,6 +149,7 @@ export default function App() {
       abortRef.current?.abort();
       const ctrl = new AbortController();
       abortRef.current = ctrl;
+      startedAtRef.current = performance.now();
       setAsking(true);
       setAskError(null);
       setAskNote(null);
@@ -136,6 +171,12 @@ export default function App() {
         setLiveTrace(trace);
         setTab("travel");
         const hits = trace.graph.nodes.filter((n) => n.seed).map((n) => n.i);
+        const tookS = (performance.now() - t0) / 1000;
+        setHistory((prev) => {
+          const next = [{ q: question, ts: Date.now(), ms: tookS }, ...prev.filter((h) => h.q !== question)];
+          saveHistory(next);
+          return next.slice(0, HISTORY_MAX);
+        });
         if (cosmosFull && hits.length) {
           const keep = new Set(hits);
           cosmosFull.spotlight(keep);
@@ -145,12 +186,12 @@ export default function App() {
           cosmosFull.paint(paints);
           focusNode(hits[0]);
           setAskNote(
-            `live answer in Travel (${((performance.now() - t0) / 1000).toFixed(1)}s via ${endpoint === "/api/memory" ? "dev proxy" : "direct"}); ${hits.length} hit nodes lit in Cosmos`,
+            `live answer in Travel (${tookS.toFixed(1)}s via ${endpoint === "/api/memory" ? "dev proxy" : "direct"}); ${hits.length} hit nodes lit in Cosmos`,
           );
         } else if (!cosmosFull) {
-          setAskNote("live answer in Travel; Cosmos canvas unavailable (no renderer), so no highlight");
+          setAskNote(`live answer in Travel (${tookS.toFixed(1)}s); Cosmos canvas unavailable (no renderer), so no highlight`);
         } else {
-          setAskNote("live answer in Travel; no graph hits to highlight");
+          setAskNote(`live answer in Travel (${tookS.toFixed(1)}s); no graph hits to highlight`);
         }
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") {
@@ -186,13 +227,27 @@ export default function App() {
         <nav>
           <button className={tab === "cosmos" ? "on" : ""} onClick={() => setTab("cosmos")}>cosmos</button>
           <button className={tab === "travel" ? "on" : ""} onClick={() => setTab("travel")}>travel</button>
-          <a className="doclink" href="https://github.com/" title="see docs/trace-api.md in the repo" onClick={(e) => e.preventDefault()}>
-            v1 · fixtures + live ask
-          </a>
+          <button className="doclink" onClick={() => setAbout(true)} title="what this is, data provenance, controls">
+            about · v1
+          </button>
         </nav>
       </header>
 
-      <QueryBar asking={asking} error={askError} note={askNote} ready={liveReady} onAsk={askLive} onCancel={cancelAsk} />
+      <QueryBar
+        asking={asking}
+        error={askError}
+        note={askNote}
+        ready={liveReady}
+        elapsedS={elapsedS}
+        history={history}
+        onAsk={askLive}
+        onCancel={cancelAsk}
+        onPickHistory={askLive}
+        onClearHistory={() => {
+          setHistory([]);
+          saveHistory([]);
+        }}
+      />
 
       {tab === "cosmos" && (
         <CosmosView
@@ -207,6 +262,7 @@ export default function App() {
       )}
       {tab === "travel" && <TravelView cosmos={cosmosTravel} manifest={manifest} liveTrace={liveTrace} />}
 
+      {about && <AboutModal onClose={() => setAbout(false)} />}
       {dataError && (
         <ErrorOverlay
           title="Index data failed to load"
@@ -222,12 +278,14 @@ export default function App() {
         />
       )}
       {!dataError && !canvasError && renderMode === "canvas2d" && !modeDismissed && (
-        <div className="modebadge" role="status">
+        <div className={`modebadge ${tab === "travel" ? "raised" : ""}`} role="status">
           <span>
-            <b>2D fallback mode</b> — WebGPU is unavailable here, so the graph renders on canvas2D
-            (same data, same journey). {SWIFTSHADER_HINT}
+            <b>canvas2d fallback</b> — no WebGPU in this browser; same data, same journey
+            ({SWIFTSHADER_HINT})
           </span>
-          <button onClick={() => setModeDismissed(true)} title="dismiss">got it</button>
+          <button className="ghostbtn" onClick={() => setModeDismissed(true)} title="dismiss">
+            <XIcon size={11} />
+          </button>
         </div>
       )}
     </div>
