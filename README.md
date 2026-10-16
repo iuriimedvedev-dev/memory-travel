@@ -5,7 +5,7 @@ through embeddings → vector hits → graph walk → BM25 → fusion → rerank
 context assembly → grounded answer. Cosmic look, zero mockups — every pixel is
 driven by real memory telemetry or the real index.
 
-## Run it (offline-first, zero live dependencies)
+## Run it
 
 ```bash
 cd app
@@ -13,18 +13,29 @@ npm install
 npm run dev      # → http://localhost:5173
 ```
 
-The demo serves only static files under `app/public/data/`. It survives memory
-service restarts — no live calls at runtime.
+`npm run dev` also proxies `/api/memory` → the memory bridge (see
+`vite.config.ts`), which is what powers **ask live**. Without the bridge the
+five fixture traces still play; without WebGPU the app falls back to Canvas2D
+automatically. `npm run build` is clean (`tsc -b && vite build`).
 
 ## Views
 
 - **Cosmos** — the full production index: 47,355 entities / 54,502 relations,
-  positioned by UMAP over the stored 768-dim vectors. Search, click for entity
-  info, pan/zoom. “Take the tour” jumps into Travel.
-- **Travel** — scripted playback of a saved recall trace (5 questions, picker
-  at top): scrubbable 8-stage timeline with eased camera flights, score bars,
-  before/after rerank lists, context blocks, and an extractive answer preview
-  whose citations fly back to their nodes.
+  positioned by UMAP over the stored 768-dim vectors, coloured by entity
+  family. Search-as-you-type spotlights matches and dims the rest, the legend
+  toggles families on/off, hovering shows a tooltip, clicking opens an info
+  card (fly-to, degree, description). HUD shows node/edge counts, zoom and the
+  active renderer. "Take the tour" jumps into Travel.
+- **Travel** — cinematic replay of a saved recall trace (5 fixtures + any live
+  answer, picker at top): query card, vector hits pulse in, BFS glow spreads
+  hop by hop, BM25 hits rain in, fusion stamps rank by rank, rerank moves flare
+  white, context stack builds up, answer facts link back to their source nodes.
+  Scrubbable 8-stage timeline with play/pause, 0.75–2× speed, per-stage
+  progress, keyboard (←/→, space, Home/End).
+- **ask live** — real `memory_recall` through the bridge with animated
+  (honestly labelled estimated) phase hints, cancel, and recent-question
+  history (localStorage). The live trace feeds the same Travel playback and
+  lights its hit nodes in Cosmos.
 
 ## Where the data came from (reproducible pipeline)
 
@@ -51,9 +62,13 @@ itself needs none of it.
 ## What works vs what's stubbed/honest-approximation
 
 - WORKS: full-graph cosmos render (WebGPU primary, automatic Canvas2D
-  fallback — verified with screenshots in `docs/screenshots/`), search + node info,
-  all 8 travel stages with real scores/latencies/ids, camera flights, trace
-  picker, autoplay + scrubber, `tsc` + `vite build` clean.
+  fallback — Canvas2D verified headless with screenshots in `docs/screenshots/`
+  and via CDP pixel sampling; WebGPU path verified by code-reading on this
+  machine, which exposes no GPU adapter to headless Chrome), search spotlight,
+  legend toggles, hover tooltips, HUD, all 8 travel stages with real
+  scores/latencies/ids and animated reveals, camera flights, trace picker,
+  autoplay + scrubber + speed, live ask with phases + history, `tsc` +
+  `vite build` clean, headless console clean.
 - APPROXIMATIONS (all labelled in-UI):
   - “Pre-rerank” order is reconstructed as dense-score order — the live
     response only exposes post-rerank `fused_chunks`. `docs/trace-api.md`
