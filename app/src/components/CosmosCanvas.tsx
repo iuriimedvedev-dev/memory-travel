@@ -5,10 +5,13 @@ interface Props {
   onCosmos: (c: Cosmos | null) => void;
   onSelect: (s: SelectedNode | null) => void;
   onHover: (s: SelectedNode | null) => void;
+  /** Init failures surface here (rendered as a readable overlay) — never console-only. */
+  onError: (e: Error) => void;
+  label: string;
 }
 
 /** A full-bleed GraphGPU canvas. Parent drives it via the Cosmos instance. */
-export default function CosmosCanvas({ onCosmos, onSelect, onHover }: Props) {
+export default function CosmosCanvas({ onCosmos, onSelect, onHover, onError, label }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const selectRef = useRef(onSelect);
   const hoverRef = useRef(onHover);
@@ -16,6 +19,8 @@ export default function CosmosCanvas({ onCosmos, onSelect, onHover }: Props) {
   hoverRef.current = onHover;
   const cbRef = useRef(onCosmos);
   cbRef.current = onCosmos;
+  const errRef = useRef(onError);
+  errRef.current = onError;
 
   useEffect(() => {
     let dead = false;
@@ -27,7 +32,11 @@ export default function CosmosCanvas({ onCosmos, onSelect, onHover }: Props) {
       .then(() => {
         if (!dead) cbRef.current(cosmos);
       })
-      .catch((e) => console.error("cosmos init failed", e));
+      .catch((e: unknown) => {
+        const err = e instanceof Error ? e : new Error(`${label} canvas init failed: ${String(e)}`);
+        console.error(`${label} canvas init failed`, err);
+        if (!dead) errRef.current(err);
+      });
     return () => {
       dead = true;
       cbRef.current(null);

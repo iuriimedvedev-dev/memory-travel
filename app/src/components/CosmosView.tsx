@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Cosmos } from "../lib/cosmos";
 import type { CosmosGraph } from "../lib/types";
+import { CompassIcon, SparkIcon } from "./icons";
 
 interface Props {
   cosmos: Cosmos | null;
@@ -77,11 +78,11 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
           </button>
         </div>
       )}
-      {hoverName && !node && <p className="hover">⌖ {hoverName}</p>}
+      {hoverName && !node && <p className="hover"><CompassIcon size={12} /> {hoverName}</p>}
       <div className="row">
         <button onClick={() => cosmos?.fit()}>reset view</button>
         <button className="primary" onClick={onTour} disabled={!graph}>
-          ✦ take the tour — one query’s journey
+          <SparkIcon size={12} /> take the tour — one query’s journey
         </button>
       </div>
       <p className="hint">drag to pan · scroll to zoom · click a star for details</p>

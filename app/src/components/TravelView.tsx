@@ -3,20 +3,25 @@ import { Cosmos, INK, toWorld, type RGBA } from "../lib/cosmos";
 import { loadTrace } from "../lib/data";
 import { STAGES } from "../lib/stages";
 import type { ChunkHit, CosmosGraph, TraceManifestEntry, TravelTrace } from "../lib/types";
+import { AlertIcon, ChevronLeftIcon, ChevronRightIcon, PauseIcon, PlayIcon } from "./icons";
 
 interface Props {
   cosmos: Cosmos | null;
   manifest: TraceManifestEntry[] | null;
+  liveTrace: TravelTrace | null;
 }
+
+const LIVE_ID = "__live__";
 
 type XY = [number, number];
 
-export default function TravelView({ cosmos, manifest }: Props) {
+export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
   const [traceId, setTraceId] = useState<string>("trace_01");
   const [trace, setTrace] = useState<TravelTrace | null>(null);
   const [stage, setStage] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [statusErr, setStatusErr] = useState(false);
   const markers = useRef<number[]>([]);
   const baseZoom = useRef(1);
   const traceRef = useRef<TravelTrace | null>(null);
@@ -71,19 +76,37 @@ export default function TravelView({ cosmos, manifest }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trace, posOf]);
 
-  // ---- load trace + subgraph into the travel canvas
+  // A fresh live answer jumps the picker to the live entry.
   useEffect(() => {
-    if (!cosmos || !traceId) return;
+    if (liveTrace) setTraceId(LIVE_ID);
+  }, [liveTrace]);
+
+  // ---- load trace + subgraph into the travel canvas.
+  // The trace JSON always loads (text stages stay readable); the 3D
+  // subgraph load is skipped with a note when the canvas is unavailable.
+  useEffect(() => {
+    if (!traceId) return;
+    const useLive = traceId === LIVE_ID;
+    if (useLive && !liveTrace) return;
     let dead = false;
-    setStatus("loading trace…");
+    setStatus(useLive ? "compiling live answer…" : "loading trace…");
+    setStatusErr(false);
     setTrace(null);
     const entry = manifest?.find((e) => e.id === traceId);
-    loadTrace(entry?.file ?? `traces/${traceId}.json`)
+    const src: Promise<TravelTrace> = useLive
+      ? Promise.resolve(liveTrace!)
+      : loadTrace(entry?.file ?? `traces/${traceId}.json`);
+    src
       .then(async (t) => {
         if (dead) return;
         setTrace(t);
         setStage(0);
         setPlaying(false);
+        if (!cosmos) {
+          setStatus("3D canvas unavailable (WebGPU) — telemetry text below stays readable.");
+          setStatusErr(true);
+          return;
+        }
         const g2g = new Map<number, number>();
         t.graph.nodes.forEach((n, li) => g2g.set(n.i, li));
         const cg: CosmosGraph = {
@@ -93,23 +116,38 @@ export default function TravelView({ cosmos, manifest }: Props) {
             .filter(([s, e]) => s !== undefined && e !== undefined),
         };
         setStatus("loading subgraph…");
+        setStatusErr(false);
         clearMarkers();
         cosmos.clear();
-        await cosmos.load(
-          cg,
-          t.graph.nodes.map((n) => n.xy),
-        );
+        try {
+          await cosmos.load(
+            cg,
+            t.graph.nodes.map((n) => n.xy),
+          );
+        } catch (e) {
+          if (!dead) {
+            setStatus(`subgraph render failed: ${e instanceof Error ? e.message : String(e)}`);
+            setStatusErr(true);
+          }
+          return;
+        }
         if (dead) return;
         baseZoom.current = cosmos.currentZoom();
         setStatus(null);
+        setStatusErr(false);
       })
       .catch((e) => {
-        if (!dead) setStatus(`trace load failed: ${String(e)}`);
+        if (!dead) {
+          // loadTrace() names the file: `fetch <path>: <status>`.
+          setStatus(`trace load failed (stage=fetch ${entry?.file ?? `traces/${traceId}.json`}): ${String(e)}`);
+          setStatusErr(true);
+        }
       });
     return () => {
       dead = true;
     };
-  }, [cosmos, traceId, manifest]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cosmos, traceId, manifest, liveTrace]);
 
   // ---- markers cleanup helper (ref-based: safe from stale closures)
   const clearMarkers = () => {
@@ -212,7 +250,8 @@ export default function TravelView({ cosmos, manifest }: Props) {
       trace.fusion.forEach((h) => {
         const p = hitPos(h);
         const moved = h.dense_rank !== after.get(h.chunk_id);
-        if (p) mark(moved ? "↕" : "=", p, moved ? 13 : 8, moved ? INK.white : INK.orange);
+        // ASCII-only canvas labels ("!" moved vs "=" static) — no pictographs.
+        if (p) mark(moved ? "!" : "=", p, moved ? 13 : 8, moved ? INK.white : INK.orange);
       });
       paintEntities([...new Set(trace.fusion.flatMap((h) => h.entities))], INK.white, 1.6);
       cosmos.fit(0.2);
@@ -227,7 +266,7 @@ export default function TravelView({ cosmos, manifest }: Props) {
       paintEntities(bnames, INK.gold, 2.4);
       bullets.forEach((b, i) => {
         const p = posOf.size ? centroidOf(b.entities, posOf) : null;
-        if (p) mark(`★${i + 1}`, p, 14, INK.query);
+        if (p) mark(`A${i + 1}`, p, 14, INK.query);
       });
       cosmos.fit(0.2);
     }
@@ -255,13 +294,28 @@ export default function TravelView({ cosmos, manifest }: Props) {
         <h1>Memory Travel</h1>
         <p className="sub">One real query’s journey through the memory machinery — every score, latency and id below is saved telemetry, not a mockup.</p>
         <select value={traceId} onChange={(e) => setTraceId(e.target.value)} className="search">
+          {liveTrace && (
+            <option value={LIVE_ID}>
+              live: {liveTrace.meta.question.slice(0, 72)}…
+            </option>
+          )}
           {(manifest ?? []).map((m) => (
             <option key={m.id} value={m.id}>
               {m.id}: {m.question.slice(0, 72)}…
             </option>
           ))}
         </select>
-        {status && <p className="loading">{status}</p>}
+        {traceId === LIVE_ID && (
+          <p className="dim">
+            Live recall — same trace format as fixtures (per-chunk entities by context-entity mention, query marker at
+            top-hits centroid; no embedder in the browser).
+          </p>
+        )}
+        {status && (
+          <p className={statusErr ? "status-err" : "loading"}>
+            {statusErr && <AlertIcon size={12} />} {status}
+          </p>
+        )}
         {trace && (
           <div className="meta">
             <MetaRow k="mode" v={`${trace.meta.mode} / LightRAG ${trace.meta.lightrag_mode}`} />
@@ -282,9 +336,11 @@ export default function TravelView({ cosmos, manifest }: Props) {
       <div className="timeline">
         <div className="caption">{trace && <><b>{STAGES[stage].title}.</b> {STAGES[stage].caption(trace)}</>}</div>
         <div className="scrub">
-          <button onClick={() => setStage((s) => (s + 7) % 8)}>‹</button>
-          <button onClick={() => setPlaying((p) => !p)} className="primary">{playing ? "❚❚" : "▶"}</button>
-          <button onClick={() => setStage((s) => (s + 1) % 8)}>›</button>
+          <button onClick={() => setStage((s) => (s + 7) % 8)} title="previous stage"><ChevronLeftIcon size={13} /></button>
+          <button onClick={() => setPlaying((p) => !p)} className="primary" title={playing ? "pause" : "play"}>
+            {playing ? <PauseIcon size={13} /> : <PlayIcon size={13} />}
+          </button>
+          <button onClick={() => setStage((s) => (s + 1) % 8)} title="next stage"><ChevronRightIcon size={13} /></button>
           <input type="range" min={0} max={7} step={1} value={stage} onChange={(e) => { setPlaying(false); setStage(Number(e.target.value)); }} />
           <div className="dots">
             {STAGES.map((s, i) => (
@@ -427,11 +483,11 @@ function StageBody({
   }
   return (
     <div className="ctx">
-      <p className="dim">Extractive preview — verbatim quotes, not LLM prose. Click a star to fly there.</p>
+      <p className="dim">Extractive preview — verbatim quotes, not LLM prose. Each answer marker (A1…) flies back to its nodes.</p>
       {trace.answer_preview.map((b, i) => (
         <div key={i} className="bullet">
           <p>“{b.quote}…”</p>
-          <p><span className="ref">[★{i + 1} {b.doc}]</span> <span className="dim">via {b.entities.slice(0, 3).join(", ")}</span></p>
+          <p><span className="ref">[A{i + 1} {b.doc}]</span> <span className="dim">via {b.entities.slice(0, 3).join(", ")}</span></p>
         </div>
       ))}
     </div>

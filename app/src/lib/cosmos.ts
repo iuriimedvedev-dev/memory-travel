@@ -6,6 +6,7 @@
 // (the lib only exposes instant setView).
 import { GraphGPU } from "graphgpu";
 import type { CosmosGraph } from "./types";
+import { hasWebGPU, webgpuInitFailedError, webgpuMissingError } from "./webgpu";
 
 export type RGBA = [number, number, number, number];
 
@@ -68,15 +69,40 @@ export class Cosmos {
   }
 
   async init(canvas: HTMLCanvasElement): Promise<void> {
-    const g = new GraphGPU({
-      canvas,
-      background: [0.012, 0.016, 0.045, 1],
-      nodeSize: 6,
-      edgeOpacity: 0.09,
-      maxNodes: 60000,
-      maxEdges: 80000,
-    });
-    await g.init();
+    // Fail LOUD: without WebGPU (or if GraphGPU refuses to start on the
+    // real graph) callers must surface this to the error overlay — GraphGPU
+    // itself resolves init() === false and renders nothing (black canvas).
+    if (!canvas) throw new Error("cosmos init failed at stage=canvas: no canvas element");
+    if (!hasWebGPU()) throw webgpuMissingError();
+    let g: GraphGPU;
+    try {
+      g = new GraphGPU({
+        canvas,
+        background: [0.012, 0.016, 0.045, 1],
+        nodeSize: 6,
+        edgeOpacity: 0.09,
+        maxNodes: 60000,
+        maxEdges: 80000,
+      });
+    } catch (e) {
+      throw new Error(`cosmos init failed at stage=construct: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    let ok = false;
+    try {
+      ok = await g.init();
+    } catch (e) {
+      throw new Error(`cosmos init failed at stage=gpu-init: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    if (!ok) {
+      // init() === false means the renderer refused (no adapter/device).
+      // Distinguish "browser has no WebGPU at all" from "init refused".
+      try {
+        g.destroy();
+      } catch { /* noop */ }
+      throw ((navigator as Navigator & { gpu?: unknown }).gpu == null
+        ? webgpuMissingError()
+        : webgpuInitFailedError("GraphGPU init() returned false"));
+    }
     g.setLabelsVisible(false);
     this.g = g;
     g.on("node:click", (e: unknown) => {
