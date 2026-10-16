@@ -164,6 +164,8 @@ def main():
             "blocked_inversions": rr.get("blocked_inversions"),
             "fusion_margin": rr.get("fusion_margin"),
             "max_fusion_score": rr.get("max_fusion_score"),
+            "fallback_reason": rr.get("fallback_reason"),
+            "skip_threshold": rr.get("skip_threshold"),
         }
 
         # --- traversed subgraph: context entities + entities of top chunks + 1-hop

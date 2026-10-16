@@ -27,6 +27,8 @@ export interface RerankInfo {
   blocked_inversions: number | null;
   fusion_margin: number | null;
   max_fusion_score: number | null;
+  fallback_reason: string | null;
+  skip_threshold: number | null;
 }
 
 export interface GraphNode {

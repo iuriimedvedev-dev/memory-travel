@@ -407,7 +407,9 @@ function StageBody({
           <h4>served order (out)</h4>
           <ol>{trace.rerank.after.slice(0, 10).map((id, i) => <li key={id} className={trace.rerank.before[i] !== id ? "moved" : ""}>{i + 1}. {name(id)}</li>)}</ol>
         </div>
-        <p className="dim">backend {trace.rerank.backend} · pool {trace.rerank.pool} · {fmtS(trace.rerank.latency_ms)} · {trace.rerank.blocked_inversions} inversions blocked (margin {trace.rerank.fusion_margin})</p>
+        {trace.rerank.applied
+          ? <p className="dim">backend {trace.rerank.backend} · pool {trace.rerank.pool} · {fmtS(trace.rerank.latency_ms)} · {trace.rerank.blocked_inversions} inversions blocked (margin {trace.rerank.fusion_margin})</p>
+          : <p className="dim">rerank SKIPPED — {trace.rerank.fallback_reason} (max fused {trace.rerank.max_fusion_score} ≥ threshold {trace.rerank.skip_threshold}). Lists differ only by fusion itself.</p>}
       </div>
     );
   }

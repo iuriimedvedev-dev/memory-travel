@@ -42,7 +42,9 @@ export const STAGES: StageDef[] = [
     id: "rerank",
     title: "Rerank",
     caption: (t) =>
-      `A cross-encoder reranker (${t.rerank.backend ?? "?"} backend) reads the top-${t.rerank.pool ?? "?"} candidates properly — slowly (${t.rerank.latency_ms ? (t.rerank.latency_ms / 1000).toFixed(1) + " s" : "? s"}) — and reorders them, with ${t.rerank.blocked_inversions ?? "?"} would-be swaps blocked by a fusion guardrail. White = chunks that moved. This final order is what gets served.`,
+      t.rerank.applied
+        ? `A cross-encoder reranker (${t.rerank.backend ?? "?"} backend) reads the top-${t.rerank.pool ?? "?"} candidates properly — slowly (${t.rerank.latency_ms ? (t.rerank.latency_ms / 1000).toFixed(1) + " s" : "? s"}) — and reorders them, with ${t.rerank.blocked_inversions ?? "?"} would-be swaps blocked by a fusion guardrail. White = chunks that moved. This final order is what gets served.`
+        : `Plot twist, straight from telemetry: the reranker STOOD DOWN (${t.rerank.fallback_reason ?? "confident"} — best fused score ${t.rerank.max_fusion_score ?? "?"} beat the ${t.rerank.skip_threshold ?? "?"} skip threshold), so the fusion order was served as-is. White markers show where the fusion blend alone moved chunks versus pure vector order.`,
   },
   {
     id: "context",
