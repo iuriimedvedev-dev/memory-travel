@@ -4,11 +4,29 @@ A guided 9-chapter walkthrough of how the HARS long-term memory works, driven
 entirely by real data (the exported 47k-entity graph + one real `memory_recall`
 trace). Launched from the tour button on the cosmos panel; `Esc` exits.
 
-Bilingual from day one: **EN (default)** and RU, switchable mid-presentation via
-the RU/EN toggle (top-right) — the chapter position is kept, only the strings
-swap. Language persists in `localStorage` (`mt.lang.v1`); a fresh browser (or a
-cleared key) boots in English, and only an explicitly stored `ru` switches to
-Russian.
+Bilingual: **EN (default)** and RU, switchable mid-presentation via the RU/EN
+toggle (top-right) — the chapter position is kept, only the strings swap.
+Language persists in `localStorage` (`mt.lang.v1`); a fresh browser (or a cleared
+key) boots in English, and only an explicitly stored `ru` switches to Russian.
+Both dictionaries are kept in exact parity (`Dict` is derived from the RU
+literal and `EN: Dict` is an object literal — a key present in only one
+dictionary is a build error). Presentation narration/facts are `L10n {ru, en}`
+pairs in `lib/presentation.ts`; every panel string lives in `i18n/strings.ts`.
+
+## Design rule — ILLUSTRATE, DON'T OCCUPY
+
+The starfield is the hero. **Nothing in the presentation covers more than ~25%
+of the viewport by default**, and nothing covers the centre region where the
+camera is flying. Every chapter shows a small, translucent **schematic** that
+illustrates its step; the full data (tables, per-channel contributions, row
+movements, citations) is always **one click away**, never pre-expanded.
+
+- a small persistent hint reads **"Click any element for details" /
+  «Нажмите на элемент для деталей»** (bottom bar, in the active language);
+- clicking a schematic element opens **ONE** detail card, docked at the right
+  edge; it has an X and **`Esc` closes it first** (a second `Esc` exits the
+  presentation);
+- detail state resets on every chapter change.
 
 ## Controls
 
@@ -17,8 +35,9 @@ Russian.
 | `←` / `→` | previous / next chapter |
 | `Space` | play / pause the current chapter's animation |
 | `F` | fullscreen |
-| `Esc` | close chapter menu, or exit the presentation |
-| «Главы» button | chapter menu overlay |
+| `Esc` | close a detail card / the chapter menu, or exit the presentation |
+| «chapters» / «главы» button | chapter menu overlay |
+| click any schematic element | open that chapter's ONE detail card |
 | «данные этапа» button (gear icon) | opens the stage inspector over the live scene (trace chapters) |
 | RU / EN toggle | switch narration language without losing position |
 
@@ -26,42 +45,67 @@ Every control glyph is a monochrome inline SVG (`components/icons.tsx`): the
 presentation ships **zero emoji**, enforced by `npm run lint:no-emoji`
 (also wired as `prebuild`, so `npm run build` fails on a pasted emoji).
 
-## Cards (AnimatedCard)
+## Chapter 2 (ingest) — compact schematic + two drill-downs
 
-One reusable card component (`components/AnimatedCard.tsx`) draws the frame and
-the content in two phases (gradient frame sweeps on → content slides in; quick
-fade on exit). It is used for:
+`components/IngestPanel.tsx`. The default view is ONE compact schematic
+(≤ 340 px wide, docked top-left, translucent, ~5% of the viewport):
 
-- the **narration** card (`plain` / `lg`) and the **fact** card (`accent` / `md`)
-  in the bottom panel — keyed by chapter id, so every chapter change replays
-  the entrance;
-- the **node selection tooltip** in the cosmos view (`accent` / `sm`);
-- the **docked chapter cards** (below);
-- the two **ingest panels** (chapter 2).
+```
+note chip ─▶ SECTIONS row (proportional blocks, labelled by heading)
+          ─▶ CHUNKS row  (index windows, alternating tint, overlaps hatched)
+5 chunks · 2 048 tok · overlap 64        <- from chunkingParams.ts
+params: chunk_token_size 2048 · chunk_overlap_token_size 64 · …   (one line)
+note → sections → chunks → teacher records
+[Show document]  [Show 8 extracted records]
+```
 
-Props/slots: `open`, `children`, `title`, `meta`, `variant` (`accent|gold|plain`),
-`size` (`sm|md|lg`), `className`, `style`, `delayMs` (stagger), `onClose`,
-`closeTitle`.
+Every number is read from `lib/chunkingParams.ts` (`CHUNKING_PARAMS`, `paramRows`)
+or the fixture — nothing is written in the component. Section blocks and window
+blocks are positioned/width-ed proportionally over the same line axis; section
+titles are printed only when the block is wide enough to hold them (the rest
+carry a tooltip).
 
-## Docked chapter cards (chapters 3–8)
+Two **collapsed-by-default** drill-downs (both in AnimatedCards):
 
-Chapters 3–8 (the transformation chapters) dock a row of AnimatedCards at the
-top of the cosmos view, staggered left→right (`delayMs = i * 110`) while the
-camera flight keeps playing behind them. Every number comes straight out of the
-loaded trace (`components/PresStageCards.tsx`), never invented:
+- **Show document** → the full parameterised split preview: the editable
+  parameter table, **both window lanes** over the shared line axis ("as
+  ingested" = the verbatim index windows, and "md_struct, re-split from the
+  parameters above" = the client-side mirror `splitNote()`), the note text
+  tinted by the index windows with heading/section markers, overlap stripes and
+  per-window token counts, plus the honest note about the two lanes. Clicking a
+  window pins it and scrolls the note to its first line.
+- **Show N extracted records** → the teacher's real extraction records
+  (entities; relations when present), docked under the schematic. Hovering a
+  window lights its records and dims the rest of the two panels, and vice versa.
 
-| Chapter | Cards |
-| --- | --- |
-| 3 question→embedding | question text; embedding (model/dim + real UMAP x,y,z strip, candidate pool, dense ms, top score, top-12 dense score bars) |
-| 4 channels | vector channel (hits/top score/dense ms + bars), BM25 channel (hits/top score/sparse ms/BM25 chunks + bars), graph channel (seeds/nodes/edges traversed + degree bars) |
-| 5 fusion | fused ranking (fused bars + per-channel dense/sparse contribution bars with dense/sparse ranks, α from the trace) |
-| 6 rerank | before/after top-5 ordering with moved rows, backend/pool/blocked inversions/moved count (or the honest skip reason) |
-| 7 context | assembled chars / 15 000 budget, entity facts, relations, sources, preview quotes + entity list |
-| 8 synthesis | answer quote + client latency, quotes/citations counts, citation list (`[A1]…`, `[ref n]`) |
+Data: `scripts/export_ingest_fixture.py` (read-only) →
+`app/public/data/ingest_fixture.json`: the note's full `doc.text` +
+`doc.line_count` (32 227 chars / 1 074 lines), its five index windows
+(2048/2048/2048/2048/308 tokens, real line overlaps at 186–217, 476–520,
+760–793, 1035–1068) and the teacher's extraction records.
 
-Model identity (EmbeddingGemma 768-d, Qwen3-Reranker-0.6B on iGPU) is a shared
-constant in `app/src/lib/presentation.ts` (`PIPELINE`) — the same facts the
-narrations state, not per-trace telemetry.
+## Chapters 3–8 (transformations) — compact schematic strip + one detail card
+
+`components/PresStageCards.tsx`. Each transformation chapter docks ONE small
+card (≤ 260 px, `.topcard.compact`) at the top edge, semi-transparent, with a
+one-line caption; the camera flight keeps playing behind it. Clicking an element
+opens ONE detail card (the previous full tables) at the right edge.
+
+| Chapter | Compact schematic (default) | Detail card (on click) |
+| --- | --- | --- |
+| 3 question→embedding | question chip → 768-d dimension strip; model/via; caption `{hits} dense hits · {ms} ms` | UMAP x,y,z strip, candidate pool, dense ms, top score, top-12 dense score bars |
+| 4 channels | three channel pills: `vector N` · `bm25 N` · `graph N seeds` (one per detail) | per-channel tables: hits/top score/latency + bars (vector, BM25, graph) |
+| 5 fusion | top-4 fused-score bars; meta `α (dense weight) = …`; caption `{n} chunks in the fused ranking` | fused bars + per-channel dense/sparse contribution bars with dense/sparse ranks |
+| 6 rerank | before/after top-3 with moved rows highlighted; meta applied/skipped | before/after top-5, backend/pool/blocked inversions/moved count (or the honest skip reason) |
+| 7 context | top-4 context blocks (width ∝ description length); meta = char budget | assembled chars / 15 000 budget, entity facts, relations, sources, preview quotes |
+| 8 synthesis | answer quote chip; meta = client latency; caption `{n} citations` | answer quote + quotes/citations counts + citation list (`[A1]…`, `[ref n]`) |
+
+Every number comes straight out of the loaded trace — never invented. Model
+identity (EmbeddingGemma 768-d, Qwen3-Reranker-0.6B on iGPU) is a shared
+constant in `app/src/lib/presentation.ts` (`PIPELINE`), the same facts the
+narrations state, not per-trace telemetry. The 768-d row is a pure dimension
+ruler (a CSS stripe), not fabricated per-dimension data — the trace carries the
+real 3 UMAP coordinates, shown in the detail card.
 
 ## Chapters (viz source: `cosmos` = full 47k starfield, `trace` = the recall subgraph)
 
@@ -73,43 +117,12 @@ runtime.
 ### 1. Что это / What this is — `cosmos`
 - **RU:** «Перед вами долговременная память агента: 1 854 заметки превращены в {nodes} сущностей и {edges} связей. Это GraphRAG-гибрид: векторный поиск по смыслу + knowledge graph + BM25 по словам. Каждая звезда — реальная сущность продакшн-индекса, положение — 3D UMAP по 768-мерным векторам.»
 - **EN:** “This is an agent's long-term memory: 1,854 notes distilled into {nodes} entities and {edges} relations. A GraphRAG hybrid: semantic vector search + a knowledge graph + BM25 over words. Every star is a real entity of the production index; positions are a 3D UMAP of 768-dim vectors.”
-- **Fact:** `47 355 сущностей · 54 502 связей — не мокап, а живой индекс.`
 
 ### 2. Как знание попадает в память / How knowledge enters memory — `cosmos`
-- Two panels (`components/IngestPanel.tsx`): LEFT the teacher's REAL extraction
-  records (entities/relations from the index `llm_response_cache`, in
-  AnimatedCards); RIGHT the REAL note (`docs-specs-demo-alignment-task.spec.md`)
-  rendered as structured text with the **chunk windows visualised** — each
-  index window's line range tinted (alternating), overlapping ranges marked
-  with a striped band, heading boundaries tagged, and per-window token counts.
-- **Parameterised split preview**: the parameter table is derived from
-  `app/src/lib/chunkingParams.ts` (`chunk_token_size` 2048,
-  `chunk_overlap_token_size` 64, `mode` `md_struct`, `min_section_merge`
-  200 chars, derived `target_chars` = tokens × 4). The numbers are editable in
-  place and the note is re-split live by `splitNote()` — a client-side mirror of
-  the production splitter `hars_memory/ingest/md_structure.py` (section
-  boundaries → paragraph/table/fence blocks, `[A > B]` breadcrumb repeated,
-  runt sections merged up), labelled as an illustration.
-- **Two lanes, on purpose**: "как в индексе" shows the verbatim index windows
-  (the sampled note was ingested by LightRAG's token chunker: five windows of
-  exactly 2048 / 2048 / 2048 / 2048 / 308 tokens with real line overlaps at
-  186–217, 476–520, 760–793, 1035–1068), while "md_struct, по параметрам выше"
-  shows the mirror split (25 section-aligned windows, no overlap unless the
-  overlap parameter is raised). The caption states this difference instead of
-  pretending one splitter explains the other.
-- **Hover works both ways**: a window lights its extraction records (by
-  `chunk_id` for index windows, by line-range intersection for mirror windows)
-  and dims the rest of the note; hovering a record lights its window and its
-  lines. Clicking a window pins the highlight and scrolls the note to its first
-  line.
-- Data: `scripts/export_ingest_fixture.py` (read-only) → `app/public/data/ingest_fixture.json`,
-  which now carries the note's full `doc.text` + `doc.line_count` so the panel
-  can render the same lines the chunk ranges index into (32 227 chars / 1 074 lines).
-- **RU:** «Заметка разрезается md_struct-чанкером по секциям (заголовки → секции → чанки с номерами строк). Учитель — локальная 27B модель — извлекает из каждого чанка сущности и связи; мердж идёт в общий граф. Справа в карточке — настоящая заметка и её настоящие extraction-записи из кэша учителя.»
+- Compact schematic + two drill-downs (above).
 
 ### 3. Вопрос → эмбеддинг / Question → embedding — `trace` (stage: query)
 - The magenta query beacon lands at the question's true UMAP position.
-- **Fact (real):** «dense-поиск по 30 чанкам занял 36.65 мс.»
 
 ### 4. Параллельные каналы / Parallel channels — `trace` (stage: vector)
 - Cyan vector hits pulse in staggered by score; the narration contrasts the
@@ -132,6 +145,24 @@ runtime.
 ### 9. Цифры / The numbers — `cosmos`
 - Measured results: `fusion recall@10 = 0.979 @ 12.7 мс; реранк ~1.6 с на iGPU;
   1 854 документа, 60 117 связей`.
+
+## Screenshots (`docs/screenshots/`)
+
+Captured headless (Chrome CDP, real-time waits — never
+`--virtual-time-budget`, which zeroes canvases) against the built app:
+
+- `pres-c2-compact-en.png` — chapter 2 default: compact schematic, detail
+  collapsed, starfield visible and unobstructed behind it;
+- `pres-c2-doc-en.png` / `pres-c2-doc-ru.png` — the document drill-down expanded
+  (EN and RU);
+- `pres-c2-records-en.png` — the extraction-records drill-down;
+- `pres-c3-embed-en.png`, `pres-c4-channels-en.png`, `pres-c6-rerank-en.png`,
+  `pres-c7-context-en.png`, `pres-c8-answer-en.png` — the compact strips;
+- `pres-c5-strip-en.png` / `pres-c5-strip-ru.png` and `pres-c5-detail-en.png` —
+  chapter 5 compact strip (EN/RU) and one expanded detail card;
+- `app-cosmos-en.png`, `app-cosmos-legend-en.png`, `app-cosmos-ru.png`,
+  `app-travel-en.png`, `app-travel-ru.png`, `app-about-ru.png`,
+  `app-about-en.png` — the whole app in EN (default) and RU.
 
 ## Data provenance
 
@@ -160,4 +191,5 @@ scanned with the full class. Replace a hit with an icon from
 
 `prefers-reduced-motion` collapses the CSS animations globally (media query in
 `index.css`); without WebGL2 the Canvas2D fallback renderer drives the same
-chapters in flat projection (camera flights degrade to eased zooms).
+chapters in flat projection (camera flights degrade to eased zooms). The compact
+schematics are plain DOM/CSS, so they render identically in both renderers.

@@ -1,11 +1,14 @@
-// Presentation chapters 3–8 — docked transformation cards.
+// Presentation chapters 3–8 — compact transformation schematics + drill-down.
 //
-// The "transformation" chapters (question→embedding, channels, fusion, rerank,
-// context, synthesis) each get a row of AnimatedCards docked at the TOP of the
-// cosmos view, showing that chapter's REAL example data straight out of the
-// loaded trace (never invented numbers). Cards animate in per chapter with the
-// two-phase AnimatedCard entrance, staggered left→right by `delayMs`, and the
-// camera flight keeps playing behind them.
+// ILLUSTRATE, DON'T OCCUPY. Each transformation chapter docks ONE small
+// schematic (<=260px) at the top edge, semi-transparent, with a one-line
+// caption; the starfield stays the hero and the camera flight keeps playing.
+// Clicking a schematic element opens ONE AnimatedCard detail (the full tables:
+// dense bars, per-channel contributions, rerank moved rows, context budget,
+// citations) docked at the right edge — closed by default, Esc or its X closes
+// it. Every number is read from the loaded trace (never invented) and every
+// label is in both dictionaries.
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { PIPELINE } from "../lib/presentation";
 import type { ChunkHit, TravelTrace } from "../lib/types";
@@ -22,43 +25,90 @@ interface CardSpec {
   body: ReactNode;
 }
 
-/** Chapter id → docked cards (empty for 1, 2 and 9: they own the screen). */
+interface StripSpec {
+  title: string;
+  meta?: ReactNode;
+  body: ReactNode;
+  caption?: string;
+}
+
+/** Chapter id → compact schematic (empty for 1, 2 and 9: they own the screen). */
 export function PresStageCards({
   chapterId,
   trace,
   t,
   lang,
+  onDetailOpen,
 }: {
   chapterId: string;
   trace: TravelTrace | null;
   t: Dict;
   lang: Lang;
+  onDetailOpen?: (open: boolean) => void;
 }) {
+  const [detail, setDetail] = useState<string | null>(null);
+
+  useEffect(() => setDetail(null), [chapterId]);
+  useEffect(() => {
+    if (!detail) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDetail(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [detail]);
+  // tell PresentationView a detail card is open (so Esc closes it, not the exit)
+  useEffect(() => {
+    onDetailOpen?.(detail !== null);
+    return () => onDetailOpen?.(false);
+  }, [detail, onDetailOpen]);
+
   if (!trace) return null;
-  const cards = cardsFor(chapterId, trace, t, lang);
-  if (!cards.length) return null;
+  const strip = stripFor(chapterId, trace, t, lang, setDetail);
+  if (!strip) return null;
+  const cards = detail ? detailCardsFor(chapterId, trace, t, lang) : [];
+  const dc = detail ? cards.find((c) => c.key === detail) ?? cards[0] : null;
+
   return (
-    <div className="topcards" aria-label={t.cardsAria}>
-      {cards.map((c, i) => (
+    <>
+      <div className="topcards" aria-label={t.cardsAria}>
         <AnimatedCard
-          key={`${chapterId}-${c.key}`}
+          key={`${chapterId}-strip`}
           open
-          variant={c.variant ?? "accent"}
-          size={c.size ?? "md"}
-          title={c.title}
-          meta={c.meta}
-          delayMs={i * 110}
-          className={`topcard ${c.cls ?? ""}`}
+          variant="plain"
+          size="sm"
+          className="topcard compact"
+          title={strip.title}
+          meta={strip.meta}
         >
-          {c.body}
+          <div className="prestrip">{strip.body}</div>
+          {strip.caption && <p className="prescap">{strip.caption}</p>}
         </AnimatedCard>
-      ))}
-    </div>
+      </div>
+
+      {dc && (
+        <div className="pres-detail">
+          <AnimatedCard
+            key={`${chapterId}-${dc.key}`}
+            open
+            variant={dc.variant ?? "accent"}
+            size={dc.size ?? "md"}
+            title={dc.title}
+            meta={dc.meta}
+            onClose={() => setDetail(null)}
+            closeTitle={t.presDetailClose}
+          >
+            {dc.body}
+          </AnimatedCard>
+        </div>
+      )}
+    </>
   );
 }
 
 const n1 = (v: number | null | undefined, digits = 3) => (typeof v === "number" ? v.toFixed(digits) : "—");
 const int = (v: number | null | undefined) => (typeof v === "number" ? v.toLocaleString("en-US") : "—");
+const trim = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
 function Row({ k, v }: { k: string; v: ReactNode }) {
   return (
@@ -108,18 +158,164 @@ const shortDoc = (h: { doc: string; section?: string }) =>
 const topBy = (hits: ChunkHit[], key: "dense" | "sparse", n: number) =>
   [...hits].sort((a, b) => b[key] - a[key]).slice(0, n);
 
-function cardsFor(chapterId: string, trace: TravelTrace, t: Dict, lang: Lang): CardSpec[] {
+/** Compact schematic for one transformation chapter (clickable → detail). */
+function stripFor(
+  chapterId: string,
+  trace: TravelTrace,
+  t: Dict,
+  lang: Lang,
+  open: (key: string) => void,
+): StripSpec | null {
+  const m = trace.meta;
+  const nf = (n: number) => n.toLocaleString(lang === "ru" ? "ru-RU" : "en-US");
+
+  switch (chapterId) {
+    case "embed": {
+      const ms = m.latency_ms.dense != null ? String(Math.round(m.latency_ms.dense * 10) / 10) : "—";
+      return {
+        title: t.cardEmbedding,
+        meta: `${PIPELINE.embedder.dim}-d`,
+        body: (
+          <button className="prestripbtn" onClick={() => open("emb")} title={t.presClickDetails}>
+            <span className="preline">
+              <span className="prechip">{trim(m.question, 44)}</span>
+              <span className="prearrow">→</span>
+              <span className="presdimstrip" aria-hidden="true" />
+            </span>
+            <span className="preline dim">
+              {PIPELINE.embedder.model} · {PIPELINE.embedder.via}
+            </span>
+          </button>
+        ),
+        caption: fmt(t.presCapEmbed, { hits: trace.vector_hits.length, ms }),
+      };
+    }
+
+    case "channels": {
+      const seeds = trace.graph.nodes.filter((n) => n.seed).length;
+      return {
+        title: t.presCapChannels,
+        body: (
+          <span className="prepillrow">
+            <button className="prepill v" onClick={() => open("vector")} title={`${t.cardVectorCh} · ${t.presClickDetails}`}>
+              {fmt(t.presPillVector, { n: trace.vector_hits.length })}
+            </button>
+            <button className="prepill b" onClick={() => open("sparse")} title={`${t.cardSparseCh} · ${t.presClickDetails}`}>
+              {fmt(t.presPillBm25, { n: nf(m.bm25_chunks ?? 0) })}
+            </button>
+            <button className="prepill g" onClick={() => open("graph")} title={`${t.cardGraphCh} · ${t.presClickDetails}`}>
+              {fmt(t.presPillGraph, { n: seeds })}
+            </button>
+          </span>
+        ),
+      };
+    }
+
+    case "fusion": {
+      const top = trace.fusion.slice(0, 4);
+      const max = Math.max(...top.map((h) => h.fused), 1e-9);
+      return {
+        title: t.cardFused,
+        meta: `${t.cardAlpha} = ${m.alpha ?? "—"}`,
+        body: (
+          <button className="prestripbtn" onClick={() => open("fused")} title={t.presClickDetails}>
+            <span className="prebars">
+              {top.map((h, i) => (
+                <span className="prebarline" key={h.chunk_id}>
+                  <span className="prebarnum">{i + 1}</span>
+                  <span className="prebar">
+                    <i style={{ width: `${Math.max(4, (h.fused / max) * 100)}%`, background: "#ff9d4d" }} />
+                  </span>
+                </span>
+              ))}
+            </span>
+          </button>
+        ),
+        caption: fmt(t.presCapFusion, { n: trace.fusion.length }),
+      };
+    }
+
+    case "rerank": {
+      const rr = trace.rerank;
+      const byId = new Map(trace.fusion.map((h) => [h.chunk_id, h]));
+      const name = (id: string) => shortDoc(byId.get(id) ?? { doc: id.slice(0, 12) });
+      const moved = rr.before.filter((id, i) => rr.after[i] !== id).length;
+      return {
+        title: t.scoreRerank,
+        meta: rr.applied ? t.cardApplied : t.presCapRerankOff,
+        body: (
+          <button className="prestripbtn" onClick={() => open("order")} title={t.presClickDetails}>
+            <span className="premove">
+              <span className="precol">
+                <b>{t.beforeAfter_in}</b>
+                {rr.before.slice(0, 3).map((id, i) => (
+                  <span key={id} className={rr.after[i] !== id ? "moved" : ""}>{i + 1}. {name(id)}</span>
+                ))}
+              </span>
+              <span className="premid">→</span>
+              <span className="precol">
+                <b>{t.beforeAfter_out}</b>
+                {rr.after.slice(0, 3).map((id, i) => (
+                  <span key={id} className={rr.before[i] !== id ? "moved" : ""}>{i + 1}. {name(id)}</span>
+                ))}
+              </span>
+            </span>
+          </button>
+        ),
+        caption: rr.applied ? fmt(t.presCapRerankOn, { n: moved }) : t.presCapRerankOff,
+      };
+    }
+
+    case "context": {
+      const cb = trace.context_blocks;
+      const used = trace.full_chunks.reduce((a, c) => a + c.content.length, 0);
+      const maxLen = Math.max(...cb.entities.slice(0, 4).map((e) => (e.description ?? "").length), 1);
+      return {
+        title: t.cardContext,
+        meta: fmt(t.contextBudget, { used: nf(used), total: "15 000" }),
+        body: (
+          <button className="prestripbtn" onClick={() => open("ctx")} title={t.presClickDetails}>
+            <span className="prebars">
+              {cb.entities.slice(0, 4).map((e, i) => (
+                <span className="prebarline" key={`${e.entity}-${i}`}>
+                  <span className="prebarnum">{i + 1}</span>
+                  <span className="prebar">
+                    <i style={{ width: `${Math.max(8, ((e.description ?? "").length / maxLen) * 100)}%`, background: "var(--gold)" }} />
+                  </span>
+                </span>
+              ))}
+            </span>
+          </button>
+        ),
+        caption: fmt(t.presCapContext, { n: cb.entities.length }),
+      };
+    }
+
+    case "answer": {
+      const a = trace.answer_preview[0];
+      return {
+        title: t.cardAnswer,
+        meta: `${m.client_latency_s ?? "—"} s`,
+        body: (
+          <button className="prestripbtn" onClick={() => open("ans")} title={t.presClickDetails}>
+            <span className="prechip prequot">{a ? trim(a.quote, 90) : "—"}</span>
+          </button>
+        ),
+        caption: fmt(t.presCapAnswer, { n: trace.context_blocks.source_count }),
+      };
+    }
+
+    default:
+      return null;
+  }
+}
+
+/** Full detail card bodies (shown only after a click — one at a time). */
+function detailCardsFor(chapterId: string, trace: TravelTrace, t: Dict, lang: Lang): CardSpec[] {
   const m = trace.meta;
   switch (chapterId) {
     case "embed":
       return [
-        {
-          key: "q",
-          title: t.cardQuestion,
-          meta: `top_k ${m.top_k ?? "—"} · ${m.mode ?? "—"}`,
-          size: "md",
-          body: <p className="cardq">{m.question}</p>,
-        },
         {
           key: "emb",
           title: t.cardEmbedding,

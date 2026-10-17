@@ -31,6 +31,8 @@ export default function PresentationView({ onExit }: { onExit: () => void }) {
   const [insp, setInsp] = useState<Inspection | null>(null);
   const [progress, setProgress] = useState<string | null>(t.presLoading);
   const [fixture, setFixture] = useState<IngestFixture | null>(null);
+  /** true while a chapter's drill-down detail card is open (Esc closes it first). */
+  const [detailOpen, setDetailOpen] = useState(false);
 
   // two canvases: full cosmos (ch 1-2, 9) + trace subgraph (ch 3-8)
   const [cosmosFull, setCosmosFull] = useState<AnyCosmos | null>(null);
@@ -275,16 +277,17 @@ export default function PresentationView({ onExit }: { onExit: () => void }) {
         else void document.documentElement.requestFullscreen();
       } else if (e.key === "Escape") {
         if (menuOpen) setMenuOpen(false);
-        else onExit();
+        else if (!detailOpen) onExit();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [menuOpen, onExit]);
+  }, [menuOpen, detailOpen, onExit]);
 
   const goto = (i: number) => {
     setMenuOpen(false);
     setInsp(null);
+    setDetailOpen(false);
     setPlaying(true);
     setChapter((c) => {
       void c;
@@ -323,12 +326,12 @@ export default function PresentationView({ onExit }: { onExit: () => void }) {
         </div>
       )}
 
-      {/* chapter 2: two-panel ingest (records | parameterised split preview) */}
-      {ch.id === "ingest" && fixture && <IngestPanel fixture={fixture} lang={lang} t={t} />}
+      {/* chapter 2: compact ingest schematic with optional drill-downs */}
+      {ch.id === "ingest" && fixture && <IngestPanel fixture={fixture} lang={lang} t={t} onDetailOpen={setDetailOpen} />}
 
-      {/* chapters 3-8: the chapter's real data docked at the top of the cosmos */}
+      {/* chapters 3-8: a compact schematic strip + one optional detail card */}
       {CARD_CHAPTERS.has(ch.id) && (
-        <PresStageCards chapterId={ch.id} trace={trace} t={t} lang={lang} />
+        <PresStageCards chapterId={ch.id} trace={trace} t={t} lang={lang} onDetailOpen={setDetailOpen} />
       )}
 
       <div className="pres-bottom">
@@ -370,6 +373,9 @@ export default function PresentationView({ onExit }: { onExit: () => void }) {
               {t.inspectOpen} <GearIcon size={13} />
             </button>
           )}
+          <span className="dim pres-hint" style={{ fontSize: 11 }}>
+            {t.presDetailHint}
+          </span>
           <span className="dim" style={{ fontSize: 11 }}>
             ←/→ · space · F · Esc
           </span>
