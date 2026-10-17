@@ -5,6 +5,9 @@ through embeddings → vector hits → graph walk → BM25 → fusion → rerank
 context assembly → grounded answer. Cosmic look, zero mockups — every pixel is
 driven by real memory telemetry or the real index.
 
+> Setup / deployment (demo mode, live bridge, your own index, systemd):
+> **docs/SETUP.md** (EN+RU). Bridge target: `MEMORY_BRIDGE_URL=http://host:8099/mcp npm run dev`.
+
 ## Run it
 
 ```bash

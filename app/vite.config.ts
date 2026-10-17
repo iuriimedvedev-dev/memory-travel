@@ -1,19 +1,30 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
+// Memory bridge target — configurable so colleagues can point this at THEIR
+// own memory service:  MEMORY_BRIDGE_URL=http://their-host:8099/mcp npm run dev
+const BRIDGE_URL = process.env.MEMORY_BRIDGE_URL ?? 'http://10.66.66.99:8099/mcp'
+const bridgeOrigin = new URL(BRIDGE_URL)
+const BRIDGE_PATH = bridgeOrigin.pathname === '/' ? '/mcp' : bridgeOrigin.pathname
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  define: {
+    // baked into the client bundle as the DIRECT fallback URL (used when no
+    // same-origin proxy exists, e.g. `vite preview` / static hosting)
+    __MEMORY_BRIDGE_URL__: JSON.stringify(BRIDGE_URL),
+  },
   server: {
     proxy: {
       // Live memory bridge (Streamable HTTP MCP, no auth). The page and the
       // bridge are cross-origin, so dev traffic goes same-origin here and
-      // the proxy forwards to the bridge. The app falls back to the direct
-      // URL when no proxy is present (static preview / build).
+      // the proxy forwards to the bridge. READ-ONLY: the client only ever
+      // calls the `memory_recall` tool — nothing else is proxied.
       '/api/memory': {
-        target: 'http://10.66.66.99:8099',
+        target: bridgeOrigin.origin,
         changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/api\/memory/, '/mcp'),
+        rewrite: (p) => p.replace(/^\/api\/memory/, BRIDGE_PATH),
       },
     },
   },

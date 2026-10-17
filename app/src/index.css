@@ -311,6 +311,9 @@ button { display: inline-flex; gap: 6px; align-items: center; justify-content: c
 .results button b {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px;
 }
+.results button.on { background: rgba(125, 243, 255, 0.14); border-color: var(--accent); }
+.results button .dim { font-size: 10.5px; flex: none; }
+.results mark { background: rgba(125, 243, 255, 0.3); color: inherit; border-radius: 2px; padding: 0 1px; }
 
 /* ---- node info card ---- */
 .cardhead { display: flex; gap: 8px; align-items: center; }

@@ -31,6 +31,7 @@ const SEARCH_HIGHLIGHT_CAP = 3000;
 export default function CosmosView({ cosmos, graph, names, loading, onTour, focusNode, mode }: Props) {
   const { t } = useI18n();
   const [q, setQ] = useState("");
+  const [hi, setHi] = useState(0);
   const [sel, setSel] = useState<number | null>(null);
   const [hover, setHover] = useState<HoverInfo | null>(null);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
@@ -129,6 +130,7 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
   const select = (idx: number) => {
     setSel(idx);
     setQ("");
+    setHi(0);
     focusNode(idx);
   };
 
@@ -188,15 +190,34 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
             className="search bare"
             placeholder={t.searchPlaceholder}
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setHi(0);
+            }}
             onKeyDown={(e) => {
-              if (e.key === "Escape") setQ("");
-              if (e.key === "Enter" && results.length > 0) select(results[0]);
+              if (e.key === "Escape") {
+                setQ("");
+                setHi(0);
+              } else if (e.key === "ArrowDown") {
+                setHi((h) => Math.min(results.length - 1, h + 1));
+                e.preventDefault();
+              } else if (e.key === "ArrowUp") {
+                setHi((h) => Math.max(0, h - 1));
+                e.preventDefault();
+              } else if (e.key === "Enter") {
+                // Enter flies the 3D camera to the node and opens its card
+                const pickIdx = results[hi] ?? results[0];
+                if (pickIdx !== undefined) select(pickIdx);
+              }
             }}
             aria-label="Search entities"
+            role="combobox"
+            aria-expanded={results.length > 0}
+            aria-controls="search-results"
+            aria-activedescendant={results.length > 0 ? `search-res-${hi}` : undefined}
           />
           {q && (
-            <button className="ghostbtn" onClick={() => setQ("")} title={t.searchClear}>
+            <button className="ghostbtn" onClick={() => { setQ(""); setHi(0); }} title={t.searchClear}>
               <XIcon size={11} />
             </button>
           )}
@@ -204,20 +225,43 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
         {q.trim().length >= 2 && (
           <p className="searchmeta dim">
             {results.length > 0
-              ? `${countMatches(names, q)} matches — top ${results.length} below, matches lit cyan on the map`
-              : "no entities match"}
+              ? fmt(t.searchMetaTop, { n: countMatches(names, q), k: results.length })
+              : t.searchMetaNone}
           </p>
         )}
         {results.length > 0 && (
-          <ul className="results">
-            {results.map((i) => (
-              <li key={i}>
-                <button onClick={() => select(i)}>
-                  <i className="swatch" style={{ background: colorForType(graph!.nodes[i].t) }} />
-                  <b>{names![i]}</b> <span className="dim">{graph!.nodes[i].t}</span>
-                </button>
-              </li>
-            ))}
+          <ul className="results" id="search-results" role="listbox">
+            {results.map((i, ri) => {
+              const name = names![i];
+              const needle = q.trim().toLowerCase();
+              const at = name.toLowerCase().indexOf(needle);
+              return (
+                <li key={i}>
+                  <button
+                    id={`search-res-${ri}`}
+                    role="option"
+                    aria-selected={ri === hi}
+                    className={ri === hi ? "on" : ""}
+                    onMouseEnter={() => setHi(ri)}
+                    onClick={() => select(i)}
+                  >
+                    <i className="swatch" style={{ background: colorForType(graph!.nodes[i].t) }} />
+                    <b>
+                      {at >= 0 ? (
+                        <>
+                          {name.slice(0, at)}
+                          <mark>{name.slice(at, at + needle.length)}</mark>
+                          {name.slice(at + needle.length)}
+                        </>
+                      ) : (
+                        name
+                      )}
+                    </b>
+                    <span className="dim">{graph!.nodes[i].t} · {graph!.nodes[i].deg}◆</span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
 

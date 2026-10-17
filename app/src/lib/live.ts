@@ -10,7 +10,11 @@
 // the direct URL, which needs the bridge to allow CORS. If every endpoint
 // is unreachable the caller gets one readable Error and fixtures keep working.
 
-export const BRIDGE_DIRECT_URL = "http://10.66.66.99:8099/mcp";
+// Bridge target: set at build/dev time via MEMORY_BRIDGE_URL (vite.config
+// injects __MEMORY_BRIDGE_URL__). Same default as the dev proxy.
+declare const __MEMORY_BRIDGE_URL__: string;
+export const BRIDGE_DIRECT_URL =
+  typeof __MEMORY_BRIDGE_URL__ === "string" ? __MEMORY_BRIDGE_URL__ : "http://10.66.66.99:8099/mcp";
 export const BRIDGE_PROXY_PATH = "/api/memory";
 
 export const LIVE_TIMEOUT_MS = 120_000;

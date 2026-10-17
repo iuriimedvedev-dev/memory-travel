@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { BRIDGE_DIRECT_URL } from "../lib/live";
 import { SparkIcon, XIcon } from "./icons";
 
 interface Props {
@@ -45,8 +46,12 @@ export default function AboutModal({ onClose }: Props) {
           bridge (context_only — the visualiser shows extractive quotes, it does not write answers).
         </p>
         <p className="dim">
-          Rendering: WebGPU (GraphGPU) when the browser offers it, with an automatic Canvas2D fallback on the
-          same data pipeline. Keyboard: ←/→ stages, space play/pause, Esc closes cards.
+          Rendering: WebGL2 starfield (Three.js) primary, automatic Canvas2D fallback on the same data pipeline.
+          Keyboard: ←/→ stages, space play/pause, Esc closes cards.
+        </p>
+        <p className="dim">
+          Live bridge: <code>{BRIDGE_DIRECT_URL}</code> — set <code>MEMORY_BRIDGE_URL</code> to point elsewhere
+          (see docs/SETUP.md). The proxy exposes ONE read-only tool: <code>memory_recall</code>; nothing is written.
         </p>
         <p className="dim">Repo: ~/Project/software/memory-travel — docs/trace-api.md has the trace schema.</p>
       </div>

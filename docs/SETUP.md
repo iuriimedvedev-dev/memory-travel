@@ -1,0 +1,195 @@
+# Memory Travel — Setup & Deployment / Установка и запуск
+
+**EN** below, then **RU** (same content).
+
+---
+
+## EN
+
+### 1. Quick start — demo mode, zero dependencies
+
+Works fully offline: the repo ships a real data snapshot (the 47k-entity graph, 3D UMAP coords, and five real
+`memory_recall` telemetry traces).
+
+```bash
+git clone <this repo> memory-travel && cd memory-travel/app
+npm install
+npm run dev          # http://127.0.0.1:5174
+```
+
+Open http://127.0.0.1:5174 — the **cosmos** starfield, the **travel** journey playback, and the **presentation**
+mode ("Презентация: как работает память") all work against the baked-in fixtures. Nothing else to configure.
+
+### 2. Live mode — connect to a memory
+
+The live question bar ("ask live") needs a memory bridge exposing the read-only `memory_recall` MCP tool
+(any LightRAG-compatible bridge). Point the dev server at it:
+
+```bash
+MEMORY_BRIDGE_URL=http://their-host:8099/mcp npm run dev
+```
+
+- The Vite dev proxy forwards `/api/memory → $MEMORY_BRIDGE_URL` (server-side, no CORS needed).
+- `MEMORY_BRIDGE_URL` must be reachable **from the host running Vite**, not from the browser.
+- Default: `http://10.66.66.99:8099/mcp`.
+- Read-only guarantee: the client speaks MCP `tools/call` with **exactly one tool — `memory_recall`**. No write,
+  delete, or index tools are exposed or proxied.
+
+### 3. Connecting a DIFFERENT index (your own knowledge base)
+
+The starfield data is produced by offline export scripts (they read a LightRAG-style index dir: kv stores +
+graphml + vdb; works with any index built by this pipeline):
+
+```bash
+# from the repo root; activates .venv or: python3 -m venv .venv && .venv/bin/pip install umap-learn numpy
+scripts/export_graph.py     # index dir -> app/public/data/graph.json + node_index.json
+scripts/compute_umap.py     # -> coords_entities.json / coords_chunks.json with 3D xyz (n_components=3)
+scripts/capture_fixtures.py # capture real memory_recall telemetry -> fixtures/ (needs a live bridge)
+scripts/compile_trace.py    # fixtures + coords -> app/public/data/traces/*.json
+scripts/export_ingest_fixture.py  # presentation chapter 2 (md_struct chunks + teacher extractions)
+```
+
+Notes:
+- UMAP must run with **n_components=3** (the starfield is 3D); `xy` is still emitted for backward compat.
+- Re-running `compile_trace.py` needs the local embedder (llama.cpp :8791) to project the fixture questions.
+- Outputs land in `app/public/data/` and are served statically — no rebuild needed (dev hot-reloads; for static
+  serving rebuild or just refresh).
+
+### 4. Persistent serve
+
+Dev-server-as-a-service (systemd --user), our unit as the example:
+
+```ini
+# ~/.config/systemd/user/memory-travel-dev.service
+[Unit]
+Description=Memory Travel dev server (Vite :5174)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Environment=PATH=/home/angkira/.nvm/versions/node/v25.0.0/bin:/usr/local/bin:/usr/bin:/bin
+Environment=MEMORY_BRIDGE_URL=http://10.66.66.99:8099/mcp
+Type=simple
+WorkingDirectory=/home/angkira/Project/software/memory-travel/app
+ExecStart=/home/angkira/.nvm/versions/node/v25.0.0/bin/npm run dev -- --host 127.0.0.1 --port 5174
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+```
+
+```bash
+systemctl --user daemon-reload && systemctl --user enable --now memory-travel-dev.service
+```
+
+Production-ish alternative: `npm run build` → serve `app/dist/` with any static file server. The live bridge
+fallback URL is baked at build time (`MEMORY_BRIDGE_URL=... npm run build`) or the app tries the same-origin
+`/api/memory` path first — put a reverse proxy rule there.
+
+### 5. Renderer notes
+
+- **Primary: WebGL2 (Three.js starfield)** — every current Chrome/Edge/Firefox/Safari.
+- **Fallback: Canvas2D** (flat projection, same data) — automatic; a badge announces it.
+- Locked-down Chrome on a machine without real GPU drivers: WebGPU-era SwiftShader flags also enable software
+  WebGL2: `--use-angle=swiftshader --enable-unsafe-swiftshader` (verified working, that's how CI screenshots run).
+
+### 6. Troubleshooting
+
+| Symptom | Cause / fix |
+| --- | --- |
+| Blank/black canvas, no badge | Old tab from before a rebuild — hard reload (Ctrl+Shift+R). If it persists, the browser has neither WebGL2 nor 2D canvas (ancient build). |
+| "canvas2d fallback" badge | No WebGL2 in this browser — expected on very old machines; everything still works flat. |
+| "memory bridge unreachable" | The proxy target (`MEMORY_BRIDGE_URL`) is not reachable **from the vite host**. `curl $MEMORY_BRIDGE_URL` on that host. |
+| Port 5174 busy | `--port 5175` or stop the other instance (`systemctl --user stop memory-travel-dev`). |
+| Live answer never resolves | Recalls can take up to 120 s (rerank on iGPU). The bar shows honest elapsed-time phases; Cancel aborts. |
+
+### 7. Security
+
+- The app ↔ bridge proxy issues **only** `memory_recall` (read-only). Never proxy destructive memory tools.
+- Keep memory bridges off the public internet — ours is WireGuard-only by design.
+- No auth on the demo bridge: run it on a trusted network only.
+
+---
+
+## RU (то же самое)
+
+### 1. Быстрый старт — демо-режим, без зависимостей
+
+Работает полностью офлайн: в репозитории лежит реальный снимок данных (граф 47k сущностей, 3D-координаты UMAP
+и пять трейсов реальной телеметрии `memory_recall`).
+
+```bash
+git clone <этот репозиторий> memory-travel && cd memory-travel/app
+npm install
+npm run dev          # http://127.0.0.1:5174
+```
+
+Откройте http://127.0.0.1:5174 — «космос», «путешествие» и «Презентация: как работает память» работают на
+встроенных фикстурах. Ничего настраивать не нужно.
+
+### 2. Живой режим — подключение к памяти
+
+Строке живого вопроса («ask live») нужен мост памяти с read-only MCP-инструментом `memory_recall`
+(любой LightRAG-совместимый мост). Направьте dev-сервер на него:
+
+```bash
+MEMORY_BRIDGE_URL=http://their-host:8099/mcp npm run dev
+```
+
+- Vite-прокси проксирует `/api/memory → $MEMORY_BRIDGE_URL` (на стороне сервера, CORS не нужен).
+- `MEMORY_BRIDGE_URL` должен быть доступен **с хоста, где запущен Vite**, а не из браузера.
+- По умолчанию: `http://10.66.66.99:8099/mcp`.
+- Гарантия read-only: клиент шлёт MCP `tools/call` ровно с одним инструментом — `memory_recall`. Инструменты
+  записи/удаления не проксируются и не вызываются.
+
+### 3. Подключение ДРУГОГО индекса (своя база знаний)
+
+Данные туманности готовят офлайн-скрипты (читают LightRAG-подобный каталог индекса: kv-сторы + graphml + vdb;
+работают с любым индексом этого пайплайна):
+
+```bash
+scripts/export_graph.py     # каталог индекса -> app/public/data/graph.json + node_index.json
+scripts/compute_umap.py     # -> coords_entities.json / coords_chunks.json с 3D xyz (n_components=3)
+scripts/capture_fixtures.py # снять реальную телеметрию memory_recall -> fixtures/ (нужен живой мост)
+scripts/compile_trace.py    # фикстуры + координаты -> app/public/data/traces/*.json
+scripts/export_ingest_fixture.py  # глава 2 презентации (md_struct-чанки + экстракции учителя)
+```
+
+Замечания:
+- UMAP обязан запускаться с **n_components=3** (туманность трёхмерная); `xy` тоже пишется для совместимости.
+- Пересборка трейсов требует локального эмбеддера (llama.cpp :8791) для проекции вопросов фикстур.
+- Результаты складываются в `app/public/data/` и раздаются статикой — пересборка приложения не нужна.
+
+### 4. Постоянный запуск
+
+Dev-сервер как сервис (systemd --user), наш юнит как пример — см. EN-раздел выше (вставьте свой PATH до npm,
+при необходимости nvm; `MEMORY_BRIDGE_URL` добавляется строкой `Environment=`).
+
+Альтернатива «по-продакшнному»: `npm run build` → раздавать `app/dist/` любым статическим сервером. Прямой
+адрес моста вшивается на этапе сборки (`MEMORY_BRIDGE_URL=... npm run build`), либо проксируйте `/api/memory`
+на своём reverse-proxy.
+
+### 5. Рендереры
+
+- **Основной: WebGL2 (Three.js-туманность)** — все современные Chrome/Edge/Firefox/Safari.
+- **Резерв: Canvas2D** (плоская проекция, те же данные) — включается автоматически, приложение показывает плашку.
+- Chrome на машине без драйверов GPU: те же SwiftShader-флаги включают и программный WebGL2:
+  `--use-angle=swiftshader --enable-unsafe-swiftshader` (проверено — так снимаются скриншоты в CI).
+
+### 6. Траблшутинг
+
+| Симптом | Причина / решение |
+| --- | --- |
+| Пустой/чёрный холст, без плашки | Старая вкладка до пересборки — жёсткая перезагрузка (Ctrl+Shift+R). Если повторяется — в браузере нет ни WebGL2, ни 2D-canvas (очень старая сборка). |
+| Плашка «canvas2d fallback» | В этом браузере нет WebGL2 — ожидаемо на старых машинах; всё работает в плоской проекции. |
+| «memory bridge unreachable» | Цель прокси (`MEMORY_BRIDGE_URL`) недоступна **с хоста vite**. Проверьте `curl $MEMORY_BRIDGE_URL` там. |
+| Порт 5174 занят | `--port 5175` или остановите второй экземпляр (`systemctl --user stop memory-travel-dev`). |
+| Живой ответ не приходит | Recall может занимать до 120 с (реранк на iGPU). В строке честные фазы по прошедшему времени; Cancel прерывает. |
+
+### 7. Безопасность
+
+- Прокси приложение ↔ мост вызывает **только** `memory_recall` (read-only). Никогда не проксируйте
+  деструктивные инструменты памяти.
+- Держите мосты памяти вне публичного интернета — наш доступен только из WireGuard.
+- На демо-мосте нет аутентификации: запускайте только в доверенной сети.
