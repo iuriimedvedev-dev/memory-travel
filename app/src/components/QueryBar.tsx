@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "../i18n/useI18n";
-import { AlertIcon, ClockIcon, SearchIcon, XIcon } from "./icons";
-import { MAX_QUESTION_CHARS } from "../lib/live";
+import { AlertIcon, ChevronRightIcon, ClockIcon, SearchIcon, XIcon } from "./icons";
+import { MAX_QUESTION_CHARS, type RecallStep, type StepId, type StepStatus } from "../lib/live";
 
 export interface HistoryEntry {
   q: string;
@@ -18,45 +18,119 @@ interface Props {
   /** Seconds since the current recall started (drives the honest phase hints). */
   elapsedS: number;
   history: HistoryEntry[];
+  /** Per-stage rows for the pipeline list (estimated in flight, measured after). */
+  steps: RecallStep[];
   onAsk: (question: string) => void;
   onCancel: () => void;
   onPickHistory: (q: string) => void;
   onClearHistory: () => void;
 }
 
+// ---------------------------------------------------------------------------
+// Local copy. This component owns no i18n keys (i18n/ belongs to another
+// agent), so every string it needs beyond the shared t.qbAsk / t.qbHistory is
+// kept here as an inline {en, ru} pair and picked with the current language.
+// ---------------------------------------------------------------------------
+type L10n = { en: string; ru: string };
+
 /** Honest phase hints for the live recall. The bridge answers in ONE response
  *  (no streaming events), so these are elapsed-time estimates, clearly labelled.
- *  Real telemetry (latencies per channel) lands in the trace once it returns. */
-const PHASES: [number, string][] = [
-  [0, "connecting to the memory bridge…"],
-  [3, "embedding the question · extracting keywords…"],
-  [10, "dense + sparse retrieval · graph walk · fusion…"],
-  [25, "rerank + context assembly — recalls can take up to 120s…"],
+ *  Real telemetry (latencies per channel) lands in the pipeline rows. */
+const PHASES: [number, L10n][] = [
+  [0, { en: "connecting to the memory bridge…", ru: "подключаюсь к мосту памяти…" }],
+  [3, { en: "embedding the question · extracting keywords…", ru: "эмбеддинг вопроса · извлечение ключевых слов…" }],
+  [10, { en: "dense + sparse retrieval · graph walk · fusion…", ru: "dense + sparse поиск · обход графа · fusion…" }],
+  [25, { en: "rerank + context assembly — recalls can take up to 120s…", ru: "реранк + сборка контекста — recall может занять до 120с…" }],
 ];
 
-function phaseFor(elapsedS: number): string {
-  let label = PHASES[0][1];
-  for (const [from, text] of PHASES) if (elapsedS >= from) label = text;
+function phaseFor(elapsedS: number, lang: "en" | "ru"): string {
+  let label = PHASES[0][1][lang];
+  for (const [from, text] of PHASES) if (elapsedS >= from) label = text[lang];
   return label;
 }
 
+const STEP_LABEL: Record<StepId, L10n> = {
+  keywords: { en: "Keywords & mode", ru: "Ключевые слова и режим" },
+  dense: { en: "Dense / vector search", ru: "Dense / векторный поиск" },
+  sparse: { en: "Sparse / BM25", ru: "Sparse / BM25" },
+  graph: { en: "Graph expansion", ru: "Обход графа" },
+  fusion: { en: "Fusion", ru: "Смешение / fusion" },
+  rerank: { en: "Rerank", ru: "Реранк" },
+  context: { en: "Context assembly", ru: "Сборка контекста" },
+  total: { en: "Total", ru: "Итого" },
+};
+
+const COPY = {
+  aria: { en: "Ask a live memory question", ru: "Живой вопрос к памяти" },
+  cancel: { en: "cancel", ru: "отменить" },
+  cancelTitle: { en: "Cancel the live recall", ru: "Отменить живой recall" },
+  askTitle: { en: "Run a live memory_recall", ru: "Выполнить живой memory_recall" },
+  estNote: { en: "estimated stages, the bridge answers in one shot", ru: "оценка этапов — мост отвечает разом" },
+  streamNote: { en: "live trace stream — times measured as stages finish", ru: "живой поток трассировки — времена по мере прохождения этапов" },
+  historyTook: { en: "took", ru: "заняло" },
+  clearTitle: { en: "clear recent questions", ru: "очистить историю вопросов" },
+  seconds: { en: "s", ru: "с" },
+  steps: { en: "pipeline", ru: "конвейер" },
+  toggle: { en: "collapse / expand the pipeline steps", ru: "свернуть / развернуть шаги конвейера" },
+  estimated: { en: "estimated", ru: "оценка" },
+  ms: { en: "ms", ru: "мс" },
+};
+
+function StepGlyph({ status }: { status: StepStatus }) {
+  if (status === "active") {
+    return (
+      <svg className="icon qspin" width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" aria-hidden="true">
+        <path d="M12 3 a9 9 0 1 0 9 9" />
+      </svg>
+    );
+  }
+  if (status === "done") {
+    return (
+      <svg className="icon" width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <polyline points="5,13 10,18 19,6" />
+      </svg>
+    );
+  }
+  if (status === "error") return <AlertIcon size={12} />;
+  if (status === "skipped") {
+    return (
+      <svg className="icon" width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" aria-hidden="true">
+        <line x1="5" y1="12" x2="19" y2="12" />
+      </svg>
+    );
+  }
+  return (
+    <svg className="icon" width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+      <circle cx="12" cy="12" r="2.6" />
+    </svg>
+  );
+}
+
 export default function QueryBar({
-  asking, error, note, ready, elapsedS, history, onAsk, onCancel, onPickHistory, onClearHistory,
+  asking, error, note, ready, elapsedS, history, steps, onAsk, onCancel, onPickHistory, onClearHistory,
 }: Props) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [q, setQ] = useState("");
+  const [stepsOpen, setStepsOpen] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const c = <K extends keyof typeof COPY>(k: K): string => COPY[k][lang];
+  const label = (id: StepId): string => STEP_LABEL[id][lang];
+
   const submit = () => {
-    const t = q.trim();
-    if (!t || asking || !ready) return;
-    onAsk(t);
+    const text = q.trim();
+    if (!text || asking || !ready) return;
+    onAsk(text);
   };
 
   // keep the input filled when a history chip is picked
   useEffect(() => {
     if (!asking) inputRef.current?.focus();
   }, [asking]);
+
+  const estimatedNow = asking && steps.some((s) => s.status === "active" && s.estimated);
+  /** Any row carrying a measured (non-estimated) value => streaming trace. */
+  const streaming = steps.some((s) => !s.estimated);
 
   return (
     <div className="querybar" role="search">
@@ -67,38 +141,63 @@ export default function QueryBar({
           type="text"
           value={q}
           maxLength={MAX_QUESTION_CHARS}
-          placeholder={
-            ready
-              ? t.qbPlaceholder
-              : t.qbPlaceholder
-          }
+          placeholder={t.qbPlaceholder}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") submit();
           }}
           disabled={asking || !ready}
-          aria-label="Ask a live memory question"
+          aria-label={c("aria")}
         />
         <span className="qcount dim">
           {q.length}/{MAX_QUESTION_CHARS}
         </span>
         {asking ? (
-          <button onClick={onCancel} title="Cancel the live recall">
-            <XIcon size={12} /> cancel
+          <button onClick={onCancel} title={c("cancelTitle")}>
+            <XIcon size={12} /> {c("cancel")}
           </button>
         ) : (
-          <button className="primary" onClick={submit} disabled={!q.trim() || !ready} title="Run a live memory_recall">
+          <button className="primary" onClick={submit} disabled={!q.trim() || !ready} title={c("askTitle")}>
             {t.qbAsk}
           </button>
         )}
       </div>
 
+      {steps.length > 0 && (
+        <div className="qsteps">
+          <button
+            type="button"
+            className="qsteps-head"
+            onClick={() => setStepsOpen((o) => !o)}
+            title={c("toggle")}
+            aria-expanded={stepsOpen}
+          >
+            <ChevronRightIcon size={11} className={`qchev${stepsOpen ? " open" : ""}`} />
+            <span>{c("steps")}</span>
+            {estimatedNow && <span className="qsteps-est">{c("estimated")}</span>}
+          </button>
+          {stepsOpen && (
+            <ol className="qstep-list" aria-label={c("steps")}>
+              {steps.map((s, i) => (
+                <li key={s.id} className={`qstep qstep-${s.status}${s.estimated ? " qstep-est" : ""}`}>
+                  <span className="qstep-ico"><StepGlyph status={s.status} /></span>
+                  <span className="qstep-num">{i + 1}</span>
+                  <span className="qstep-name">{label(s.id)}</span>
+                  <span className="qstep-detail">{s.detail}</span>
+                  <span className="qstep-ms">{s.ms == null ? "—" : `${Math.round(s.ms)} ${c("ms")}`}</span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      )}
+
       {asking && (
         <div className="qprogress" role="status">
           <div className="qshimmer" />
           <span className="qphase">
-            <ClockIcon size={11} /> {phaseFor(elapsedS)} <b>{elapsedS.toFixed(1)}s</b>
-            <span className="dim"> — estimated stages, the bridge answers in one shot</span>
+            <ClockIcon size={11} /> {phaseFor(elapsedS, lang)} <b>{elapsedS.toFixed(1)}{c("seconds")}</b>
+            <span className="dim"> — {streaming ? c("streamNote") : c("estNote")}</span>
           </span>
         </div>
       )}
@@ -113,11 +212,11 @@ export default function QueryBar({
         <div className="qhistory">
           <span className="dim">{t.qbHistory}</span>
           {history.slice(0, 5).map((h) => (
-            <button key={h.ts} className="chip" onClick={() => onPickHistory(h.q)} title={`${h.q} — took ${h.ms.toFixed(1)}s`}>
+            <button key={h.ts} className="chip" onClick={() => onPickHistory(h.q)} title={`${h.q} — ${c("historyTook")} ${h.ms.toFixed(1)}${c("seconds")}`}>
               {h.q.length > 42 ? `${h.q.slice(0, 41)}…` : h.q}
             </button>
           ))}
-          <button className="ghostbtn" onClick={onClearHistory} title="clear recent questions">
+          <button className="ghostbtn" onClick={onClearHistory} title={c("clearTitle")}>
             <XIcon size={11} />
           </button>
         </div>

@@ -186,3 +186,545 @@ export async function memoryRecallLive(
     clearTimeout(timer);
   }
 }
+
+// ===========================================================================
+// Live recall step list — per-stage telemetry for the query bar
+// ===========================================================================
+//
+// The MCP `memory_recall` bridge answers in ONE shot, so per-stage numbers are
+// only known once the response lands. Every value below is parsed from the
+// response's real telemetry (`hybrid.latency_ms`, `hybrid.bm25_index`,
+// `hybrid.rerank`, `hybrid.confidence`, `context`, plus the compiled subgraph
+// counts) — nothing is invented. While the request is in flight the rows are
+// a clearly-labelled ESTIMATE from elapsed wall-clock time.
+
+export type StepId =
+  | "keywords"
+  | "dense"
+  | "sparse"
+  | "graph"
+  | "fusion"
+  | "rerank"
+  | "context"
+  | "total";
+
+export type StepStatus = "pending" | "active" | "done" | "skipped" | "error";
+
+/** One row of the live pipeline list rendered under the query input. */
+export interface RecallStep {
+  id: StepId;
+  /** compact, language-neutral detail line (numbers rendered monospace). */
+  detail: string;
+  /** ms for the right-aligned time column; null when the channel exposes none. */
+  ms: number | null;
+  status: StepStatus;
+  /** true while the value is a client-side estimate, false once measured. */
+  estimated: boolean;
+}
+
+export const STEP_ORDER: StepId[] = [
+  "keywords",
+  "dense",
+  "sparse",
+  "graph",
+  "fusion",
+  "rerank",
+  "context",
+  "total",
+];
+
+function freshSteps(): RecallStep[] {
+  return STEP_ORDER.map((id) => ({ id, detail: "", ms: null, status: "pending", estimated: true }));
+}
+
+/** All eight rows, pending — the state a fresh query starts from. */
+export function emptySteps(): RecallStep[] {
+  return freshSteps();
+}
+
+/** Static stage windows (ms) for the in-flight estimate. Not measurements —
+ *  the list is labelled "estimated" until the response lands. One bound per
+ *  stage plus the closing infinity. */
+const EST_BOUNDS: number[] = [0, 2000, 3500, 6000, 8000, 10000, 22000, 32000, Number.POSITIVE_INFINITY];
+
+/** Progressive estimate from elapsed wall-clock time. The active row shows a
+ *  live ticking elapsed; finished rows show the (estimated) window they took. */
+export function estimateSteps(elapsedMs: number): RecallStep[] {
+  const rows = freshSteps();
+  for (let i = 0; i < rows.length; i++) {
+    const start = EST_BOUNDS[i];
+    const end = EST_BOUNDS[i + 1];
+    const r = rows[i];
+    r.estimated = true;
+    if (elapsedMs >= end) {
+      r.status = "done";
+      r.ms = Math.round(end - start);
+    } else if (elapsedMs >= start) {
+      r.status = "active";
+      r.ms = Math.round(elapsedMs - start);
+    }
+  }
+  return rows;
+}
+
+/** Mark the first still-open row as failed (bridge unreachable / aborted). */
+export function markStepsError(steps: RecallStep[], reason: string): RecallStep[] {
+  let marked = false;
+  return steps.map((r) => {
+    if (!marked && (r.status === "active" || r.status === "pending")) {
+      marked = true;
+      return { ...r, status: "error" as StepStatus, estimated: false, detail: reason.slice(0, 140) };
+    }
+    return r;
+  });
+}
+
+// ---- real telemetry --------------------------------------------------------
+
+export interface RecallTelemetry {
+  mode: string | null;
+  lightragMode: string | null;
+  modeFallback: string | null;
+  llKeywords: string[];
+  denseHits: number | null;
+  denseTop: number | null;
+  denseMs: number | null;
+  bm25Indexed: number | null;
+  bm25Hits: number | null;
+  bm25Ms: number | null;
+  graphSeeds: number | null;
+  graphNodes: number | null;
+  graphEdges: number | null;
+  alpha: number | null;
+  candidatePool: number | null;
+  /** fusion has no per-stage timer in the response — stays null (honest). */
+  fusionMs: number | null;
+  rerankApplied: boolean | null;
+  rerankReason: string | null;
+  rerankBackend: string | null;
+  rerankPool: number | null;
+  rerankBlocked: number | null;
+  rerankMs: number | null;
+  contextChars: number | null;
+  contextBlocks: number | null;
+  /** per-doc cap is not exposed by the service — stays null. */
+  contextCap: number | null;
+  totalMs: number | null;
+}
+
+function num(v: unknown): number | null {
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+function str(v: unknown): string | null {
+  return typeof v === "string" && v.length > 0 ? v : null;
+}
+
+/**
+ * Parse the real memory_recall payload into the step telemetry.
+ * `graphCounts` come from the compiled subgraph (seeds/nodes/edges), since the
+ * response exposes the graph pass only via the `context` entity/relation lines.
+ */
+export function parseRecallTelemetry(
+  r: Record<string, unknown>,
+  clientLatencyS: number,
+  llKeywords: string[],
+  graphCounts: { seeds: number; nodes: number; edges: number } | null = null,
+): RecallTelemetry {
+  const h = (r["hybrid"] ?? {}) as Record<string, unknown>;
+  const lat = (h["latency_ms"] ?? {}) as Record<string, unknown>;
+  const conf = (h["confidence"] ?? {}) as Record<string, unknown>;
+  const rr = (h["rerank"] ?? {}) as Record<string, unknown>;
+  const bm = (h["bm25_index"] ?? {}) as Record<string, unknown>;
+  const fc = Array.isArray(h["fused_chunks"]) ? (h["fused_chunks"] as Record<string, unknown>[]) : [];
+  const denseScores = fc.map((c) => num(c["dense_score"])).filter((v): v is number => v != null);
+  const sparseScores = fc.map((c) => num(c["sparse_score"])).filter((v): v is number => v != null);
+  const ctx = typeof r["context"] === "string" ? (r["context"] as string) : "";
+  let blocks = 0;
+  for (const line of ctx.split("\n")) if (line.includes('"reference_id"')) blocks++;
+  const topDense = num(conf["top_dense_score"]) ?? (denseScores.length ? Math.max(...denseScores) : null);
+  return {
+    mode: str(r["mode"]),
+    lightragMode: str(r["lightrag_mode"]),
+    modeFallback: str(r["mode_fallback"]),
+    llKeywords,
+    denseHits: denseScores.length || null,
+    denseTop: topDense,
+    denseMs: num(lat["dense_channel"]),
+    bm25Indexed: num(bm["chunks_indexed"]),
+    bm25Hits: sparseScores.filter((v) => v > 0).length || null,
+    bm25Ms: num(lat["sparse_channel"]),
+    graphSeeds: graphCounts?.seeds ?? null,
+    graphNodes: graphCounts?.nodes ?? null,
+    graphEdges: graphCounts?.edges ?? null,
+    alpha: num(h["alpha"]),
+    candidatePool: num(h["candidate_pool_size"]),
+    fusionMs: null,
+    rerankApplied: typeof rr["applied"] === "boolean" ? (rr["applied"] as boolean) : null,
+    rerankReason: str(rr["fallback_reason"]),
+    rerankBackend: str(rr["backend"]),
+    rerankPool: num(rr["pool"]),
+    rerankBlocked: num(rr["blocked_inversions"]),
+    rerankMs: num(rr["latency_ms"]) ?? num(lat["rerank_channel"]),
+    contextChars: ctx.length || null,
+    contextBlocks: blocks || null,
+    contextCap: null,
+    totalMs: Math.round(clientLatencyS * 1000),
+  };
+}
+
+const dash = "—";
+const f4 = (v: number) => (Math.round(v * 1e4) / 1e4).toString();
+const nOr = (v: number | null) => (v == null ? dash : v.toLocaleString("en-US"));
+
+/** Build the final, measured step rows from parsed telemetry. */
+export function stepsFromTelemetry(t: RecallTelemetry): RecallStep[] {
+  const lls = t.llKeywords.length ? t.llKeywords.slice(0, 5).join(", ") : dash;
+  const kw =
+    `${t.mode ?? dash}${t.lightragMode ? ` · ${t.lightragMode}` : ""} · ll: ${lls}` +
+    (t.modeFallback ? ` · fallback: ${t.modeFallback}` : "");
+  const dense = `hits ${nOr(t.denseHits)} · top ${t.denseTop == null ? dash : f4(t.denseTop)}`;
+  const sparse = `indexed ${nOr(t.bm25Indexed)} · hits ${nOr(t.bm25Hits)}`;
+  const graph = `seeds ${nOr(t.graphSeeds)} · nodes ${nOr(t.graphNodes)} · edges ${nOr(t.graphEdges)}`;
+  const fusion =
+    `alpha ${t.alpha == null ? dash : t.alpha.toFixed(2)} · pool ${nOr(t.candidatePool)}`;
+  const rerank =
+    t.rerankApplied === false
+      ? `skipped${t.rerankReason ? ` · ${t.rerankReason}` : ""}${t.rerankPool == null ? "" : ` · pool ${t.rerankPool}`}`
+      : `${t.rerankApplied === true ? "applied" : dash}${t.rerankBackend ? ` · ${t.rerankBackend}` : ""}` +
+        ` · pool ${nOr(t.rerankPool)} · inversions ${nOr(t.rerankBlocked)}`;
+  const context =
+    `${nOr(t.contextChars)} chars · ${nOr(t.contextBlocks)} doc blocks` +
+    (t.contextCap == null ? "" : ` · cap ${nOr(t.contextCap)}`);
+  const total = t.totalMs == null ? dash : `${(t.totalMs / 1000).toFixed(2)} s`;
+
+  const steps: RecallStep[] = [
+    { id: "keywords", detail: kw, ms: null, status: "done", estimated: false },
+    { id: "dense", detail: dense, ms: t.denseMs, status: t.denseHits == null ? "skipped" : "done", estimated: false },
+    { id: "sparse", detail: sparse, ms: t.bm25Ms, status: t.bm25Hits == null ? "skipped" : "done", estimated: false },
+    { id: "graph", detail: graph, ms: null, status: t.graphNodes == null ? "skipped" : "done", estimated: false },
+    { id: "fusion", detail: fusion, ms: t.fusionMs, status: t.alpha == null ? "skipped" : "done", estimated: false },
+    {
+      id: "rerank",
+      detail: rerank,
+      ms: t.rerankMs,
+      status: t.rerankApplied === false ? "skipped" : t.rerankApplied == null ? "skipped" : "done",
+      estimated: false,
+    },
+    { id: "context", detail: context, ms: null, status: t.contextChars == null ? "skipped" : "done", estimated: false },
+    { id: "total", detail: total, ms: t.totalMs, status: "done", estimated: false },
+  ];
+  return steps;
+}
+
+// ===========================================================================
+// Live streaming trace (SSE stage frames) — preferred when available
+// ===========================================================================
+//
+// The memory service exposes a real-time trace endpoint
+// (GET <trace-host>/trace, default http://10.66.66.99:8098/trace). It emits one
+// SSE frame per pipeline stage IN REAL EXECUTION ORDER, then `result` (the full
+// recall JSON) and `done` (total_ms); `error` on failure. Each frame carries
+// trace_id/seq/t_ms. We probe `GET /healthz` once (cached); when it does not
+// answer `trace:true` we fall back to the one-shot recall + estimate→real flow.
+// Nothing here blocks: the probe has a short timeout and the stream has a
+// first-frame grace plus a per-gap inactivity timeout.
+
+export interface TraceEvent {
+  event: string;
+  data: Record<string, unknown>;
+}
+
+/** Same-origin dev proxy (see vite.config.ts: /api/trace -> <trace-host>). */
+export const TRACE_PROXY_PATH = "/api/trace";
+/** Direct fallback when no proxy exists (vite preview / static hosting). */
+declare const __MEMORY_TRACE_URL__: string;
+export const TRACE_DIRECT_URL =
+  typeof __MEMORY_TRACE_URL__ === "string" ? __MEMORY_TRACE_URL__ : "http://10.66.66.99:8098";
+
+function traceBases(): string[] {
+  return [TRACE_PROXY_PATH, TRACE_DIRECT_URL];
+}
+
+let traceSupport: boolean | null = null;
+
+/** Probe `GET /healthz` once (cached); the service reports `trace: true` there. */
+export async function probeTraceSupport(timeoutMs = 1500): Promise<boolean> {
+  if (traceSupport != null) return traceSupport;
+  for (const base of traceBases()) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const r = await fetch(`${base}/healthz`, { signal: ctrl.signal });
+      if (r.ok) {
+        const j = (await r.json()) as { trace?: boolean };
+        if (j.trace === true) {
+          traceSupport = true;
+          return true;
+        }
+      }
+    } catch {
+      /* try the next base */
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  traceSupport = false;
+  return false;
+}
+
+function parseSseFrame(raw: string): TraceEvent | null {
+  let event = "message";
+  const dataLines: string[] = [];
+  for (const line of raw.split("\n")) {
+    if (line.startsWith(":")) continue; // keep-alive comment
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+  }
+  if (!dataLines.length) return null;
+  const body = dataLines.join("\n");
+  if (body === "[DONE]") return null;
+  try {
+    return { event, data: JSON.parse(body) as Record<string, unknown> };
+  } catch {
+    return null;
+  }
+}
+
+/** Some transports wrap the final recall in the MCP tool envelope. */
+function normalizeTraceResult(data: Record<string, unknown>): Record<string, unknown> | null {
+  if ("hybrid" in data || "context" in data) return data;
+  const res = data["result"] as { content?: { text?: string }[] } | undefined;
+  const text = res?.content?.[0]?.text;
+  if (typeof text === "string") {
+    try {
+      return JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Stream a recall trace. Returns the final `memory_recall` JSON when the
+ * endpoint yields one; `null` when the endpoint is absent/incomplete so the
+ * caller falls back to the one-shot path. Stage frames are pushed to
+ * `onEvent` as they arrive. Aborts only on the caller's signal (or timeout).
+ */
+export async function streamRecallTrace(
+  question: string,
+  onEvent: (ev: TraceEvent) => void,
+  opts: { signal?: AbortSignal; firstFrameMs?: number; gapMs?: number; timeoutMs?: number } = {},
+): Promise<Record<string, unknown> | null> {
+  const firstFrameMs = opts.firstFrameMs ?? 5000;
+  const gapMs = opts.gapMs ?? 20000;
+  const timeoutMs = opts.timeoutMs ?? LIVE_TIMEOUT_MS;
+  const q = encodeURIComponent(question.trim());
+  const kws = keywordsFor(question);
+  const query =
+    `question=${q}&context_only=true&mode=hybrid&top_k=10` +
+    `&ll_keywords=${encodeURIComponent(kws.join(","))}` +
+    `&hl_keywords=${encodeURIComponent(kws.slice(0, 3).join(","))}`;
+  for (const base of traceBases()) {
+    const ctrl = new AbortController();
+    const forward = () => ctrl.abort(opts.signal?.reason as Error | undefined);
+    if (opts.signal) {
+      if (opts.signal.aborted) throw opts.signal.reason ?? new DOMException("cancelled", "AbortError");
+      opts.signal.addEventListener("abort", forward, { once: true });
+    }
+    try {
+      const r = await fetch(`${base}/trace?${query}`, {
+        headers: { Accept: "text/event-stream" },
+        signal: ctrl.signal,
+      });
+      if (!r.ok || !r.body) continue;
+      const reader = r.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      let sawFrame = false;
+      let result: Record<string, unknown> | null = null;
+      const overall = setTimeout(() => ctrl.abort(new DOMException(`trace timed out after ${timeoutMs / 1000}s`, "AbortError")), timeoutMs);
+      let gap = setTimeout(() => ctrl.abort(new DOMException("trace stalled", "AbortError")), firstFrameMs);
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          let idx: number;
+          while ((idx = buf.indexOf("\n\n")) >= 0) {
+            const ev = parseSseFrame(buf.slice(0, idx));
+            buf = buf.slice(idx + 2);
+            if (!ev) continue;
+            sawFrame = true;
+            clearTimeout(gap);
+            gap = setTimeout(() => ctrl.abort(new DOMException("trace stalled", "AbortError")), gapMs);
+            if (ev.event === "result") result = normalizeTraceResult(ev.data);
+            onEvent(ev);
+          }
+        }
+      } finally {
+        clearTimeout(overall);
+        clearTimeout(gap);
+      }
+      if (result) return result;
+      if (sawFrame) return null; // streamed stages but no final result -> one-shot
+    } catch (e) {
+      if (opts.signal?.aborted) throw opts.signal.reason ?? e;
+    } finally {
+      opts.signal?.removeEventListener("abort", forward);
+    }
+  }
+  return null;
+}
+
+/** Real execution order of the stage events: the row to spin next. */
+const NEXT_AFTER: Record<string, StepId> = {
+  trace_start: "sparse", // bm25 runs first
+  bm25_hits: "dense", // then the vector channel
+  vector_hits: "fusion",
+  fusion: "rerank",
+  rerank: "graph", // graph expansion runs after the reranker
+  graph_expand: "context",
+  context: "total",
+};
+
+/** Move the spinner to the stage that is actually running next. */
+function markNext(steps: RecallStep[], id: StepId | undefined): RecallStep[] {
+  if (!id) return steps;
+  return steps
+    .map((r) =>
+      r.status === "active" ? { ...r, status: "pending" as StepStatus, ms: null, estimated: true } : r,
+    )
+    .map((r) =>
+      r.id === id && r.status === "pending"
+        ? { ...r, status: "active" as StepStatus, estimated: false, ms: null }
+        : r,
+    );
+}
+
+/**
+ * Fold one SSE stage frame into the step list, replacing the estimate for that
+ * row with the real payload values. Row order is pedagogical (dense → sparse →
+ * graph → fusion → rerank → context) while the events arrive in execution order
+ * (bm25 → vector → fusion → rerank → graph); the spinner follows execution.
+ * A row's time is only ever the `latency_ms` (or `total_ms` for done) actually
+ * received — never inherited from the estimate. Unknown frames are no-ops.
+ */
+export function applyTraceEvent(steps: RecallStep[], ev: TraceEvent): RecallStep[] {
+  const d = ev.data ?? {};
+  const patch = (id: StepId, fn: (r: RecallStep) => RecallStep): RecallStep[] =>
+    steps.map((r) => (r.id === id ? fn({ ...r, estimated: false }) : r));
+  let out: RecallStep[];
+
+  switch (ev.event) {
+    case "trace_start": {
+      const ll = Array.isArray(d["ll_keywords"])
+        ? (d["ll_keywords"] as unknown[]).map(String).filter(Boolean)
+        : [];
+      const kws = ll.length ? ll.slice(0, 5).join(", ") : dash;
+      const fallback = str(d["mode_fallback"]);
+      out = patch("keywords", (r) => ({
+        ...r,
+        status: "done",
+        // the stream exposes no separate keywords/embedding timer
+        ms: num(d["latency_ms"]),
+        detail:
+          `${str(d["mode"]) ?? dash}${str(d["lightrag_mode"]) ? ` · ${str(d["lightrag_mode"])}` : ""} · ll: ${kws}` +
+          `${num(d["top_k"]) != null ? ` · top_k ${num(d["top_k"])}` : ""}` +
+          `${fallback ? ` · fallback: ${fallback}` : ""}`,
+      }));
+      break;
+    }
+    case "vector_hits": {
+      const hits = Array.isArray(d["hits"]) ? (d["hits"] as Record<string, unknown>[]) : [];
+      const top = hits.reduce((m, x) => Math.max(m, num(x["dense_score"]) ?? 0), 0);
+      out = patch("dense", (r) => ({
+        ...r,
+        status: "done",
+        ms: num(d["latency_ms"]),
+        detail: `hits ${hits.length} · top ${f4(top)}`,
+      }));
+      break;
+    }
+    case "bm25_hits": {
+      const hits = Array.isArray(d["hits"]) ? (d["hits"] as Record<string, unknown>[]) : [];
+      out = patch("sparse", (r) => ({
+        ...r,
+        status: "done",
+        ms: num(d["latency_ms"]),
+        detail: `indexed ${nOr(num(d["chunks_indexed"]))} · hits ${hits.length}`,
+      }));
+      break;
+    }
+    case "graph_expand": {
+      // entities/relations are DERIVED from the rendered context string; mark it.
+      const derived = str(d["derived_from"]) === "context_string";
+      out = patch("graph", (r) => ({
+        ...r,
+        status: "done",
+        ms: num(d["latency_ms"]),
+        detail:
+          `entities ${nOr(num(d["entity_count"]))} · rels ${nOr(num(d["relation_count"]))} · ` +
+          `edges ${nOr(num(d["traversed_edge_count"]))}${derived ? " · ctx-parsed" : ""}`,
+      }));
+      break;
+    }
+    case "fusion":
+      out = patch("fusion", (r) => ({
+        ...r,
+        status: "done",
+        ms: num(d["latency_ms"]),
+        detail:
+          `alpha ${num(d["alpha"]) == null ? dash : num(d["alpha"])!.toFixed(2)}` +
+          ` · pool ${nOr(num(d["candidate_pool_size"]))} · fused ${nOr(num(d["pool_size"]))}`,
+      }));
+      break;
+    case "rerank": {
+      const applied = d["applied"] === true;
+      const reason = str(d["fallback_reason"]);
+      out = patch("rerank", (r) => ({
+        ...r,
+        status: applied ? "done" : "skipped",
+        // never show a time the payload omitted (skipped rerank -> null)
+        ms: applied ? num(d["latency_ms"]) : null,
+        detail: applied
+          ? `applied${str(d["backend"]) ? ` · ${str(d["backend"])}` : ""} · pool ${nOr(num(d["pool"]))} · inversions ${nOr(num(d["blocked_inversions"]))}`
+          : `skipped${reason ? ` · ${reason}` : ""} · pool ${nOr(num(d["pool"]))}`,
+      }));
+      break;
+    }
+    case "context": {
+      const caps = (d["caps"] ?? {}) as Record<string, unknown>;
+      const budget = num(caps["max_chars"]);
+      const has = d["has_context"] !== false;
+      out = patch("context", (r) => ({
+        ...r,
+        status: has ? "done" : "skipped",
+        ms: num(d["latency_ms"]),
+        detail:
+          `chars ${nOr(num(d["chars"]))}${budget != null ? ` / ${nOr(budget)}` : ""} · ` +
+          `${nOr(num(d["source_count"]))} doc blocks`,
+      }));
+      break;
+    }
+    case "done":
+      out = patch("total", (r) => ({
+        ...r,
+        status: "done",
+        ms: num(d["total_ms"]),
+        detail: num(d["total_ms"]) == null ? r.detail : `${(num(d["total_ms"])! / 1000).toFixed(2)} s`,
+      })).map((r) => (r.status === "active" ? { ...r, status: "pending" as StepStatus, ms: null, estimated: true } : r));
+      break;
+    case "error": {
+      const msg = str(d["error"]) ?? str(d["hint"]) ?? "trace error";
+      const kind = str(d["error_type"]);
+      return markStepsError(steps, kind ? `${kind}: ${msg}` : msg);
+    }
+    default:
+      return steps;
+  }
+  return markNext(out, NEXT_AFTER[ev.event]);
+}
+
+
+

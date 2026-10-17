@@ -12,7 +12,7 @@ import type { AnyCosmos } from "./lib/cosmos2d";
 import { asJourney3D } from "./lib/cosmos3d";
 import { compileLiveTrace } from "./lib/compileLive";
 import { loadChunkCoords, loadEntityCoords, loadGraph, loadManifest, loadNodeIndex } from "./lib/data";
-import { memoryRecallLive } from "./lib/live";
+import { memoryRecallLive, keywordsFor, estimateSteps, emptySteps, markStepsError, parseRecallTelemetry, stepsFromTelemetry, probeTraceSupport, streamRecallTrace, applyTraceEvent, BRIDGE_PROXY_PATH, type RecallStep } from "./lib/live";
 import type { CosmosGraph, TraceManifestEntry, TravelTrace } from "./lib/types";
 import { useI18n } from "./i18n/useI18n";
 
@@ -59,16 +59,24 @@ export default function App() {
   const [askNote, setAskNote] = useState<string | null>(null);
   const [elapsedS, setElapsedS] = useState(0);
   const [history, setHistory] = useState<HistoryEntry[]>(loadHistory);
+  const [steps, setSteps] = useState<RecallStep[]>(emptySteps);
   const [about, setAbout] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const startedAtRef = useRef(0);
+  /** Lock for the in-flight step ESTIMATOR: true once streaming frames arrive
+   *  or the recall has finished/errored, so the ticker can't overwrite measured
+   *  rows with estimates in the completion race. */
+  const tracingRef = useRef(false);
 
-  // elapsed-seconds ticker for the honest phase hints while a recall runs
+  // elapsed-seconds ticker for the honest phase hints while a recall runs;
+  // also drives the in-flight step estimate (spinner + ticking per row).
   useEffect(() => {
     if (!asking) return;
     setElapsedS(0);
     const id = window.setInterval(() => {
-      setElapsedS((performance.now() - startedAtRef.current) / 1000);
+      const ms = performance.now() - startedAtRef.current;
+      setElapsedS(ms / 1000);
+      if (!tracingRef.current) setSteps(estimateSteps(ms));
     }, 100);
     return () => window.clearInterval(id);
   }, [asking]);
@@ -172,12 +180,42 @@ export default function App() {
       const ctrl = new AbortController();
       abortRef.current = ctrl;
       startedAtRef.current = performance.now();
+      tracingRef.current = false;
+      setSteps(emptySteps());
       setAsking(true);
       setAskError(null);
       setAskNote(null);
       try {
         const t0 = performance.now();
-        const { result, clientLatencyS, endpoint } = await memoryRecallLive(question, { signal: ctrl.signal });
+        const kws = keywordsFor(question);
+        // Optional streaming trace (docs/trace-api.md): probe once, consume SSE
+        // stage frames when present, otherwise fall back to the one-shot recall.
+        // Never blocks — short probe timeout + first-frame grace.
+        let result: Record<string, unknown> | null = null;
+        let clientLatencyS = 0;
+        let endpoint = BRIDGE_PROXY_PATH;
+        if (await probeTraceSupport()) {
+          try {
+            result = await streamRecallTrace(
+              question,
+              (ev) => {
+                tracingRef.current = true;
+                setSteps((prev) => applyTraceEvent(prev, ev));
+              },
+              { signal: ctrl.signal },
+            );
+            if (result) clientLatencyS = (performance.now() - t0) / 1000;
+          } catch (e) {
+            if (e instanceof DOMException && e.name === "AbortError") throw e;
+            result = null; // any stream error -> one-shot fallback
+          }
+        }
+        if (!result) {
+          const one = await memoryRecallLive(question, { signal: ctrl.signal });
+          result = one.result;
+          clientLatencyS = one.clientLatencyS;
+          endpoint = one.endpoint;
+        }
         const idxOf = new Map(names.map((n, i) => [n, i] as const));
         const entityXy = new Map<string, [number, number]>();
         const entityXyz = new Map<string, XYZ>();
@@ -196,6 +234,22 @@ export default function App() {
           chunkXyz,
         });
         setLiveTrace(trace);
+        // measured per-stage rows (graph counts come from the compiled subgraph)
+        tracingRef.current = true; // stop the estimator before it can race
+        const measured = stepsFromTelemetry(
+          parseRecallTelemetry(result, clientLatencyS, kws, {
+            seeds: trace.graph.nodes.filter((n) => n.seed).length,
+            nodes: trace.graph.nodes.length,
+            edges: trace.graph.edges.length,
+          }),
+        );
+        // keep rows the stream already filled with real per-stage values; fill
+        // any row the stream did not reach from the response telemetry.
+        setSteps((prev) =>
+          prev.length === measured.length
+            ? prev.map((r, i) => (r.estimated || r.status === "pending" || r.status === "active" ? measured[i] : r))
+            : measured,
+        );
         setTab("travel");
         const hits = trace.graph.nodes.filter((n) => n.seed).map((n) => n.i);
         const tookS = (performance.now() - t0) / 1000;
@@ -221,10 +275,14 @@ export default function App() {
           setAskNote(`live answer in Travel (${tookS.toFixed(1)}s); no graph hits to highlight`);
         }
       } catch (e) {
+        tracingRef.current = true; // lock the estimator: keep the error state
         if (e instanceof DOMException && e.name === "AbortError") {
           setAskError("live recall cancelled — fixtures still playable below.");
+          setSteps((prev) => markStepsError(prev, "cancelled"));
         } else {
-          setAskError(e instanceof Error ? e.message : String(e));
+          const msg = e instanceof Error ? e.message : String(e);
+          setAskError(msg);
+          setSteps((prev) => markStepsError(prev, msg));
         }
       } finally {
         abortRef.current = null;
@@ -274,6 +332,7 @@ export default function App() {
             ready={liveReady}
             elapsedS={elapsedS}
             history={history}
+            steps={steps}
             onAsk={askLive}
             onCancel={cancelAsk}
             onPickHistory={askLive}

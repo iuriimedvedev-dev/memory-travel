@@ -1,0 +1,131 @@
+/* Live Query UX — owned by the live-query agent.
+ *
+ * Two concerns, both scoped to files that agent owns:
+ *  1. the query-bar width rule (50% above 560px, full width below), and
+ *  2. the per-stage pipeline list rendered under the query input.
+ *
+ * index.css is imported first (see main.tsx); this sheet is imported after it,
+ * so these equal-specificity rules win — including over index.css's own
+ * responsive `.querybar { left: … }` media queries.
+ */
+
+/* ---- 1. query bar width -------------------------------------------------
+ * Centred horizontally, top-aligned. Full width by default; capped at half the
+ * viewport once it is wider than 560px. The step list lives inside .querybar,
+ * so it follows the exact same width and stays aligned. */
+.querybar {
+  left: 0;
+  right: 0;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+@media (min-width: 560px) {
+  .querybar { width: 50%; }
+}
+
+/* ---- 2. pipeline step list --------------------------------------------- */
+.qsteps {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+}
+.qsteps-head {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--dim);
+  font-size: 10.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.qsteps-head:hover { color: var(--accent); }
+.qsteps-est {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--gold);
+  font-size: 10px;
+}
+.qchev { transition: transform 0.15s ease; }
+.qchev.open { transform: rotate(90deg); }
+
+.qstep-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 172px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.qstep {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  line-height: 1.6;
+  padding: 0 2px;
+}
+.qstep-ico {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--dim);
+}
+.qstep-num {
+  flex: none;
+  width: 13px;
+  text-align: right;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+}
+.qstep-name {
+  flex: none;
+  min-width: 118px;
+  color: var(--ink);
+}
+.qstep-detail {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dim);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10.5px;
+}
+.qstep-ms {
+  flex: none;
+  min-width: 60px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  color: var(--ink);
+}
+
+/* row states */
+.qstep-pending { opacity: 0.45; }
+.qstep-active .qstep-name, .qstep-active .qstep-ms { color: var(--accent); }
+.qstep-done .qstep-ico { color: var(--accent); }
+.qstep-skipped { opacity: 0.55; }
+.qstep-error .qstep-ico, .qstep-error .qstep-name { color: #ff9d9d; }
+.qstep-error .qstep-detail { color: #ff9d9d; }
+/* estimated rows (in flight) read as provisional */
+.qstep-est .qstep-ms { color: var(--dim); }
+.qstep-est.qstep-done .qstep-ico { opacity: 0.6; }
+
+.qspin { animation: qspin 0.9s linear infinite; transform-origin: 50% 50%; }
+@keyframes qspin { to { transform: rotate(360deg); } }
