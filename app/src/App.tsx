@@ -6,13 +6,13 @@ import ErrorOverlay from "./components/ErrorOverlay";
 import QueryBar, { type HistoryEntry } from "./components/QueryBar";
 import TravelView from "./components/TravelView";
 import { SparkIcon, XIcon } from "./components/icons";
-import { INK, toWorld, type RGBA } from "./lib/cosmos";
+import { INK, toWorld3, type RGBA, type XYZ } from "./lib/cosmos";
 import type { AnyCosmos } from "./lib/cosmos2d";
+import { asJourney3D } from "./lib/cosmos3d";
 import { compileLiveTrace } from "./lib/compileLive";
 import { loadChunkCoords, loadEntityCoords, loadGraph, loadManifest, loadNodeIndex } from "./lib/data";
 import { memoryRecallLive } from "./lib/live";
 import type { CosmosGraph, TraceManifestEntry, TravelTrace } from "./lib/types";
-import { SWIFTSHADER_HINT } from "./lib/webgpu";
 
 const HISTORY_KEY = "mt.history.v1";
 const HISTORY_MAX = 8;
@@ -45,8 +45,8 @@ export default function App() {
   const [canvasError, setCanvasError] = useState<string | null>(null);
   const [renderMode, setRenderMode] = useState<string | null>(null);
   const [modeDismissed, setModeDismissed] = useState(false);
-  const [xyByIdx, setXyByIdx] = useState<([number, number] | null)[] | null>(null);
-  const [chunkXy, setChunkXy] = useState<Record<string, [number, number]>>({});
+  const [posByIdx, setPosByIdx] = useState<(XYZ | null)[] | null>(null);
+  const [chunkXyz, setChunkXyz] = useState<Record<string, [number, number, number]>>({});
 
   // Live Q&A state (one box above both views).
   const [liveTrace, setLiveTrace] = useState<TravelTrace | null>(null);
@@ -72,21 +72,30 @@ export default function App() {
   useEffect(() => {
     let dead = false;
     Promise.all([loadGraph(), loadNodeIndex(), loadEntityCoords(), loadChunkCoords(), loadManifest()])
-      .then(([g, idx, coords, cxy, man]) => {
+      .then(([g, idx, coords, cxyz, man]) => {
         if (dead) return;
         setGraph(g);
         setNames(idx);
         setManifest(man);
-        setChunkXy(cxy);
-        const m = new Map<string, [number, number]>();
-        coords.ids.forEach((id, i) => m.set(id, coords.xy[i]));
+        setChunkXyz(cxyz);
+        // xyz preferred; old coord files (xy only) flatten to z=0
+        const m = new Map<string, XYZ>();
+        coords.ids.forEach((id, i) => {
+          const v = coords.xyz?.[i];
+          if (v) m.set(id, v);
+          else {
+            const xy = coords.xy[i];
+            if (xy) m.set(id, [xy[0], xy[1], 0]);
+          }
+        });
         let hit = 0;
         const aligned = g.nodes.map((n) => {
-          const xy = m.get(n.id) ?? null;
-          if (xy) hit++;
-          return xy;
+          const v = m.get(n.id) ?? null;
+          if (v) hit++;
+          // raw UMAP [-1,1] -> world units (shared mapping with markers)
+          return v ? toWorld3(v) : null;
         });
-        setXyByIdx(aligned);
+        setPosByIdx(aligned);
         setProgress((p) => (g ? `${p} coord coverage ${(100 * hit / g.nodes.length).toFixed(1)}%` : p));
       })
       .catch((e: unknown) => {
@@ -102,11 +111,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!cosmosFull || !graph || !xyByIdx) return;
+    if (!cosmosFull || !graph || !posByIdx) return;
     let dead = false;
     setProgress("lighting up 47k stars…");
     cosmosFull
-      .load(graph, xyByIdx, (done, total) => {
+      .load(graph, posByIdx, (done, total) => {
         if (!dead) setProgress(`lighting up 47k stars… ${((done / total) * 100).toFixed(0)}%`);
       })
       .then(() => !dead && setProgress(null))
@@ -119,17 +128,24 @@ export default function App() {
     return () => {
       dead = true;
     };
-  }, [cosmosFull, graph, xyByIdx]);
+  }, [cosmosFull, graph, posByIdx]);
 
   const focusNode = useCallback(
     (idx: number) => {
-      if (!cosmosFull || !xyByIdx) return;
-      const xy = xyByIdx[idx];
-      if (!xy) return;
-      const [x, y] = toWorld(xy);
-      cosmosFull.flyTo(x, y, cosmosFull.currentZoom() * 3.2, 1400);
+      if (!cosmosFull || !posByIdx) return;
+      const p = posByIdx[idx];
+      if (!p) return;
+      const j = asJourney3D(cosmosFull);
+      if (j) {
+        // posByIdx already holds WORLD coords (toWorld3 applied at load);
+        // focus = target tweens onto the node, camera ends 28 units away.
+        j.flyToNode(p, 28, 850);
+      } else {
+        // 2D fallback: z doesn't exist there, plain eased zoom.
+        cosmosFull.flyTo(p[0], p[1], cosmosFull.currentZoom() * 3.2, 1400);
+      }
     },
-    [cosmosFull, xyByIdx],
+    [cosmosFull, posByIdx],
   );
 
   const onCanvasError = useCallback((e: Error) => {
@@ -141,11 +157,11 @@ export default function App() {
   }, []);
 
   // ---- live question: recall -> compile (same path as fixtures) -> play + highlight
-  const liveReady = graph !== null && names !== null && xyByIdx !== null;
+  const liveReady = graph !== null && names !== null && posByIdx !== null;
 
   const askLive = useCallback(
     async (question: string) => {
-      if (!graph || !names || !xyByIdx) return;
+      if (!graph || !names || !posByIdx) return;
       abortRef.current?.abort();
       const ctrl = new AbortController();
       abortRef.current = ctrl;
@@ -158,15 +174,20 @@ export default function App() {
         const { result, clientLatencyS, endpoint } = await memoryRecallLive(question, { signal: ctrl.signal });
         const idxOf = new Map(names.map((n, i) => [n, i] as const));
         const entityXy = new Map<string, [number, number]>();
+        const entityXyz = new Map<string, XYZ>();
         graph.nodes.forEach((n, i) => {
-          const xy = xyByIdx[i];
-          if (xy) entityXy.set(n.id, xy);
+          const v = posByIdx[i];
+          if (v) {
+            entityXyz.set(n.id, v);
+            entityXy.set(n.id, [v[0], v[1]]);
+          }
         });
         const trace = compileLiveTrace(question, result, clientLatencyS, {
           graph,
           idxOf,
           entityXy,
-          chunkXy,
+          entityXyz,
+          chunkXyz,
         });
         setLiveTrace(trace);
         setTab("travel");
@@ -204,7 +225,7 @@ export default function App() {
         setAsking(false);
       }
     },
-    [graph, names, xyByIdx, chunkXy, cosmosFull, focusNode],
+    [graph, names, posByIdx, chunkXyz, cosmosFull, focusNode],
   );
 
   const cancelAsk = useCallback(() => {
@@ -273,15 +294,15 @@ export default function App() {
       {!dataError && canvasError && (
         <ErrorOverlay
           title="Canvas initialisation failed"
-          body="Neither the WebGPU renderer nor the Canvas2D fallback could start — this browser cannot provide any 2D canvas. The text panels stay readable. (On any browser from the last decade this path should be unreachable.)"
+          body="Neither the WebGL2 renderer nor the Canvas2D fallback could start — this browser cannot provide any GPU canvas at all. The text panels stay readable. (On any browser from the last decade this path should be unreachable.)"
           detail={canvasError}
         />
       )}
       {!dataError && !canvasError && renderMode === "canvas2d" && !modeDismissed && (
         <div className={`modebadge ${tab === "travel" ? "raised" : ""}`} role="status">
           <span>
-            <b>canvas2d fallback</b> — no WebGPU in this browser; same data, same journey
-            ({SWIFTSHADER_HINT})
+            <b>canvas2d fallback</b> — no WebGL2 in this browser, so the 3D starfield can't run;
+            same data, same journey, flat projection.
           </span>
           <button className="ghostbtn" onClick={() => setModeDismissed(true)} title="dismiss">
             <XIcon size={11} />

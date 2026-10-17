@@ -154,7 +154,7 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
           </>
         )}
         <i>·</i>
-        <span className="hudmode">{mode === "webgpu" ? "webgpu" : "canvas2d"}</span>
+        <span className="hudmode">{mode === "webgl2" ? "webgl2 · 3d" : "canvas2d"}</span>
       </div>
 
       {/* hover tooltip follows the cursor over the canvas */}
@@ -172,8 +172,8 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
         <h1>Memory Cosmos</h1>
         <p className="sub">
           The live HARS knowledge graph — {graph ? graph.nodes.length.toLocaleString("en-US") : "…"} entities,{" "}
-          {graph ? graph.edges.length.toLocaleString("en-US") : "…"} relations, laid out by meaning (UMAP over stored
-          768-dim vectors). Not a mock: this is the production index.
+          {graph ? graph.edges.length.toLocaleString("en-US") : "…"} relations, laid out by meaning (3D UMAP over stored
+          768-dim vectors — a true starfield you can orbit). Not a mock: this is the production index.
         </p>
         {loading && <p className="loading">{loading}</p>}
 
@@ -287,7 +287,7 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
             <SparkIcon size={12} /> take the tour — one query’s journey
           </button>
         </div>
-        <p className="hint">drag to pan · scroll to zoom · click a star for details</p>
+        <p className="hint">drag to orbit · scroll to zoom · right-drag to pan · click a star for details</p>
         <SelectBridge select={select} setHover={setHover} cosmos={cosmos} graph={graph} />
       </div>
     </>

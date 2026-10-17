@@ -7,18 +7,21 @@
 // functions, so a colour in the legend is the colour on the canvas.
 
 export const FAMILY_COLORS: Record<string, string> = {
-  docs: "#4f8ef7", // documents, specs
-  knowledge: "#8a7bef", // concepts, findings, decisions, hypotheses
-  engineering: "#38c8d8", // components, tools, encoders, agents
-  models: "#d95fa8", // models, backbones, adapters
-  data: "#2fbf9f", // datasets, artifacts, checkpoints, content
-  work: "#d9a441", // tasks, plans, pipelines, job runs
-  results: "#58c470", // metrics, reports, analyses, tests
-  experiments: "#e08a4a", // experiments
-  config: "#a8c85f", // configs, architecture, programs
-  people: "#e06a6a", // people, organizations, locations
-  events: "#6a7fe0", // events
-  other: "#7d8fb3", // everything else (incl. UNKNOWN)
+  // Desaturated deep tones (hsl sat 0.22–0.48, L≈0.60–0.70): the WebGL2
+  // starfield draws with AdditiveBlending, which brightens overlaps
+  // naturally — vivid bases turned the old map into eye-searing neon.
+  docs: "#86a4d5", // documents, specs
+  knowledge: "#a292d3", // concepts, findings, decisions, hypotheses
+  engineering: "#72c1ca", // components, tools, encoders, agents
+  models: "#cb86a8", // models, backbones, adapters
+  data: "#74be86", // datasets, artifacts, checkpoints, content
+  work: "#cfaf77", // tasks, plans, pipelines, job runs
+  results: "#7fbd8c", // metrics, reports, analyses, tests
+  experiments: "#ca7f68", // experiments
+  config: "#b2c384", // configs, architecture, programs
+  people: "#cd8484", // people, organizations, locations
+  events: "#8d95ce", // events
+  other: "#899ab4", // everything else (incl. UNKNOWN)
 };
 
 /** type string -> family key. Explicit for all 44 types seen in the index. */

@@ -4,12 +4,15 @@ Inputs (read-only): vdb_entities.json / vdb_chunks.json matrices (base64
 float32, 768-dim) + node_index.json (entity order from export_graph.py).
 
 Outputs (into ../public/data/):
-  coords_entities.json  {ids:[...], xy:[[x,y]...]}  (47k, UMAP cosine)
-  coords_chunks.json    {chunk_id: [x,y]}           (2.8k, same fit space? no:
-                         separate fit over chunk vectors)
+  coords_entities.json  {ids:[...], xy:[[x,y]...], xyz:[[x,y,z]...]}  (47k, UMAP cosine)
+  coords_chunks.json    {chunk_id: [x,y,z]}                           (2.8k, separate fit)
+
+3D (n_components=3) since the cosmos is now a THREE.js starfield; `xy` is
+kept as the first two dims for backward compat with old traces that baked
+2D positions. Per-axis normalised to [-1,1]; the client flattens z slightly.
 
 Entity order MUST match vdb `data` order intersected with node_index.json;
-we emit ids + xy so the client joins by id (robust to order drift).
+we emit ids + coords so the client joins by id (robust to order drift).
 UMAP params fixed + random_state=42 for reproducibility.
 
 CPU-only (no GPU jobs on this box). ~minutes for 47k points.
@@ -34,11 +37,11 @@ def load_matrix(name):
     return d["data"], arr
 
 
-def fit_umap(X, seed=42):
+def fit_umap(X, seed=42, dim=3):
     import umap
 
     reducer = umap.UMAP(
-        n_neighbors=15, min_dist=0.35, metric="cosine", random_state=seed
+        n_neighbors=15, min_dist=0.35, n_components=dim, metric="cosine", random_state=seed
     )
     return reducer.fit_transform(X)
 
@@ -56,13 +59,18 @@ def main():
     print("loading entity vectors...", flush=True)
     edata, X = load_matrix("vdb_entities.json")
     print("entities:", X.shape, flush=True)
-    print("fitting UMAP (entities)...", flush=True)
-    Xe = norm(fit_umap(X))
+    print("fitting UMAP 3D (entities)...", flush=True)
+    Xe = norm(fit_umap(X, seed=42, dim=3))
     eids = [r.get("__id__") for r in edata]
     # vdb entity ids are ent-... hashes, NOT graphml names. Join key instead:
     # data[].entity_name <-> graphml entity_id. Emit name-keyed coords.
     names = [r.get("entity_name", "") for r in edata]
-    out = {"ids": names, "xy": [[round(float(a), 4), round(float(b), 4)] for a, b in Xe]}
+    xyz = [[round(float(a), 4) for a in row] for row in Xe]
+    out = {
+        "ids": names,
+        "xy": [[row[0], row[1]] for row in xyz],  # first two dims: old-trace compat
+        "xyz": xyz,
+    }
     with open(DATADIR / "coords_entities.json", "w") as f:
         json.dump(out, f, separators=(",", ":"))
     print("wrote coords_entities.json", flush=True)
@@ -70,12 +78,12 @@ def main():
     print("loading chunk vectors...", flush=True)
     cdata, C = load_matrix("vdb_chunks.json")
     print("chunks:", C.shape, flush=True)
-    print("fitting UMAP (chunks)...", flush=True)
-    Xc = norm(fit_umap(C, seed=43))
+    print("fitting UMAP 3D (chunks)...", flush=True)
+    Xc = norm(fit_umap(C, seed=43, dim=3))
     cids = [r.get("__id__", "") for r in cdata]
     outc = {
-        cid: [round(float(a), 4), round(float(b), 4)]
-        for cid, (a, b) in zip(cids, Xc)
+        cid: [round(float(a), 4) for a in row]
+        for cid, row in zip(cids, Xc)
     }
     with open(DATADIR / "coords_chunks.json", "w") as f:
         json.dump(outc, f, separators=(",", ":"))

@@ -1,10 +1,11 @@
-// Canvas2D fallback for Memory Travel — API-compatible with Cosmos (lib/cosmos.ts).
+// Canvas2D fallback for Memory Travel — API-compatible with Cosmos3D.
 //
-// Auto-switch rule (see components/CosmosCanvas.tsx): the app tries WebGPU
-// first; when navigator.gpu is missing or GraphGPU init fails, it constructs
-// this class on the SAME canvas instead. Travellers of the Cosmos/Cosmos2D
-// union only touch the shared surface below, so Travel/Cosmos views work
-// unchanged on either path.
+// Auto-switch rule (see components/CosmosCanvas.tsx): the app tries the
+// WebGL2/Three.js starfield first; when WebGL2 is missing or init fails, it
+// constructs this class on the SAME canvas instead. Travellers of the
+// Cosmos3D/Cosmos2D union only touch the shared surface below, so
+// Travel/Cosmos views work unchanged on either path. Positions arrive as
+// 3D (XYZ); the 2D plane simply drops z.
 //
 // Performance principles (this is what keeps 47k nodes interactive in 2D):
 // - Static frames only: every state change sets a dirty flag; one rAF
@@ -16,8 +17,8 @@
 //   edge count is large, edges are skipped and repainted ~150ms after the
 //   gesture ends.
 // - DPR-aware backing store; pan/zoom/click-select with mouse reusing the
-//   same world mapping as the WebGPU path (toWorld / WORLD_SCALE in cosmos.ts).
-import { WORLD_SCALE, toWorld, type RGBA, type SelectedNode } from "./cosmos";
+//   same world mapping as the 3D path (toWorld / WORLD_SCALE in cosmos.ts).
+import { WORLD_SCALE, type CosmosLike, type RGBA, type SelectedNode, type XYZ } from "./cosmos";
 import { colorForType, familyOf } from "./palette";
 import type { CosmosGraph } from "./types";
 
@@ -41,7 +42,7 @@ const NODE_K = 0.06;
 /** Above this many edges, skip edges while a pan/zoom gesture is active. */
 const EDGE_INTERACTION_CUTOFF = 5000;
 
-export class Cosmos2D {
+export class Cosmos2D implements CosmosLike {
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
   private ro: ResizeObserver | null = null;
@@ -114,10 +115,10 @@ export class Cosmos2D {
     this.requestDraw();
   }
 
-  /** Load the graph at UMAP positions. Same signature as Cosmos.load. */
+  /** Load the graph at 3D positions, flattened to the 2D plane (z dropped). */
   async load(
     graph: CosmosGraph,
-    xyByIdx: ([number, number] | null)[],
+    posByIdx: (XYZ | null)[],
     onProgress?: (done: number, total: number) => void,
   ): Promise<void> {
     if (!this.canvas) throw new Error("cosmos2d not initialised");
@@ -131,8 +132,10 @@ export class Cosmos2D {
     this.names = graph.nodes.map((nd) => nd.id);
     for (let i = 0; i < n; i++) {
       const nd = graph.nodes[i];
-      const xy = xyByIdx[i];
-      const [x, y] = xy ? toWorld(xy) : [(Math.random() - 0.5) * WORLD_SCALE, (Math.random() - 0.5) * WORLD_SCALE];
+      const p = posByIdx[i];
+      const [x, y] = p
+        ? [p[0], p[1]]
+        : [(Math.random() - 0.5) * WORLD_SCALE, (Math.random() - 0.5) * WORLD_SCALE];
       this.wx[i] = x;
       this.wy[i] = y;
       const size = 3.2 + Math.min(9, Math.sqrt(nd.deg) * 1.6);
@@ -532,5 +535,5 @@ export class Cosmos2D {
   }
 }
 
-/** Either renderer. Structural union — both expose the same surface. */
-export type AnyCosmos = import("./cosmos").Cosmos | Cosmos2D;
+/** Either renderer. Structural union — both expose the same shared surface. */
+export type AnyCosmos = import("./cosmos3d").Cosmos3D | Cosmos2D;

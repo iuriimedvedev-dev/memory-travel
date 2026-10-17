@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
-import { Cosmos, type SelectedNode } from "../lib/cosmos";
+import { Cosmos3D, type SelectedNode } from "../lib/cosmos3d";
 import { Cosmos2D, type AnyCosmos } from "../lib/cosmos2d";
 
-export type RenderMode = "webgpu" | "canvas2d";
+export type RenderMode = "webgl2" | "canvas2d";
 
 interface Props {
   onCosmos: (c: AnyCosmos | null) => void;
@@ -10,16 +10,16 @@ interface Props {
   onHover: (s: SelectedNode | null) => void;
   /** Init failures surface here (rendered as a readable overlay) — never console-only. */
   onError: (e: Error) => void;
-  /** Reports which backend actually initialised (WebGPU primary, 2D fallback). */
+  /** Reports which backend actually initialised (WebGL2 primary, 2D fallback). */
   onMode?: (m: RenderMode) => void;
   label: string;
 }
 
 /**
- * A full-bleed graph canvas with automatic graceful degradation: WebGPU
- * (GraphGPU) stays primary; when navigator.gpu is missing or init fails,
- * the same canvas falls back to the Canvas2D renderer. onError fires only
- * when NEITHER backend works (ancient browser — nearly unreachable).
+ * A full-bleed graph canvas with automatic graceful degradation: the
+ * WebGL2/Three.js starfield is primary; when WebGL2 is missing or init
+ * fails, the same canvas falls back to the Canvas2D renderer. onError fires
+ * only when NEITHER backend works (ancient browser — nearly unreachable).
  */
 export default function CosmosCanvas({ onCosmos, onSelect, onHover, onError, onMode, label }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -44,21 +44,21 @@ export default function CosmosCanvas({ onCosmos, onSelect, onHover, onError, onM
     };
     (async () => {
       const canvas = canvasRef.current!;
-      // Primary: WebGPU.
-      const webgpu = new Cosmos();
+      // Primary: WebGL2 starfield (Three.js).
+      const c3d = new Cosmos3D();
       try {
-        wire(webgpu);
-        await webgpu.init(canvas);
+        wire(c3d);
+        await c3d.init(canvas);
         if (!dead) {
-          modeRef.current?.("webgpu");
-          cbRef.current(webgpu);
+          modeRef.current?.("webgl2");
+          cbRef.current(c3d);
         }
         return;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        console.warn(`${label} WebGPU path failed, trying Canvas2D fallback: ${msg}`);
+        console.warn(`${label} WebGL2 path failed, trying Canvas2D fallback: ${msg}`);
         try {
-          webgpu.destroy();
+          c3d.destroy();
         } catch { /* noop */ }
       }
       // Fallback: Canvas2D on the same canvas.
@@ -75,7 +75,7 @@ export default function CosmosCanvas({ onCosmos, onSelect, onHover, onError, onM
       } catch (e2: unknown) {
         const err =
           e2 instanceof Error ? e2 : new Error(`${label} canvas init failed: ${String(e2)}`);
-        console.error(`${label} canvas init failed (WebGPU + 2D)`, err);
+        console.error(`${label} canvas init failed (WebGL2 + 2D)`, err);
         if (!dead) errRef.current(err);
       }
     })();

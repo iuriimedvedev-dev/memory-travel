@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { INK, toWorld, type RGBA } from "../lib/cosmos";
+import { INK, toWorld3, type RGBA, type XYZ } from "../lib/cosmos";
 import type { AnyCosmos } from "../lib/cosmos2d";
 import { loadTrace } from "../lib/data";
 import { makeTimeline, type Timeline } from "../lib/reveal";
@@ -15,7 +15,9 @@ interface Props {
 
 const LIVE_ID = "__live__";
 
-type XY = [number, number];
+/** 3D position in UMAP space (old traces without xyz flatten z to 0). */
+const p3 = (n: { xy: [number, number] | null; xyz: [number, number, number] | null }): XYZ | null =>
+  n.xyz ?? (n.xy ? [n.xy[0], n.xy[1], 0] : null);
 
 const SPEEDS = [0.75, 1, 1.5, 2] as const;
 /** Extra hold after a stage's reveal finishes before autoplay advances. */
@@ -39,11 +41,12 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
   const cosmosRef = useRef<AnyCosmos | null>(null);
   cosmosRef.current = cosmos;
 
-  // name -> entity-space xy (raw UMAP units) for the loaded subgraph
+  // name -> entity-space xyz (raw UMAP units) for the loaded subgraph
   const posOf = useMemo(() => {
-    const m = new Map<string, XY>();
+    const m = new Map<string, XYZ>();
     trace?.graph.nodes.forEach((n) => {
-      if (n.xy) m.set(n.name, n.xy);
+      const p = p3(n);
+      if (p) m.set(n.name, p);
     });
     return m;
   }, [trace]);
@@ -54,35 +57,40 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
     return m;
   }, [trace]);
 
-  const hitPos = (h: { entities: string[] }): XY | null => {
+  const hitPos = (h: { entities: string[] }): XYZ | null => {
     let sx = 0,
       sy = 0,
+      sz = 0,
       k = 0;
     for (const e of h.entities) {
       const p = posOf.get(e);
       if (p) {
         sx += p[0];
         sy += p[1];
+        sz += p[2];
         k++;
       }
     }
-    return k ? [sx / k, sy / k] : null;
+    return k ? [sx / k, sy / k, sz / k] : null;
   };
 
-  const queryPos: XY | null = useMemo(() => {
+  const queryPos: XYZ | null = useMemo(() => {
     if (!trace) return null;
+    if (trace.query.xyz) return trace.query.xyz;
     let sx = 0,
       sy = 0,
+      sz = 0,
       k = 0;
     for (const h of trace.vector_hits.slice(0, 3)) {
       const p = hitPos(h);
       if (p) {
         sx += p[0];
         sy += p[1];
+        sz += p[2];
         k++;
       }
     }
-    return k ? [sx / k, sy / k] : null;
+    return k ? [sx / k, sy / k, sz / k] : null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trace, posOf]);
 
@@ -136,7 +144,10 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
         try {
           await cosmos.load(
             cg,
-            t.graph.nodes.map((n) => n.xy),
+            t.graph.nodes.map((n) => {
+              const p = p3(n);
+              return p ? toWorld3(p) : null;
+            }),
           );
         } catch (e) {
           if (!dead) {
@@ -191,10 +202,11 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
     cosmos.paint(paints);
   };
 
-  const mark = (label: string, p: XY, size: number, color: RGBA): number | null => {
+  const mark = (label: string, p: XYZ, size: number, color: RGBA): number | null => {
     if (!cosmos) return null;
-    const [x, y] = toWorld(p);
+    const [x, y, z] = toWorld3(p);
     const id = cosmos.addMarker(label, x, y, size, color);
+    void z;
     markers.current.push(id);
     return id;
   };
@@ -205,7 +217,7 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
     tl: Timeline,
     delay: number,
     label: string,
-    p: XY,
+    p: XYZ,
     from: number,
     size: number,
     color: RGBA,
@@ -213,7 +225,8 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
     pre?: () => void,
   ) => {
     let mid: number | null = null;
-    const [x, y] = toWorld(p);
+    const [x, y, z] = toWorld3(p);
+    void z;
     tl.at(delay, () => {
       pre?.();
       mid = mark(label, p, from, color);
@@ -283,7 +296,7 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
     if (stage === 0) {
       if (Q) pulseAt(tl, 0, "?", Q, 1, 15, INK.query, 700);
       if (Q) {
-        const [x, y] = toWorld(Q);
+        const [x, y] = toWorld3(Q);
         cosmos.flyTo(x, y, detail(), 1600);
       }
     } else if (stage === 1) {
@@ -301,9 +314,10 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
     } else if (stage === 2) {
       if (Q) pulseAt(tl, 0, "?", Q, 10, 10, INK.query, 1);
       // BFS glow: seeds first, then one hop at a time along real edges
-      const seeds = trace.graph.nodes.filter((n) => n.seed && n.xy);
+      const seeds = trace.graph.nodes.filter((n) => p3(n));
       seeds.forEach((n) => {
-        if (n.xy) pulseAt(tl, 0, "", n.xy, 2, 10, INK.gold, 380);
+        const pp = p3(n);
+        if (pp) pulseAt(tl, 0, "", pp, 2, 10, INK.gold, 380);
       });
       tl.at(0, () => paintEntities(seeds.map((n) => n.name), INK.gold, 2.4));
       const maxRing = Math.max(...[...ringDepth.values()], 1);
@@ -312,10 +326,11 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
       }
       tl.tween(300, 700, (t) => cosmos.setEdgeOpacity(0.09 + (0.35 - 0.09) * t));
       if (seeds.length) {
-        const cx = seeds.reduce((a, n) => a + n.xy![0], 0) / seeds.length;
-        const cy = seeds.reduce((a, n) => a + n.xy![1], 0) / seeds.length;
-        const [x, y] = toWorld([cx, cy]);
-        cosmos.flyTo(x, y, detail(), 1600);
+        const c3 = centroidOf(seeds.map((n) => n.name), posOf);
+        if (c3) {
+          const [x, y] = toWorld3(c3);
+          cosmos.flyTo(x, y, detail(), 1600);
+        }
       }
     } else if (stage === 3) {
       if (Q) pulseAt(tl, 0, "?", Q, 10, 10, INK.query, 1);
@@ -325,16 +340,17 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
         const p = hitPos(h);
         if (!p) return;
         const size = 5 + 11 * (h.sparse / max);
-        const [fx, fy] = toWorld(p);
-        const [sx, sy] = toWorld([p[0], p[1] + 22]);
+        const [fx, fy] = toWorld3(p);
+        const [sx, sy] = toWorld3([p[0], p[1], p[2] + 0.3]);
+        void sy;
         let mid: number | null = null;
         tl.at(i * 120, () => {
           paintEntities(h.entities, INK.green, 1.8);
-          mid = mark(String(i + 1), [p[0], p[1] + 22], 2, INK.green);
+          mid = mark(String(i + 1), [p[0], p[1], p[2] + 0.3], 2, INK.green);
         });
         tl.tween(i * 120, 500, (t) => {
           if (mid === null) return;
-          cosmos?.moveMarker(mid, sx + (fx - sx) * t, sy + (fy - sy) * t, 2 + (size - 2) * t);
+          cosmos?.moveMarker(mid, sx + (fx - sx) * t, fy, 2 + (size - 2) * t);
         });
       });
       tl.at(1600, () => cosmos.fit(0.2));
@@ -415,10 +431,10 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
     setStage((s + 8) % 8);
   };
 
-  const focusPoint = (p: XY, names: string[], color: RGBA = INK.white) => {
+  const focusPoint = (p: XYZ, names: string[], color: RGBA = INK.white) => {
     if (!cosmos) return;
     paintEntities(names, color, 2.6);
-    const [x, y] = toWorld(p);
+    const [x, y] = toWorld3(p);
     cosmos.flyTo(x, y, detail(), 1400);
   };
 
@@ -529,13 +545,13 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
   );
 }
 
-function centroidOf(names: string[], posOf: Map<string, XY>): XY | null {
-  let sx = 0, sy = 0, k = 0;
+function centroidOf(names: string[], posOf: Map<string, XYZ>): XYZ | null {
+  let sx = 0, sy = 0, sz = 0, k = 0;
   for (const e of names) {
     const p = posOf.get(e);
-    if (p) { sx += p[0]; sy += p[1]; k++; }
+    if (p) { sx += p[0]; sy += p[1]; sz += p[2]; k++; }
   }
-  return k ? [sx / k, sy / k] : null;
+  return k ? [sx / k, sy / k, sz / k] : null;
 }
 
 function fmtS(ms: number | null): string {
@@ -560,7 +576,7 @@ function StageBody({
   stage: number;
   trace: TravelTrace | null;
   onFocusChunk: (h: ChunkHit) => void;
-  onFocusPoint: (p: XY, names: string[], color?: RGBA) => void;
+  onFocusPoint: (p: XYZ, names: string[], color?: RGBA) => void;
 }) {
   if (!trace) return <p className="dim">loading…</p>;
   const m = trace.meta;
@@ -595,7 +611,7 @@ function StageBody({
         <ul className="hits">
           {seeds.slice(0, 10).map((n, i) => (
             <li key={n.name} style={{ animationDelay: `${i * 60}ms` }}>
-              <button className="plainrow" onClick={() => { if (n.xy) onFocusPoint(n.xy, [n.name], INK.gold); }}>
+              <button className="plainrow" onClick={() => { const p = p3(n); if (p) onFocusPoint(p, [n.name], INK.gold); }}>
                 <b>{n.name}</b> <span className="dim">{n.type} · {n.desc.slice(0, 90)}</span>
               </button>
             </li>
@@ -654,7 +670,8 @@ function StageBody({
         <h4>entities ({trace.context_blocks.entities.length}) — click to fly</h4>
         <ul>
           {trace.context_blocks.entities.slice(0, 6).map((e, i) => {
-            const p = trace.graph.nodes.find((n) => n.name === e.entity)?.xy ?? null;
+            const np = trace.graph.nodes.find((n) => n.name === e.entity) ?? null;
+            const p = np ? p3(np) : null;
             return (
               <li key={i} style={{ animationDelay: `${i * 80}ms` }}>
                 {p ? (
@@ -699,9 +716,10 @@ function StageBody({
 }
 
 function posOfLocal(trace: TravelTrace) {
-  const m = new Map<string, XY>();
+  const m = new Map<string, XYZ>();
   trace.graph.nodes.forEach((n) => {
-    if (n.xy) m.set(n.name, n.xy);
+    const p = p3(n);
+    if (p) m.set(n.name, p);
   });
   return m;
 }

@@ -12,6 +12,8 @@ export interface ChunkHit {
   doc: string;
   section: string;
   xy: [number, number] | null;
+  /** 3D position (UMAP n_components=3); null when the chunk had no coords. */
+  xyz: [number, number, number] | null;
   file: string;
   /** graph entity names sourced from this chunk (for map placement + grounding) */
   entities: string[];
@@ -38,6 +40,8 @@ export interface GraphNode {
   desc: string;
   deg: number;
   xy: [number, number] | null;
+  /** 3D position for the starfield (xyz[2] may be 0 for old traces). */
+  xyz: [number, number, number] | null;
   seed: boolean;
 }
 
@@ -61,7 +65,7 @@ export interface TraceMeta {
 
 export interface TravelTrace {
   meta: TraceMeta;
-  query: { text: string; xy: [number, number] };
+  query: { text: string; xy: [number, number]; xyz: [number, number, number] };
   vector_hits: ChunkHit[];
   bm25_hits: ChunkHit[];
   fusion: ChunkHit[];
@@ -79,6 +83,7 @@ export interface TravelTrace {
     doc: string;
     entities: string[];
     xy: [number, number] | null;
+    xyz: [number, number, number] | null;
   }[];
   full_chunks: { chunk_id: string; content: string }[];
 }

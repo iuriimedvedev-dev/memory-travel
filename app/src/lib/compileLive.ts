@@ -21,10 +21,12 @@ export interface CompileAux {
   graph: CosmosGraph;
   /** entity name -> global graph index */
   idxOf: Map<string, number>;
-  /** entity name -> UMAP xy (entity map space) */
+  /** entity name -> UMAP xy (entity map space, 2D projection for old panels) */
   entityXy: Map<string, [number, number]>;
-  /** chunk_id -> UMAP xy (chunk map space; unused for placement, kept for parity) */
-  chunkXy: Record<string, [number, number]>;
+  /** entity name -> UMAP xyz (starfield space) */
+  entityXyz: Map<string, [number, number, number]>;
+  /** chunk_id -> UMAP xyz (chunk starfield space; placement of chunk markers) */
+  chunkXyz: Record<string, [number, number, number]>;
 }
 
 interface RawChunk {
@@ -66,21 +68,24 @@ function parseContext(ctx: string): {
   return { entities, relations, sources };
 }
 
+type XYZ = [number, number, number];
 type XY = [number, number];
 
-function centroid(names: string[], posOf: Map<string, XY>): XY | null {
+function centroid3(names: string[], posOf: Map<string, XYZ>): XYZ | null {
   let sx = 0,
     sy = 0,
+    sz = 0,
     k = 0;
   for (const n of names) {
     const p = posOf.get(n);
     if (p) {
       sx += p[0];
       sy += p[1];
+      sz += p[2];
       k++;
     }
   }
-  return k ? [sx / k, sy / k] : null;
+  return k ? [sx / k, sy / k, sz / k] : null;
 }
 
 /**
@@ -121,6 +126,7 @@ export function compileLiveTrace(
 
   const slim = (c: RawChunk): ChunkHit => {
     const d = docOf(c.content ?? "");
+    const cp = aux.chunkXyz[c.chunk_id] ?? null;
     return {
       chunk_id: c.chunk_id,
       dense: Math.round((c.dense_score ?? 0) * 1e4) / 1e4,
@@ -130,7 +136,8 @@ export function compileLiveTrace(
       sparse_rank: srank.get(c.chunk_id) ?? null,
       doc: d.doc,
       section: d.section,
-      xy: aux.chunkXy[c.chunk_id] ?? null,
+      xy: cp ? [cp[0], cp[1]] : null,
+      xyz: cp,
       file: c.file_path ?? "",
       entities: entitiesOf(c),
     };
@@ -212,6 +219,7 @@ export function compileLiveTrace(
         desc: gn.d,
         deg: gn.deg,
         xy: aux.entityXy.get(gn.id) ?? null,
+        xyz: aux.entityXyz.get(gn.id) ?? null,
         seed: seedIdx.has(i),
       };
     });
@@ -227,12 +235,14 @@ export function compileLiveTrace(
   const bullets = fc.slice(0, 3).map((c) => {
     const body = (c.content ?? "").replace(DOC_HDR_ALL, "").trim().slice(0, 260).replace(/\n/g, " ");
     const d = docOf(c.content ?? "");
+    const cp = aux.chunkXyz[c.chunk_id] ?? null;
     return {
       quote: body,
       chunk_id: c.chunk_id,
       doc: d.doc,
       entities: entitiesOf(c).slice(0, 4),
-      xy: aux.chunkXy[c.chunk_id] ?? null,
+      xy: cp ? [cp[0], cp[1]] as [number, number] : null,
+      xyz: cp,
     };
   });
 
@@ -243,16 +253,20 @@ export function compileLiveTrace(
   // Query marker: centroid of top-3 vector hits (no embedder in browser).
   let qsx = 0,
     qsy = 0,
+    qsz = 0,
     qk = 0;
   for (const hb of vectorHits.slice(0, 3)) {
-    const p = centroid(hb.entities, aux.entityXy);
+    const p = centroid3(hb.entities, aux.entityXyz);
     if (p) {
       qsx += p[0];
       qsy += p[1];
+      qsz += p[2];
       qk++;
     }
   }
-  const queryXy: XY = qk ? [Math.round((qsx / qk) * 1e4) / 1e4, Math.round((qsy / qk) * 1e4) / 1e4] : [0, 0];
+  const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
+  const queryXy: XY = qk ? [r4(qsx / qk), r4(qsy / qk)] : [0, 0];
+  const queryXyz: XYZ = qk ? [r4(qsx / qk), r4(qsy / qk), r4(qsz / qk)] : [0, 0, 0];
 
   return {
     meta: {
@@ -280,7 +294,7 @@ export function compileLiveTrace(
       bm25_chunks: ((h["bm25_index"] as Record<string, unknown> | undefined)?.["chunks_indexed"] as number | null) ?? null,
       client_latency_s: Math.round(clientLatencyS * 100) / 100,
     },
-    query: { text: q, xy: queryXy },
+    query: { text: q, xy: queryXy, xyz: queryXyz },
     vector_hits: vectorHits,
     bm25_hits: bm25Hits,
     fusion,

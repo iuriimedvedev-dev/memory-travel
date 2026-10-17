@@ -27,7 +27,7 @@ TRACES = DATA / "traces"
 
 DOC_HDR = re.compile(r"\[Document:\s*(.*?)\s*\|\s*Section:\s*(.*?)\s*\|\s*Date:\s*(.*?)\]")
 
-UMAP_KW = dict(n_neighbors=15, min_dist=0.35, metric="cosine", random_state=43)
+UMAP_KW = dict(n_neighbors=15, min_dist=0.35, n_components=3, metric="cosine", random_state=43)
 
 
 def embed(texts):
@@ -81,6 +81,11 @@ def main():
         adj.setdefault(t, set()).add(s)
     ent_coords = json.load(open(DATA / "coords_entities.json"))
     exy = {nid: xy for nid, xy in zip(ent_coords["ids"], ent_coords["xy"])}
+    # 3D coords (starfield); fall back to 2D-derived z=0 for older coord files
+    exyz = {
+        nid: (xyz if len(xyz) == 3 else [xyz[0], xyz[1], 0.0])
+        for nid, xyz in zip(ent_coords["ids"], ent_coords.get("xyz") or ent_coords["xy"])
+    }
 
     print("loading entity->chunk map...", flush=True)
     echunks = json.load(open(INDEX / "kv_store_entity_chunks.json"))
@@ -101,9 +106,10 @@ def main():
     Xc = reducer.fit_transform(C)
     mins, maxs = Xc.min(axis=0), Xc.max(axis=0)
     Xn = (Xc - mins) / np.maximum(maxs - mins, 1e-9) * 2 - 1
-    cxy = {cid: [round(float(a), 4), round(float(b), 4)] for cid, (a, b) in zip(cids, Xn)}
+    cxy = {cid: [round(float(a), 4), round(float(b), 4)] for cid, (a, b, _c) in zip(cids, Xn)}
+    cxyz = {cid: [round(float(a), 4) for a in row] for cid, row in zip(cids, Xn)}
     # Overwrite sidecar so chunk coords + query coords share one consistent fit.
-    json.dump(cxy, open(DATA / "coords_chunks.json", "w"), separators=(",", ":"))
+    json.dump(cxyz, open(DATA / "coords_chunks.json", "w"), separators=(",", ":"))
 
     fixtures = sorted((ROOT / "fixtures").glob("trace_*.json"))
     questions = [json.load(open(f))["query"]["question"] for f in fixtures]
@@ -111,7 +117,6 @@ def main():
     qvecs = embed(questions)
     Q = reducer.transform(np.array(qvecs, dtype=np.float32))
     Qn = (Q - mins) / np.maximum(maxs - mins, 1e-9) * 2 - 1
-
     manifest = []
     for fi, f in enumerate(fixtures):
         fix = json.load(open(f))
@@ -139,6 +144,7 @@ def main():
                 "doc": d["doc"],
                 "section": d["section"],
                 "xy": cxy.get(c["chunk_id"]),
+                "xyz": cxyz.get(c["chunk_id"]),
                 "file": c.get("file_path", ""),
                 # entity names (graph nodes) sourced from this chunk — lets the
                 # Travel view place chunk markers in entity-map space (centroid).
@@ -203,6 +209,7 @@ def main():
                     "desc": graph["nodes"][i]["d"],
                     "deg": graph["nodes"][i]["deg"],
                     "xy": exy.get(nid),
+                    "xyz": exyz.get(nid),
                     "seed": i in seed_idx,
                 }
             )
@@ -243,6 +250,7 @@ def main():
                     "doc": d["doc"],
                     "entities": [e for e in chunk_entities.get(c["chunk_id"], []) if e in idx_of][:4],
                     "xy": cxy.get(c["chunk_id"]),
+                    "xyz": cxyz.get(c["chunk_id"]),
                 }
             )
 
@@ -275,7 +283,11 @@ def main():
                 "bm25_chunks": (h.get("bm25_index", {}) or {}).get("chunks_indexed"),
                 "client_latency_s": fix.get("client_latency_s"),
             },
-            "query": {"text": q["question"], "xy": [round(float(Qn[fi][0]), 4), round(float(Qn[fi][1]), 4)]},
+            "query": {
+                "text": q["question"],
+                "xy": [round(float(Qn[fi][0]), 4), round(float(Qn[fi][1]), 4)],
+                "xyz": [round(float(a), 4) for a in Qn[fi]],
+            },
             "vector_hits": vector_hits,
             "bm25_hits": bm25_hits,
             "fusion": fusion,
