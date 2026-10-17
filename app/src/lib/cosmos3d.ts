@@ -59,6 +59,7 @@ export interface Journey3D {
   setEdgeRings(depths: Float32Array | null): void;
   /** Continuous reveal frontier — edges with aRing <= v are lit. */
   setEdgeRingProgress(v: number): void;
+  setEdgeOpacity(v: number): void;
   setContextLines(from: XYZ, tos: XYZ[], color: RGBA): void;
   clearContextLines(): void;
   /** Glowing journey trail through the given world points. */

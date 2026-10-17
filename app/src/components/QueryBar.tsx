@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useI18n } from "../i18n/useI18n";
 import { AlertIcon, ClockIcon, SearchIcon, XIcon } from "./icons";
 import { MAX_QUESTION_CHARS } from "../lib/live";
 
@@ -42,6 +43,7 @@ function phaseFor(elapsedS: number): string {
 export default function QueryBar({
   asking, error, note, ready, elapsedS, history, onAsk, onCancel, onPickHistory, onClearHistory,
 }: Props) {
+  const { t } = useI18n();
   const [q, setQ] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -67,8 +69,8 @@ export default function QueryBar({
           maxLength={MAX_QUESTION_CHARS}
           placeholder={
             ready
-              ? "Ask memory anything… (live recall, up to 120s)"
-              : "Ask memory anything… (waiting for index data)"
+              ? t.qbPlaceholder
+              : t.qbPlaceholder
           }
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => {
@@ -86,7 +88,7 @@ export default function QueryBar({
           </button>
         ) : (
           <button className="primary" onClick={submit} disabled={!q.trim() || !ready} title="Run a live memory_recall">
-            ask live
+            {t.qbAsk}
           </button>
         )}
       </div>
@@ -109,7 +111,7 @@ export default function QueryBar({
 
       {!asking && history.length > 0 && (
         <div className="qhistory">
-          <span className="dim">recent:</span>
+          <span className="dim">{t.qbHistory}</span>
           {history.slice(0, 5).map((h) => (
             <button key={h.ts} className="chip" onClick={() => onPickHistory(h.q)} title={`${h.q} — took ${h.ms.toFixed(1)}s`}>
               {h.q.length > 42 ? `${h.q.slice(0, 41)}…` : h.q}

@@ -3,6 +3,8 @@ import type { CosmosGraph } from "../lib/types";
 import type { AnyCosmos } from "../lib/cosmos2d";
 import { INK } from "../lib/cosmos";
 import { FAMILY_COLORS, FAMILY_LABEL, LEGEND_ORDER, colorForType, familyOf } from "../lib/palette";
+import { fmt } from "../i18n/strings";
+import { useI18n } from "../i18n/useI18n";
 import { CompassIcon, LayersIcon, SearchIcon, SparkIcon, XIcon } from "./icons";
 
 interface Props {
@@ -27,6 +29,7 @@ interface HoverInfo {
 const SEARCH_HIGHLIGHT_CAP = 3000;
 
 export default function CosmosView({ cosmos, graph, names, loading, onTour, focusNode, mode }: Props) {
+  const { t } = useI18n();
   const [q, setQ] = useState("");
   const [sel, setSel] = useState<number | null>(null);
   const [hover, setHover] = useState<HoverInfo | null>(null);
@@ -169,11 +172,12 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
       )}
 
       <div className="panel left">
-        <h1>Memory Cosmos</h1>
+        <h1>{t.cosmosTitle}</h1>
         <p className="sub">
-          The live HARS knowledge graph — {graph ? graph.nodes.length.toLocaleString("en-US") : "…"} entities,{" "}
-          {graph ? graph.edges.length.toLocaleString("en-US") : "…"} relations, laid out by meaning (3D UMAP over stored
-          768-dim vectors — a true starfield you can orbit). Not a mock: this is the production index.
+          {fmt(t.cosmosSub, {
+            n: graph ? graph.nodes.length.toLocaleString("en-US") : "…",
+            m: graph ? graph.edges.length.toLocaleString("en-US") : "…",
+          })}
         </p>
         {loading && <p className="loading">{loading}</p>}
 
@@ -182,7 +186,7 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
           <input
             ref={searchRef}
             className="search bare"
-            placeholder="find an entity… (e.g. VEA, DROID, checkpoint)"
+            placeholder={t.searchPlaceholder}
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => {
@@ -192,7 +196,7 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
             aria-label="Search entities"
           />
           {q && (
-            <button className="ghostbtn" onClick={() => setQ("")} title="clear search">
+            <button className="ghostbtn" onClick={() => setQ("")} title={t.searchClear}>
               <XIcon size={11} />
             </button>
           )}
@@ -222,16 +226,16 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
             <div className="cardhead">
               <i className="swatch big" style={{ background: colorForType(node.t) }} />
               <h3>{node.id}</h3>
-              <button className="ghostbtn" onClick={() => { setSel(null); }} title="close card">
+              <button className="ghostbtn" onClick={() => { setSel(null); }} title={t.inspectClose}>
                 <XIcon size={11} />
               </button>
             </div>
             <p className="dim cardtype">
-              {node.t} · degree {node.deg} · {node.deg === 1 ? "1 direct relation" : `${node.deg} direct relations`}
+              {node.t} · degree {node.deg} · {node.deg === 1 ? t.degreeLinks1 : fmt(t.degreeLinksN, { n: node.deg })}
             </p>
-            <p className="carddesc">{node.d ? snippet(node.d, 240) : "no description stored for this entity"}</p>
+            <p className="carddesc">{node.d ? snippet(node.d, 240) : t.noDesc}</p>
             <div className="row">
-              <button onClick={() => focusNode(sel!)}>fly to</button>
+              <button onClick={() => focusNode(sel!)}>{t.flyTo}</button>
               <button
                 onClick={() => {
                   setSel(null);
@@ -239,7 +243,7 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
                   cosmos?.spotlight(null);
                 }}
               >
-                clear highlight
+                {t.clearHighlight}
               </button>
             </div>
           </div>
@@ -254,9 +258,9 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
         <div className="legend">
           <button className="legendhead" onClick={() => setLegendOpen((o) => !o)}>
             <LayersIcon size={12} />
-            <span>entity types</span>
+            <span>{t.legendTitle}</span>
             <span className="dim">
-              {totalVisible.toLocaleString("en-US")} / {graph ? graph.nodes.length.toLocaleString("en-US") : "…"} shown
+              {fmt(t.legendShown, { a: totalVisible.toLocaleString("en-US"), b: graph ? graph.nodes.length.toLocaleString("en-US") : "…" })}
             </span>
             <span className={`chev ${legendOpen ? "open" : ""}`} aria-hidden="true">›</span>
           </button>
@@ -275,19 +279,19 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
                 </button>
               ))}
               {hidden.size > 0 && (
-                <button className="legrow reset" onClick={() => setHidden(new Set())}>show all types</button>
+                <button className="legrow reset" onClick={() => setHidden(new Set())}>{t.legendShowAll}</button>
               )}
             </div>
           )}
         </div>
 
         <div className="row">
-          <button onClick={() => { cosmos?.fit(); setQ(""); }}>reset view</button>
+          <button onClick={() => { cosmos?.fit(); setQ(""); }}>{t.resetView}</button>
           <button className="primary" onClick={onTour} disabled={!graph}>
-            <SparkIcon size={12} /> take the tour — one query’s journey
+            <SparkIcon size={12} /> {t.tourButton}
           </button>
         </div>
-        <p className="hint">drag to orbit · scroll to zoom · right-drag to pan · click a star for details</p>
+        <p className="hint">{t.hintOrbit}</p>
         <SelectBridge select={select} setHover={setHover} cosmos={cosmos} graph={graph} />
       </div>
     </>

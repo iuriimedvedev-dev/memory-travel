@@ -345,3 +345,111 @@ button { display: inline-flex; gap: 6px; align-items: center; justify-content: c
   grid-column: 1 / -1; color: var(--accent); justify-content: center;
   border-top: 1px dashed var(--line); margin-top: 4px; padding-top: 7px; border-radius: 0;
 }
+
+/* ---- journey log (right side): visited nodes stream in per stage ---- */
+.jlog {
+  position: absolute; top: 108px; right: 12px; width: 250px; max-height: 56vh;
+  display: flex; flex-direction: column;
+  background: var(--glass); backdrop-filter: blur(8px);
+  border: 1px solid var(--line); border-radius: 12px; z-index: 11;
+  overflow: hidden;
+}
+.jloghead {
+  display: flex; gap: 8px; align-items: center; width: 100%;
+  background: transparent; border: none; padding: 8px 12px;
+  font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim);
+}
+.jloghead:hover { color: var(--ink); }
+.jloghead span:first-child { flex: 1; text-align: left; }
+.jlogcount { font-variant-numeric: tabular-nums; }
+.jlogbody { list-style: none; margin: 0; padding: 0 6px 8px; overflow-y: auto; }
+.jlogrow {
+  display: flex; gap: 7px; align-items: center; width: 100%;
+  background: transparent; border: none; padding: 3px 6px; border-radius: 6px;
+  font-size: 11.5px; color: var(--ink); text-align: left;
+  animation: fadeup 0.35s ease both;
+}
+.jlogrow:hover { background: rgba(125, 243, 255, 0.08); }
+.jlogname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jstage {
+  font-size: 9.5px; color: var(--accent); border: 1px solid var(--line);
+  border-radius: 4px; padding: 0 4px; font-family: monospace; flex: none;
+}
+.jlogempty, .jlogdropped { font-size: 11px; padding: 6px; }
+.jlogdropped { border-top: 1px dashed var(--line); margin-top: 4px; padding-top: 6px; }
+
+/* ---- inspector / chunk viewer drawer (right side, above journey log) ---- */
+.inspector {
+  position: absolute; top: 52px; right: 12px; bottom: 96px; width: 400px; z-index: 14;
+  background: var(--glass); backdrop-filter: blur(10px);
+  border: 1px solid var(--accent); border-radius: 14px;
+  display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 12px 50px rgba(0, 0, 0, 0.5);
+}
+.insphead { display: flex; gap: 8px; align-items: center; padding: 10px 14px 8px; border-bottom: 1px solid var(--line); }
+.insphead h3 { margin: 0; font-size: 13px; flex: 1; letter-spacing: 0.06em; color: var(--gold); }
+.inspbody { padding: 10px 14px; overflow-y: auto; font-size: 12px; }
+.insptable .q { margin-top: 0; }
+.inspgrid { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+.inspgrid th { text-align: left; color: var(--dim); font-weight: 500; padding: 3px 6px; border-bottom: 1px solid var(--line); text-transform: uppercase; font-size: 10px; letter-spacing: 0.06em; }
+.inspgrid td { padding: 3px 6px; border-bottom: 1px solid rgba(120, 150, 255, 0.07); vertical-align: middle; }
+.inspgrid tbody tr { cursor: pointer; }
+.inspgrid tbody tr:hover { background: rgba(125, 243, 255, 0.06); }
+.inspgrid .rank { color: var(--gold); font-variant-numeric: tabular-nums; }
+.inspgrid .doccell { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inspgrid tr.off td { opacity: 0.4; }
+.insplist { padding-left: 14px; margin: 4px 0; }
+.linkish { background: transparent; border: none; padding: 0; color: var(--accent); cursor: pointer; font-size: inherit; }
+.linkish:hover { text-decoration: underline; }
+.scorecard td:first-child { color: var(--dim); width: 80px; }
+.chunkview .chunkdoc { margin: 0 0 4px; font-size: 13px; }
+.chunktext {
+  max-height: 34vh; overflow-y: auto; white-space: pre-wrap; word-break: break-word;
+  font-size: 11px; line-height: 1.5; background: rgba(3, 4, 12, 0.55);
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 6px 0 0;
+}
+.inspectbtn { font-size: 12px; }
+
+/* ---- language toggle ---- */
+.langtoggle { font-size: 11px; min-width: 40px; padding: 4px 8px; border-radius: 20px; font-variant-numeric: tabular-nums; }
+
+/* ---- presentation mode ---- */
+.pres { position: absolute; inset: 0; z-index: 30; background: var(--bg); }
+.pres .canvaswrap { position: absolute; inset: 0; }
+.pres-top {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 32;
+  display: flex; gap: 10px; align-items: center; padding: 10px 16px; pointer-events: none;
+}
+.pres-top > * { pointer-events: auto; }
+.pres-brand { letter-spacing: 0.16em; font-size: 12px; color: var(--dim); flex: 1; }
+.pres-bottom {
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 32;
+  width: min(860px, 92vw);
+  background: var(--glass); backdrop-filter: blur(10px);
+  border: 1px solid var(--line); border-radius: 16px; padding: 16px 20px 12px;
+  box-shadow: 0 14px 60px rgba(0, 0, 0, 0.55);
+}
+.pres-chapternum { font-size: 11px; color: var(--accent); letter-spacing: 0.14em; text-transform: uppercase; }
+.pres-title { font-size: 19px; margin: 2px 0 6px; letter-spacing: 0.04em; }
+.pres-narr { font-size: 13.5px; line-height: 1.6; color: var(--ink); min-height: 63px; }
+.pres-fact {
+  margin-top: 8px; font-size: 12px; color: var(--gold);
+  border-left: 2px solid var(--gold); padding-left: 8px;
+}
+.pres-controls { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+.pres-controls .spacer { flex: 1; }
+.pres-progress { position: absolute; top: 0; left: 0; right: 0; height: 3px; display: flex; gap: 2px; padding: 0; }
+.pres-progress span { flex: 1; background: rgba(120, 150, 255, 0.18); }
+.pres-progress span.on { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.pres-menu {
+  position: absolute; top: 52px; right: 16px; z-index: 33; width: 340px;
+  background: var(--glass); backdrop-filter: blur(10px);
+  border: 1px solid var(--line); border-radius: 12px; padding: 8px;
+}
+.pres-menu button { display: flex; gap: 8px; width: 100%; text-align: left; font-size: 12.5px; padding: 7px 10px; }
+.pres-menu .n { color: var(--accent); font-family: monospace; }
+.pres-fact a { color: var(--gold); }
+@media (max-width: 1100px) {
+  .inspector { width: 320px; }
+  .jlog { display: none; }
+}

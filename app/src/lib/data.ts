@@ -21,3 +21,4 @@ export const loadChunkCoords = () =>
 export const loadManifest = () =>
   getJSON<TraceManifestEntry[]>("data/traces/manifest.json");
 export const loadTrace = (file: string) => getJSON<TravelTrace>(`data/${file}`);
+export const loadIngestFixture = () => getJSON<unknown>("data/ingest_fixture.json");

@@ -1,11 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { INK, toWorld3, type RGBA, type XYZ } from "../lib/cosmos";
 import type { AnyCosmos } from "../lib/cosmos2d";
+import { asJourney3D, type Journey3D } from "../lib/cosmos3d";
 import { loadTrace } from "../lib/data";
+import { stageCamera } from "../lib/journeyCam";
 import { makeTimeline, type Timeline } from "../lib/reveal";
 import { STAGES } from "../lib/stages";
 import type { ChunkHit, CosmosGraph, TraceManifestEntry, TravelTrace } from "../lib/types";
+import { pick } from "../i18n/strings";
+import { useI18n } from "../i18n/useI18n";
 import { AlertIcon, ChevronLeftIcon, ChevronRightIcon, PauseIcon, PlayIcon } from "./icons";
+import { buildJourneyLog, JourneyLog, type LogEntry } from "./JourneyLog";
+import { Inspector, type Inspection } from "./Inspector";
 
 interface Props {
   cosmos: AnyCosmos | null;
@@ -24,6 +30,7 @@ const SPEEDS = [0.75, 1, 1.5, 2] as const;
 const HOLD_MS = 2500;
 
 export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
+  const { t, lang } = useI18n();
   const [traceId, setTraceId] = useState<string>("trace_01");
   const [trace, setTrace] = useState<TravelTrace | null>(null);
   const [stage, setStage] = useState(0);
@@ -31,17 +38,22 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
   const [speed, setSpeed] = useState<number>(1);
   const [status, setStatus] = useState<string | null>(null);
   const [statusErr, setStatusErr] = useState(false);
+  const [camMode, setCamMode] = useState<"journey" | "free">("journey");
+  const [logOpen, setLogOpen] = useState(true);
+  const [insp, setInsp] = useState<Inspection | null>(null);
   const markers = useRef<number[]>([]);
-  const baseZoom = useRef(1);
   const timeline = useRef<Timeline | null>(null);
   /** false only when the user jumped (scrubber/dots): those skip straight to the end state */
   const animateNext = useRef(true);
-  const traceRef = useRef<TravelTrace | null>(null);
-  traceRef.current = trace;
   const cosmosRef = useRef<AnyCosmos | null>(null);
   cosmosRef.current = cosmos;
 
-  // name -> entity-space xyz (raw UMAP units) for the loaded subgraph
+  const j3d: Journey3D | null = useMemo(
+    () => (cosmos ? asJourney3D(cosmos) : null),
+    [cosmos],
+  );
+
+  // name -> entity-space xyz for the loaded subgraph
   const posOf = useMemo(() => {
     const m = new Map<string, XYZ>();
     trace?.graph.nodes.forEach((n) => {
@@ -57,40 +69,16 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
     return m;
   }, [trace]);
 
-  const hitPos = (h: { entities: string[] }): XYZ | null => {
-    let sx = 0,
-      sy = 0,
-      sz = 0,
-      k = 0;
-    for (const e of h.entities) {
-      const p = posOf.get(e);
-      if (p) {
-        sx += p[0];
-        sy += p[1];
-        sz += p[2];
-        k++;
-      }
-    }
-    return k ? [sx / k, sy / k, sz / k] : null;
+  const hitPos = (h: { entities: string[]; xyz?: XYZ | null }): XYZ | null => {
+    if (h.xyz) return h.xyz;
+    return centroidOf(h.entities, posOf);
   };
 
   const queryPos: XYZ | null = useMemo(() => {
     if (!trace) return null;
     if (trace.query.xyz) return trace.query.xyz;
-    let sx = 0,
-      sy = 0,
-      sz = 0,
-      k = 0;
-    for (const h of trace.vector_hits.slice(0, 3)) {
-      const p = hitPos(h);
-      if (p) {
-        sx += p[0];
-        sy += p[1];
-        sz += p[2];
-        k++;
-      }
-    }
-    return k ? [sx / k, sy / k, sz / k] : null;
+    const ps = trace.vector_hits.slice(0, 3).map(hitPos).filter((p): p is XYZ => p !== null);
+    return centroidOfList(ps) ?? null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trace, posOf]);
 
@@ -104,14 +92,12 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
   }, [liveTrace]);
 
   // ---- load trace + subgraph into the travel canvas.
-  // The trace JSON always loads (text stages stay readable); the 3D
-  // subgraph load is skipped with a note when the canvas is unavailable.
   useEffect(() => {
     if (!traceId) return;
     const useLive = traceId === LIVE_ID;
     if (useLive && !liveTrace) return;
     let dead = false;
-    setStatus(useLive ? "compiling live answer…" : "loading trace…");
+    setStatus(useLive ? "compiling live answer…" : t.travelLoadingTrace);
     setStatusErr(false);
     setTrace(null);
     const entry = manifest?.find((e) => e.id === traceId);
@@ -119,32 +105,32 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
       ? Promise.resolve(liveTrace!)
       : loadTrace(entry?.file ?? `traces/${traceId}.json`);
     src
-      .then(async (t) => {
+      .then(async (tr) => {
         if (dead) return;
-        setTrace(t);
+        setTrace(tr);
         setStage(0);
         setPlaying(false);
         if (!cosmos) {
-          setStatus("Canvas unavailable (WebGPU + 2D fallback both failed) — telemetry text below stays readable.");
+          setStatus(t.travelCanvasUnavailable);
           setStatusErr(true);
           return;
         }
         const g2g = new Map<number, number>();
-        t.graph.nodes.forEach((n, li) => g2g.set(n.i, li));
+        tr.graph.nodes.forEach((n, li) => g2g.set(n.i, li));
         const cg: CosmosGraph = {
-          nodes: t.graph.nodes.map((n) => ({ id: n.name, t: n.type, d: n.desc, deg: n.deg })),
-          edges: t.graph.edges
+          nodes: tr.graph.nodes.map((n) => ({ id: n.name, t: n.type, d: n.desc, deg: n.deg })),
+          edges: tr.graph.edges
             .map(([s, e]) => [g2g.get(s), g2g.get(e)] as [number, number])
             .filter(([s, e]) => s !== undefined && e !== undefined),
         };
-        setStatus("loading subgraph…");
+        setStatus(t.travelSubgraphLoading);
         setStatusErr(false);
         clearMarkers();
         cosmos.clear();
         try {
           await cosmos.load(
             cg,
-            t.graph.nodes.map((n) => {
+            tr.graph.nodes.map((n) => {
               const p = p3(n);
               return p ? toWorld3(p) : null;
             }),
@@ -157,13 +143,11 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
           return;
         }
         if (dead) return;
-        baseZoom.current = cosmos.currentZoom();
         setStatus(null);
         setStatusErr(false);
       })
       .catch((e) => {
         if (!dead) {
-          // loadTrace() names the file: `fetch <path>: <status>`.
           setStatus(`trace load failed (stage=fetch ${entry?.file ?? `traces/${traceId}.json`}): ${String(e)}`);
           setStatusErr(true);
         }
@@ -172,7 +156,7 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
       dead = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cosmos, traceId, manifest, liveTrace]);
+  }, [cosmos, traceId, manifest, liveTrace, t]);
 
   // ---- markers cleanup helper (ref-based: safe from stale closures)
   const clearMarkers = () => {
@@ -196,23 +180,25 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
       const li = localOf.get(nm);
       if (li !== undefined) {
         const deg = trace.graph.nodes[li].deg;
-        paints.set(li, { color, size: 3.2 + Math.min(9, Math.sqrt(deg) * 1.6) * boost });
+        paints.set(li, { color, size: (0.16 + Math.min(0.7, Math.sqrt(deg) * 0.075)) * boost * 2.4 });
       }
     });
     cosmos.paint(paints);
   };
 
-  const mark = (label: string, p: XYZ, size: number, color: RGBA): number | null => {
+  /** Marker spawn that prefers the 3D API (real z), falls back to 2D. */
+  const mark = (label: string, p: XYZ, size: number, color: RGBA, zOff = 0): number | null => {
     if (!cosmos) return null;
-    const [x, y, z] = toWorld3(p);
-    const id = cosmos.addMarker(label, x, y, size, color);
-    void z;
+    const w = toWorld3(p);
+    const id =
+      j3d
+        ? j3d.addMarker3(label, [w[0], w[1], w[2] + zOff], size, color)
+        : cosmos.addMarker(label, w[0], w[1], size, color);
     markers.current.push(id);
     return id;
   };
 
-  /** Spawn a marker at `delay` and pulse its size from->size. Cues and tweens
-   *  are both scheduled at the top level (nested scheduling would mis-time). */
+  /** Spawn a marker at `delay` and pulse its size from->size. */
   const pulseAt = (
     tl: Timeline,
     delay: number,
@@ -223,21 +209,21 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
     color: RGBA,
     dur = 420,
     pre?: () => void,
+    zFrom = 0,
   ) => {
     let mid: number | null = null;
-    const [x, y, z] = toWorld3(p);
-    void z;
+    const w = toWorld3(p);
     tl.at(delay, () => {
       pre?.();
-      mid = mark(label, p, from, color);
+      mid = mark(label, p, from, color, zFrom);
     });
-    tl.tween(delay, dur, (t) => {
+    tl.tween(delay, dur, (tt) => {
       if (mid === null) return;
-      cosmos?.moveMarker(mid, x, y, from + (size - from) * t);
+      const z = (w[2] + zFrom) * (1 - tt);
+      if (j3d) j3d.moveMarker3(mid, [w[0], w[1], z], from + (size - from) * tt);
+      else cosmos?.moveMarker(mid, w[0], w[1], from + (size - from) * tt);
     });
   };
-
-  const detail = () => baseZoom.current * 3.4;
 
   // ---- BFS ring depths over the local subgraph (for the stage-2 spread)
   const ringDepth = useMemo(() => {
@@ -246,9 +232,9 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
     const g2l = new Map<number, number>();
     trace.graph.nodes.forEach((n, li) => g2l.set(n.i, li));
     const adj = new Map<number, number[]>();
-    trace.graph.edges.forEach(([s, t]) => {
+    trace.graph.edges.forEach(([s, tt]) => {
       const a = g2l.get(s);
-      const b = g2l.get(t);
+      const b = g2l.get(tt);
       if (a === undefined || b === undefined) return;
       if (!adj.has(a)) adj.set(a, []);
       if (!adj.has(b)) adj.set(b, []);
@@ -274,17 +260,97 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
     return m;
   }, [trace]);
 
-  // ---- stage driver: a planned timeline per stage (or instant jump when scrubbing)
+  // per-edge ring depth = deeper endpoint's ring: an edge lights when its
+  // far end does. null until a trace is loaded.
+  const edgeRings = useMemo(() => {
+    if (!trace) return null;
+    const g2l = new Map<number, number>();
+    trace.graph.nodes.forEach((n, li) => g2l.set(n.i, li));
+    const arr = new Float32Array(trace.graph.edges.length * 2);
+    trace.graph.edges.forEach(([s, tt], k) => {
+      const a = ringDepth.get(g2l.get(s) ?? -1) ?? 1e9;
+      const b = ringDepth.get(g2l.get(tt) ?? -1) ?? 1e9;
+      const d = Math.min(1e6, Math.max(a === 1e9 ? 1e6 : a, b === 1e9 ? 1e6 : b));
+      arr[k * 2] = d;
+      arr[k * 2 + 1] = d;
+    });
+    return arr;
+  }, [trace, ringDepth]);
+
+  // journey-camera context per stage
+  const camCtx = useMemo(() => {
+    const vc = centroidOfList(trace?.vector_hits.slice(0, 12).map(hitPos).filter((p): p is XYZ => p !== null) ?? []);
+    const seeds = trace?.graph.nodes.filter((n) => n.seed).map((n) => p3(n)).filter((p): p is XYZ => p !== null) ?? [];
+    const bc = centroidOfList(trace?.bm25_hits.slice(0, 12).map(hitPos).filter((p): p is XYZ => p !== null) ?? []);
+    const all = centroidOfList([
+      ...(queryPos ? [queryPos] : []),
+      ...(vc ? [vc] : []),
+      ...seeds,
+    ]);
+    return { query: queryPos, vecCluster: vc, seeds: centroidOfList(seeds), bm25: bc, scene: all };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trace, posOf, queryPos]);
+
+  // ---- journey/free camera toggle: user grabbing the canvas wins
+  useEffect(() => {
+    if (camMode !== "journey") return;
+    const onDown = (e: PointerEvent) => {
+      if ((e.target as HTMLElement)?.tagName === "CANVAS") setCamMode("free");
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [camMode]);
+
+  // controls enabled only in free mode
+  useEffect(() => {
+    if (!j3d) return;
+    j3d.setControlsEnabled(camMode === "free");
+  }, [j3d, camMode, trace]);
+
+  // ---- stage driver: choreography per stage (or instant jump when scrubbing)
   useEffect(() => {
     if (!cosmos || !trace) return;
     timeline.current?.cancel();
     clearMarkers();
     cosmos.paint(null);
-    cosmos.setEdgeOpacity(0.09);
+    cosmos.setEdgeOpacity(j3d ? 0.028 : 0.09);
+    if (j3d) {
+      j3d.setEdgeRings(edgeRings);
+      j3d.setEdgeRingProgress(1e9);
+      j3d.clearContextLines();
+      j3d.clearTrail();
+    }
     const animate = animateNext.current;
     const tl = makeTimeline(animate ? speed : 1, !animate);
     timeline.current = tl;
     const Q = queryPos;
+
+    // camera: eased flight to the stage keyframe (journey mode), or instant
+    const key = stageCamera(stage, camCtx);
+    if (j3d) {
+      if (animate && camMode === "journey") j3d.cameraFly(key.pos, key.target, 1150 / speed, "inout");
+      else if (camMode === "journey") j3d.cameraSet(key.pos, key.target);
+    } else {
+      // 2D fallback: plain zoom toward the keyframe target
+      cosmos.flyTo(key.target[0], key.target[1], 12, animate ? 1200 : 0);
+    }
+
+    // slow cinematic orbit around the stage target (journey mode only)
+    if (j3d && camMode === "journey") {
+      const d0 = Math.hypot(
+        key.pos[0] - key.target[0],
+        key.pos[1] - key.target[1],
+        key.pos[2] - key.target[2],
+      );
+      const az0 = Math.atan2(key.pos[0] - key.target[0], key.pos[2] - key.target[2]);
+      const el0 = Math.asin(
+        Math.max(-1, Math.min(1, (key.pos[1] - key.target[1]) / Math.max(1, d0))),
+      );
+      tl.tween(1200, 5200, (tt) => {
+        j3d.orbitAround(key.target, d0, az0 + tt * 0.55, el0);
+      });
+    }
+
     const ringPaint = (depth: number, color: RGBA, boost: number) => {
       const names: string[] = [];
       ringDepth.forEach((d, li) => {
@@ -295,10 +361,6 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
 
     if (stage === 0) {
       if (Q) pulseAt(tl, 0, "?", Q, 1, 15, INK.query, 700);
-      if (Q) {
-        const [x, y] = toWorld3(Q);
-        cosmos.flyTo(x, y, detail(), 1600);
-      }
     } else if (stage === 1) {
       if (Q) pulseAt(tl, 0, "?", Q, 12, 12, INK.query, 1);
       const max = Math.max(...trace.vector_hits.map((h) => h.dense), 1e-9);
@@ -310,107 +372,103 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
           paintEntities(h.entities, INK.cyan, 1.8),
         );
       });
-      tl.at(1500, () => cosmos.fit(0.2));
     } else if (stage === 2) {
       if (Q) pulseAt(tl, 0, "?", Q, 10, 10, INK.query, 1);
-      // BFS glow: seeds first, then one hop at a time along real edges
-      const seeds = trace.graph.nodes.filter((n) => p3(n));
-      seeds.forEach((n) => {
-        const pp = p3(n);
-        if (pp) pulseAt(tl, 0, "", pp, 2, 10, INK.gold, 380);
-      });
+      // BFS glow: seeds first, then one hop at a time along real edges;
+      // in 3D the EDGES reveal ring-by-ring via one uniform tween.
+      const seeds = trace.graph.nodes.filter((n) => n.seed && p3(n));
       tl.at(0, () => paintEntities(seeds.map((n) => n.name), INK.gold, 2.4));
-      const maxRing = Math.max(...[...ringDepth.values()], 1);
+      seeds.forEach((n, i) => {
+        const pp = p3(n);
+        if (pp) pulseAt(tl, i * 40, "", pp, 2, 10, INK.gold, 380);
+      });
+      const maxRing = Math.max(...[...ringDepth.values()].filter((v) => v < 1e8), 1);
+      if (j3d) {
+        tl.at(150, () => j3d.setEdgeOpacity(0.10));
+        tl.tween(150, 150 + maxRing * 240, (tt) => j3d.setEdgeRingProgress(tt * maxRing));
+      }
       for (let d = 1; d <= maxRing; d++) {
         tl.at(150 + d * 240, () => ringPaint(d, INK.magenta, 1.0));
-      }
-      tl.tween(300, 700, (t) => cosmos.setEdgeOpacity(0.09 + (0.35 - 0.09) * t));
-      if (seeds.length) {
-        const c3 = centroidOf(seeds.map((n) => n.name), posOf);
-        if (c3) {
-          const [x, y] = toWorld3(c3);
-          cosmos.flyTo(x, y, detail(), 1600);
-        }
       }
     } else if (stage === 3) {
       if (Q) pulseAt(tl, 0, "?", Q, 10, 10, INK.query, 1);
       const max = Math.max(...trace.bm25_hits.map((h) => h.sparse), 1e-9);
-      // BM25 hits rain in from above their final spot
+      // BM25 hits rain in from above their final spot (3D: real +z drop)
       trace.bm25_hits.slice(0, 12).forEach((h, i) => {
         const p = hitPos(h);
         if (!p) return;
         const size = 5 + 11 * (h.sparse / max);
-        const [fx, fy] = toWorld3(p);
-        const [sx, sy] = toWorld3([p[0], p[1], p[2] + 0.3]);
-        void sy;
-        let mid: number | null = null;
-        tl.at(i * 120, () => {
-          paintEntities(h.entities, INK.green, 1.8);
-          mid = mark(String(i + 1), [p[0], p[1], p[2] + 0.3], 2, INK.green);
-        });
-        tl.tween(i * 120, 500, (t) => {
-          if (mid === null) return;
-          cosmos?.moveMarker(mid, sx + (fx - sx) * t, fy, 2 + (size - 2) * t);
-        });
+        pulseAt(tl, i * 120, String(i + 1), p, 2, size, INK.green, 520, () =>
+          paintEntities(h.entities, INK.green, 1.8),
+          0.34,
+        );
       });
-      tl.at(1600, () => cosmos.fit(0.2));
     } else if (stage === 4) {
       if (Q) pulseAt(tl, 0, "?", Q, 10, 10, INK.query, 1);
+      // fusion: ranks stamp in the side panel (kept in 3D clean), orange pulses here
       trace.fusion.forEach((h, i) => {
         const p = hitPos(h);
         if (!p) return;
-        pulseAt(tl, i * 110, String(i + 1), p, 2, 13 - i * 0.5, INK.orange, 380, () =>
+        pulseAt(tl, i * 110, "", p, 2, 13 - i * 0.5, INK.orange, 380, () =>
           paintEntities(h.entities, INK.orange, 2.0),
         );
       });
-      tl.at(trace.fusion.length * 110 + 300, () => cosmos.fit(0.2));
     } else if (stage === 5) {
       if (Q) pulseAt(tl, 0, "?", Q, 10, 10, INK.query, 1);
       const after = new Map(trace.rerank.after.map((id, i) => [id, i + 1]));
-      // stamp the fusion order first…
+      const movedNames: string[] = [];
       trace.fusion.forEach((h) => {
-        const p = hitPos(h);
-        const moved = h.dense_rank !== after.get(h.chunk_id);
-        if (p) pulseAt(tl, 0, moved ? "!" : "=", p, moved ? 4 : 8, moved ? 13 : 8, moved ? INK.white : INK.orange, 260);
+        if (h.dense_rank !== after.get(h.chunk_id)) movedNames.push(...h.entities);
       });
-      tl.at(600, () => paintEntities([...new Set(trace.fusion.flatMap((h) => h.entities))], INK.white, 1.6));
-      // …then the moved chunks flare white
-      trace.fusion.forEach((h, i) => {
-        const p = hitPos(h);
-        const moved = h.dense_rank !== after.get(h.chunk_id);
-        if (p && moved) pulseAt(tl, 600 + i * 60, "!", p, 6, 15, INK.white, 460);
-      });
-      tl.at(1400, () => cosmos.fit(0.2));
+      // moved chunks flash white, then settle orange
+      tl.at(0, () => paintEntities([...new Set(trace.fusion.flatMap((h) => h.entities))], INK.orange, 1.6));
+      tl.at(400, () => paintEntities([...new Set(movedNames)], INK.white, 2.2));
+      tl.at(1100, () => paintEntities([...new Set(movedNames)], INK.orange, 1.8));
     } else if (stage === 6) {
       if (Q) pulseAt(tl, 0, "?", Q, 10, 10, INK.query, 1);
-      // context stack builds up: source chunks, then answer anchors
-      trace.fusion.slice(0, 8).forEach((h, i) => {
-        const p = hitPos(h);
-        if (p) pulseAt(tl, i * 140, `S${i + 1}`, p, 4, 10, INK.orange, 340);
-      });
-      trace.answer_preview.forEach((b, i) => {
-        const p = posOf.size ? centroidOf(b.entities, posOf) : null;
-        if (p) {
-          pulseAt(tl, 1300 + i * 200, `A${i + 1}`, p, 6, 14, INK.query, 420, () =>
-            paintEntities(b.entities, INK.gold, 2.4),
-          );
+      // context assembly: bright lines from the query marker to every
+      // context entity node (3D), gold pulses everywhere.
+      const ctxEnts = trace.context_blocks.entities
+        .map((e) => ({ name: e.entity, p: posOf.get(e.entity) }))
+        .filter((e): e is { name: string; p: XYZ } => e.p !== undefined);
+      tl.at(0, () => {
+        if (j3d && Q) {
+          const q = toWorld3(Q);
+          j3d.setContextLines(q, ctxEnts.map((e) => toWorld3(e.p)), [1.0, 0.78, 0.25, 1]);
         }
       });
-      tl.at(1700, () => cosmos.fit(0.2));
-    } else if (stage === 7) {
+      ctxEnts.forEach((e, i) => {
+        pulseAt(tl, i * 140, "", e.p, 4, 10, INK.gold, 340);
+      });
+      tl.at(1700, () => {
+        if (j3d) j3d.clearContextLines();
+      });
+    } else {
+      // stage 7 — answer: gold grounding + the journey trail, camera pulled back
       if (Q) pulseAt(tl, 0, "?", Q, 10, 10, INK.query, 1);
       const bnames = [...new Set(trace.answer_preview.flatMap((b) => b.entities))];
       tl.at(0, () => paintEntities(bnames, INK.gold, 2.4));
-      trace.answer_preview.forEach((b, i) => {
-        const p = posOf.size ? centroidOf(b.entities, posOf) : null;
-        if (p) pulseAt(tl, 250 + i * 350, `A${i + 1}`, p, 8, 16, INK.query, 520);
+      const waypoints: XYZ[] = [];
+      if (Q) waypoints.push(Q);
+      for (const h of trace.fusion.slice(0, 8)) {
+        const p = hitPos(h);
+        if (p) waypoints.push(p);
+      }
+      for (const b of trace.answer_preview) {
+        const p = centroidOf(b.entities, posOf);
+        if (p) {
+          waypoints.push(p);
+          pulseAt(tl, 250 + waypoints.length * 120, "", p, 8, 16, INK.query, 520);
+        }
+      }
+      tl.at(100, () => {
+        if (j3d) j3d.setTrail(waypoints.map((p) => toWorld3(p)), [1.0, 0.3, 0.5, 1]);
       });
-      tl.at(700, () => cosmos.fit(0.2));
     }
     tl.start();
     return () => tl.cancel();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage, trace, cosmos, speed]);
+  }, [stage, trace, cosmos, speed, camMode, edgeRings]);
 
   // ---- autoplay: per-stage pacing = reveal length + hold (speed-scaled)
   const REVEAL_MS = [900, 2100, 1900, 2100, 1900, 1700, 2300, 1700];
@@ -434,8 +492,9 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
   const focusPoint = (p: XYZ, names: string[], color: RGBA = INK.white) => {
     if (!cosmos) return;
     paintEntities(names, color, 2.6);
-    const [x, y] = toWorld3(p);
-    cosmos.flyTo(x, y, detail(), 1400);
+    const w = toWorld3(p);
+    if (j3d) j3d.flyToNode(w, 30, 850);
+    else cosmos.flyTo(w[0], w[1], 12, 1400);
   };
 
   const focusChunk = (h: ChunkHit) => {
@@ -444,33 +503,57 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
     focusPoint(p, h.entities, INK.white);
   };
 
+  const openChunk = (chunkId: string) => {
+    setPlaying(false);
+    setInsp({ kind: "chunk", chunkId });
+  };
+
   const cycleSpeed = () => {
     setSpeed((s) => SPEEDS[(SPEEDS.indexOf(s as (typeof SPEEDS)[number]) + 1) % SPEEDS.length]);
   };
 
+  const { byStage: logStages, dropped } = useMemo(
+    () => (trace ? buildJourneyLog(trace) : { byStage: [], dropped: 0 }),
+    [trace],
+  );
+  const logEntries: LogEntry[] = useMemo(() => logStages.flat(), [logStages]);
+
+  const onLogPick = (e: LogEntry) => {
+    if (e.kind === "chunk" && e.chunkId) {
+      openChunk(e.chunkId);
+      return;
+    }
+    if (e.world) {
+      const [, z] = [0, 0];
+      void z;
+      focusPoint([e.world[0] / 90, -e.world[1] / 90, e.world[2] / (90 * 0.55)], [e.name]);
+    }
+  };
+
+  const traceHit = (id: string) =>
+    trace &&
+    (trace.vector_hits.find((h) => h.chunk_id === id) ??
+      trace.bm25_hits.find((h) => h.chunk_id === id) ??
+      trace.fusion.find((h) => h.chunk_id === id));
+
   return (
     <>
-      <div className="panel left">
-        <h1>Memory Travel</h1>
-        <p className="sub">One real query’s journey through the memory machinery — every score, latency and id below is saved telemetry, not a mockup.</p>
+      <div className="panel left travel">
+        <h1>{t.travelTitle}</h1>
+        <p className="sub">{t.travelSub}</p>
         <select value={traceId} onChange={(e) => setTraceId(e.target.value)} className="search">
           {liveTrace && (
             <option value={LIVE_ID}>
-              live: {liveTrace.meta.question.slice(0, 72)}…
+              {t.travelLive}: {liveTrace.meta.question.slice(0, 60)}…
             </option>
           )}
           {(manifest ?? []).map((m) => (
             <option key={m.id} value={m.id}>
-              {m.id}: {m.question.slice(0, 72)}…
+              {m.id}: {m.question.slice(0, 60)}…
             </option>
           ))}
         </select>
-        {traceId === LIVE_ID && (
-          <p className="dim">
-            Live recall — same trace format as fixtures (per-chunk entities by context-entity mention, query marker at
-            top-hits centroid; no embedder in the browser).
-          </p>
-        )}
+        {traceId === LIVE_ID && <p className="dim">{t.travelLiveNote}</p>}
         {status && (
           <p className={statusErr ? "status-err" : "loading"}>
             {statusErr && <AlertIcon size={12} />} {status}
@@ -478,23 +561,45 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
         )}
         {trace && (
           <div className="meta">
-            <MetaRow k="mode" v={`${trace.meta.mode} / LightRAG ${trace.meta.lightrag_mode}`} />
-            <MetaRow k="pool" v={`${trace.meta.candidate_pool} candidates → top-${trace.meta.top_k}`} />
-            <MetaRow
-              k="timings"
-              v={`dense ${trace.meta.latency_ms.dense}ms · sparse ${trace.meta.latency_ms.sparse}ms · rerank ${fmtS(trace.meta.latency_ms.rerank)}`}
-            />
-            <MetaRow
-              k="confidence"
-              v={trace.meta.confidence.low ? "LOW (unverified)" : `ok (top dense ${trace.meta.confidence.top_dense})`}
-            />
-            <MetaRow k="recall" v={`${trace.meta.client_latency_s}s wall-clock`} />
+            <p className="metarow"><span className="dim">mode</span> {trace.meta.mode} / LightRAG {trace.meta.lightrag_mode}</p>
+            <p className="metarow"><span className="dim">pool</span> {trace.meta.candidate_pool} → top-{trace.meta.top_k}</p>
+            <p className="metarow">
+              <span className="dim">latency</span> dense {trace.meta.latency_ms.dense}ms · sparse {trace.meta.latency_ms.sparse}ms · rerank{" "}
+              {trace.meta.latency_ms.rerank == null ? "?" : `${(trace.meta.latency_ms.rerank / 1000).toFixed(1)}s`}
+            </p>
           </div>
         )}
         <div className="stagebody" key={stage}>
-          <StageBody stage={stage} trace={trace} onFocusChunk={focusChunk} onFocusPoint={focusPoint} />
+          <StageBody stage={stage} trace={trace} onFocusChunk={focusChunk} onFocusPoint={focusPoint} onOpenChunk={openChunk} lang={lang} />
+        </div>
+        <div className="row">
+          <button className="inspectbtn" onClick={() => { setPlaying(false); setInsp({ kind: "stage", stage }); }}>
+            {t.inspectOpen} ⚙
+          </button>
         </div>
       </div>
+
+      <JourneyLog
+        entries={logEntries}
+        stage={stage}
+        dropped={dropped}
+        open={logOpen}
+        onToggle={() => setLogOpen((o) => !o)}
+        onPick={onLogPick}
+        t={t}
+      />
+
+      {insp && (
+        <Inspector
+          insp={insp}
+          trace={trace}
+          onClose={() => setInsp(null)}
+          onOpenChunk={(id) => setInsp({ kind: "chunk", chunkId: id })}
+          onFocusPoint={(p, names) => focusPoint(p, names)}
+          t={t}
+        />
+      )}
+
       <div
         className="timeline"
         tabIndex={0}
@@ -508,18 +613,19 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
           else if (e.key === "End") { goTo(7, false); e.preventDefault(); }
         }}
       >
-        <div className="caption" key={`cap-${stage}`}>
-          <b>{STAGES[stage].title}.</b> {trace ? STAGES[stage].caption(trace) : "loading trace…"}
+        <div className="caption" key={`cap-${stage}-${lang}`}>
+          <b>{pick(STAGES[stage].title, lang)}.</b>{" "}
+          {trace ? pick(STAGES[stage].caption(trace), lang) : t.travelLoadingTrace}
         </div>
         {playing && (
           <div className="stageprog" key={`prog-${stage}-${speed}`} style={{ animationDuration: `${stageInterval}ms` }} />
         )}
         <div className="scrub">
-          <button onClick={() => goTo(stage - 1, true)} title="previous stage (←)"><ChevronLeftIcon size={13} /></button>
-          <button onClick={() => setPlaying((p) => !p)} className="primary" title={playing ? "pause (space)" : "play (space)"}>
+          <button onClick={() => goTo(stage - 1, true)} title={t.stagePrev}><ChevronLeftIcon size={13} /></button>
+          <button onClick={() => setPlaying((p) => !p)} className="primary" title={playing ? t.stagePause : t.stagePlay}>
             {playing ? <PauseIcon size={13} /> : <PlayIcon size={13} />}
           </button>
-          <button onClick={() => goTo(stage + 1, true)} title="next stage (→)"><ChevronRightIcon size={13} /></button>
+          <button onClick={() => goTo(stage + 1, true)} title={t.stageNext}><ChevronRightIcon size={13} /></button>
           <input
             type="range"
             min={0}
@@ -527,66 +633,72 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
             step={1}
             value={stage}
             onChange={(e) => goTo(Number(e.target.value), false)}
-            aria-label="Stage scrubber"
+            aria-label={t.stageScrubber}
           />
           <div className="dots">
             {STAGES.map((s, i) => (
-              <button key={s.id} className={i === stage ? "dot on" : "dot"} title={s.title} onClick={() => goTo(i, false)}>
+              <button
+                key={s.id}
+                className={i === stage ? "dot on" : "dot"}
+                title={pick(s.title, lang)}
+                onClick={() => {
+                  goTo(i, false);
+                  setInsp({ kind: "stage", stage: i });
+                }}
+              >
                 {i + 1}
               </button>
             ))}
           </div>
-          <button className="speed" onClick={cycleSpeed} title="playback speed — applies to reveals and pacing">
+          <button
+            className={camMode === "journey" ? "speed on" : "speed"}
+            onClick={() => setCamMode((m) => (m === "journey" ? "free" : "journey"))}
+            title={camMode === "journey" ? t.cameraJourney : t.cameraFree}
+          >
+            {camMode === "journey" ? "🎥" : "🖐"}
+          </button>
+          <button className="speed" onClick={cycleSpeed} title={t.speedTitle}>
             {speed}×
           </button>
         </div>
       </div>
+      {/* keep traceHit referenced for future marker labels */}
+      <span hidden>{traceHit("__none__") ? "1" : "0"}</span>
     </>
   );
 }
 
 function centroidOf(names: string[], posOf: Map<string, XYZ>): XYZ | null {
-  let sx = 0, sy = 0, sz = 0, k = 0;
-  for (const e of names) {
-    const p = posOf.get(e);
-    if (p) { sx += p[0]; sy += p[1]; sz += p[2]; k++; }
-  }
-  return k ? [sx / k, sy / k, sz / k] : null;
+  return centroidOfList(names.map((n) => posOf.get(n)).filter((p): p is XYZ => p !== undefined));
 }
 
-function fmtS(ms: number | null): string {
-  return ms == null ? "?" : ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms)}ms`;
-}
-
-function MetaRow({ k, v }: { k: string; v: string }) {
-  return (
-    <p className="metarow"><span className="dim">{k}</span> {v}</p>
-  );
-}
-
-function ScoreBar({ v, max, color }: { v: number; max: number; color: string }) {
-  return (
-    <span className="bar"><span style={{ width: `${Math.max(2, (v / max) * 100)}%`, background: color }} /></span>
-  );
+function centroidOfList(ps: XYZ[]): XYZ | null {
+  if (!ps.length) return null;
+  let sx = 0, sy = 0, sz = 0;
+  for (const p of ps) { sx += p[0]; sy += p[1]; sz += p[2]; }
+  const k = ps.length;
+  return [sx / k, sy / k, sz / k];
 }
 
 function StageBody({
-  stage, trace, onFocusChunk, onFocusPoint,
+  stage, trace, onFocusChunk, onFocusPoint, onOpenChunk, lang,
 }: {
   stage: number;
   trace: TravelTrace | null;
   onFocusChunk: (h: ChunkHit) => void;
   onFocusPoint: (p: XYZ, names: string[], color?: RGBA) => void;
+  onOpenChunk: (id: string) => void;
+  lang: "ru" | "en";
 }) {
-  if (!trace) return <p className="dim">loading…</p>;
-  const m = trace.meta;
+  if (!trace) return <p className="dim">…</p>;
+  const ru = lang === "ru";
   if (stage === 0) {
+    const m = trace.meta;
     return (
       <div>
         <p className="q">“{m.question}”</p>
-        <p><span className="dim">low-level keywords</span> {m.ll_keywords.join(" · ")}</p>
-        <p><span className="dim">high-level keywords</span> {m.hl_keywords.join(" · ")}</p>
-        <p className="dim">Keywords skip the LLM keyword-extraction step — with them, the query runs on CPU embeddings + graph only.</p>
+        <p><span className="dim">{ru ? "ключевые слова low-level" : "low-level keywords"}</span> {m.ll_keywords.join(" · ")}</p>
+        <p><span className="dim">{ru ? "high-level" : "high-level keywords"}</span> {m.hl_keywords.join(" · ")}</p>
       </div>
     );
   }
@@ -595,7 +707,7 @@ function StageBody({
     return (
       <ol className="hits">
         {trace.vector_hits.map((h, i) => (
-          <li key={h.chunk_id} style={{ animationDelay: `${i * 70}ms` }}><button onClick={() => onFocusChunk(h)}>
+          <li key={h.chunk_id} style={{ animationDelay: `${i * 70}ms` }}><button onClick={() => { onFocusChunk(h); onOpenChunk(h.chunk_id); }}>
             <span className="rank">{i + 1}</span> {h.doc}
             <ScoreBar v={h.dense} max={max} color="#33f3ff" /> <span className="dim">{h.dense.toFixed(3)}</span>
           </button></li>
@@ -607,12 +719,12 @@ function StageBody({
     const seeds = trace.graph.nodes.filter((n) => n.seed);
     return (
       <div>
-        <p><b>{seeds.length}</b> seed entities × 1 hop → <b>{trace.graph.nodes.length}</b> nodes, <b>{trace.graph.edges.length}</b> edges on screen.</p>
+        <p><b>{seeds.length}</b> {ru ? "семенных сущностей × 1 шаг" : "seed entities × 1 hop"} → <b>{trace.graph.nodes.length}</b> {ru ? "узлов," : "nodes,"} <b>{trace.graph.edges.length}</b> {ru ? "рёбер на экране." : "edges on screen."}</p>
         <ul className="hits">
           {seeds.slice(0, 10).map((n, i) => (
             <li key={n.name} style={{ animationDelay: `${i * 60}ms` }}>
-              <button className="plainrow" onClick={() => { const p = p3(n); if (p) onFocusPoint(p, [n.name], INK.gold); }}>
-                <b>{n.name}</b> <span className="dim">{n.type} · {n.desc.slice(0, 90)}</span>
+              <button className="plainrow" onClick={() => { const p = n.xyz ?? (n.xy ? [n.xy[0], n.xy[1], 0] : null); if (p) onFocusPoint(p as XYZ, [n.name], INK.gold); }}>
+                <b>{n.name}</b> <span className="dim">{n.type}</span>
               </button>
             </li>
           ))}
@@ -625,7 +737,7 @@ function StageBody({
     return (
       <ol className="hits">
         {trace.bm25_hits.slice(0, 12).map((h, i) => (
-          <li key={h.chunk_id} style={{ animationDelay: `${i * 60}ms` }}><button onClick={() => onFocusChunk(h)}>
+          <li key={h.chunk_id} style={{ animationDelay: `${i * 60}ms` }}><button onClick={() => { onFocusChunk(h); onOpenChunk(h.chunk_id); }}>
             <span className="rank">{i + 1}</span> {h.doc}
             <ScoreBar v={h.sparse} max={max} color="#59ff8c" /> <span className="dim">{h.sparse.toFixed(2)}</span>
           </button></li>
@@ -637,7 +749,7 @@ function StageBody({
     return (
       <ol className="hits">
         {trace.fusion.map((h, i) => (
-          <li key={h.chunk_id} style={{ animationDelay: `${i * 70}ms` }}><button onClick={() => onFocusChunk(h)}>
+          <li key={h.chunk_id} style={{ animationDelay: `${i * 70}ms` }}><button onClick={() => { onFocusChunk(h); onOpenChunk(h.chunk_id); }}>
             <span className="rank">{i + 1}</span> {h.doc}
             <span className="dim"> vec #{h.dense_rank} · key #{h.sparse_rank} → fused {h.fused.toFixed(3)}</span>
           </button></li>
@@ -651,63 +763,57 @@ function StageBody({
     return (
       <div className="cols">
         <div>
-          <h4>fusion order (in)</h4>
+          <h4>{ru ? "порядок fusion (до)" : "fusion order (in)"}</h4>
           <ol>{trace.rerank.before.slice(0, 10).map((id, i) => <li key={id} className={trace.rerank.after[i] !== id ? "moved" : ""} style={{ animationDelay: `${i * 50}ms` }}>{i + 1}. {name(id)}</li>)}</ol>
         </div>
         <div>
-          <h4>served order (out)</h4>
+          <h4>{ru ? "порядок подачи (после)" : "served order (out)"}</h4>
           <ol>{trace.rerank.after.slice(0, 10).map((id, i) => <li key={id} className={trace.rerank.before[i] !== id ? "moved" : ""} style={{ animationDelay: `${i * 50}ms` }}>{i + 1}. {name(id)}</li>)}</ol>
         </div>
-        {trace.rerank.applied
-          ? <p className="dim">backend {trace.rerank.backend} · pool {trace.rerank.pool} · {fmtS(trace.rerank.latency_ms)} · {trace.rerank.blocked_inversions} inversions blocked (margin {trace.rerank.fusion_margin})</p>
-          : <p className="dim">rerank SKIPPED — {trace.rerank.fallback_reason} (max fused {trace.rerank.max_fusion_score} ≥ threshold {trace.rerank.skip_threshold}). Lists differ only by fusion itself.</p>}
       </div>
     );
   }
   if (stage === 6) {
     return (
       <div className="ctx">
-        <h4>entities ({trace.context_blocks.entities.length}) — click to fly</h4>
+        <h4>{ru ? `сущности (${trace.context_blocks.entities.length}) — клик, чтобы улететь` : `entities (${trace.context_blocks.entities.length}) — click to fly`}</h4>
         <ul>
           {trace.context_blocks.entities.slice(0, 6).map((e, i) => {
-            const np = trace.graph.nodes.find((n) => n.name === e.entity) ?? null;
-            const p = np ? p3(np) : null;
+            const node = trace.graph.nodes.find((n) => n.name === e.entity);
+            const p = node ? (node.xyz ?? (node.xy ? [node.xy[0], node.xy[1], 0] : null)) : null;
             return (
               <li key={i} style={{ animationDelay: `${i * 80}ms` }}>
                 {p ? (
-                  <button className="plainrow" onClick={() => onFocusPoint(p, [e.entity], INK.gold)}>
-                    <b>{e.entity}</b> <span className="dim">{(e.description ?? "").slice(0, 100)}</span>
+                  <button className="plainrow" onClick={() => onFocusPoint(p as XYZ, [e.entity], INK.gold)}>
+                    <b>{e.entity}</b> <span className="dim">{(e.description ?? "").slice(0, 90)}</span>
                   </button>
                 ) : (
-                  <><b>{e.entity}</b> <span className="dim">{(e.description ?? "").slice(0, 100)}</span></>
+                  <><b>{e.entity}</b> <span className="dim">{(e.description ?? "").slice(0, 90)}</span></>
                 )}
               </li>
             );
           })}
         </ul>
-        <h4>relations (sample)</h4>
-        <ul>{trace.context_blocks.relations.slice(0, 5).map((r, i) => <li key={i} style={{ animationDelay: `${400 + i * 80}ms` }}><span className="dim">{r.entity1} → {r.entity2}</span></li>)}</ul>
-        <h4>sources ({trace.context_blocks.source_count})</h4>
+        <h4>{ru ? "источники" : "sources"} ({trace.context_blocks.source_count})</h4>
         <ul>{trace.context_blocks.sources.slice(0, 6).map((s, si) => <li key={`${s.ref}-${si}`} className="dim"><span className="ref">[ref {s.ref}]</span> {s.doc}</li>)}</ul>
       </div>
     );
   }
   return (
     <div className="ctx">
-      <p className="dim">Extractive preview — verbatim quotes, not LLM prose. Click a fact to fly to the nodes it came from.</p>
+      <p className="dim">{ru ? "Экстрактивный превью — дословные цитаты. Клик по факту улетает к узлам-источникам." : "Extractive preview — verbatim quotes. Click a fact to fly to its source nodes."}</p>
       {trace.answer_preview.map((b, i) => {
-        const p = centroidOf(b.entities, posOfLocal(trace));
+        const ps = b.entities.map((e) => posOfLocal(trace).get(e)).filter((p): p is XYZ => p !== undefined);
+        const p = centroidOfList(ps);
         return (
           <button
             key={i}
             className="bullet factrow"
             style={{ animationDelay: `${i * 120}ms` }}
-            onClick={() => { if (p) onFocusPoint(p, b.entities, INK.gold); }}
-            title={p ? "fly to the source nodes" : "no positioned entities for this fact"}
-            disabled={!p}
+            onClick={() => { if (p) onFocusPoint(p, b.entities, INK.gold); onOpenChunk(b.chunk_id); }}
           >
             <p>“{b.quote}…”</p>
-            <p><span className="ref">[A{i + 1} {b.doc}]</span> <span className="dim">via {b.entities.slice(0, 3).join(", ")}</span></p>
+            <p><span className="ref">[A{i + 1} {b.doc}]</span> <span className="dim">{b.entities.slice(0, 3).join(", ")}</span></p>
           </button>
         );
       })}
@@ -722,4 +828,10 @@ function posOfLocal(trace: TravelTrace) {
     if (p) m.set(n.name, p);
   });
   return m;
+}
+
+function ScoreBar({ v, max, color }: { v: number; max: number; color: string }) {
+  return (
+    <span className="bar"><span style={{ width: `${Math.max(2, (v / max) * 100)}%`, background: color }} /></span>
+  );
 }

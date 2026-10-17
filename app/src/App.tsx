@@ -3,6 +3,7 @@ import CosmosCanvas, { type RenderMode } from "./components/CosmosCanvas";
 import CosmosView from "./components/CosmosView";
 import AboutModal from "./components/AboutModal";
 import ErrorOverlay from "./components/ErrorOverlay";
+import PresentationView from "./components/PresentationView";
 import QueryBar, { type HistoryEntry } from "./components/QueryBar";
 import TravelView from "./components/TravelView";
 import { SparkIcon, XIcon } from "./components/icons";
@@ -13,6 +14,7 @@ import { compileLiveTrace } from "./lib/compileLive";
 import { loadChunkCoords, loadEntityCoords, loadGraph, loadManifest, loadNodeIndex } from "./lib/data";
 import { memoryRecallLive } from "./lib/live";
 import type { CosmosGraph, TraceManifestEntry, TravelTrace } from "./lib/types";
+import { useI18n } from "./i18n/useI18n";
 
 const HISTORY_KEY = "mt.history.v1";
 const HISTORY_MAX = 8;
@@ -34,7 +36,9 @@ function saveHistory(h: HistoryEntry[]): void {
 }
 
 export default function App() {
+  const { t, lang, setLangL10n } = useI18n();
   const [tab, setTab] = useState<"cosmos" | "travel">("cosmos");
+  const [presenting, setPresenting] = useState(false);
   const [cosmosFull, setCosmosFull] = useState<AnyCosmos | null>(null);
   const [cosmosTravel, setCosmosTravel] = useState<AnyCosmos | null>(null);
   const [graph, setGraph] = useState<CosmosGraph | null>(null);
@@ -234,54 +238,63 @@ export default function App() {
 
   return (
     <div className="app">
-      <div className={tab === "cosmos" ? "canvaswrap" : "canvaswrap hidden"}>
-        <CosmosCanvas label="cosmos" onCosmos={setCosmosFull} onSelect={() => {}} onHover={() => {}} onError={onCanvasError} onMode={onMode} />
-      </div>
-      <div className={tab === "travel" ? "canvaswrap" : "canvaswrap hidden"}>
-        <CosmosCanvas label="travel" onCosmos={setCosmosTravel} onSelect={() => {}} onHover={() => {}} onError={onCanvasError} onMode={onMode} />
-      </div>
+      {presenting ? (
+        <PresentationView onExit={() => setPresenting(false)} />
+      ) : (
+        <>
+          <div className={tab === "cosmos" ? "canvaswrap" : "canvaswrap hidden"}>
+            <CosmosCanvas label="cosmos" onCosmos={setCosmosFull} onSelect={() => {}} onHover={() => {}} onError={onCanvasError} onMode={onMode} />
+          </div>
+          <div className={tab === "travel" ? "canvaswrap" : "canvaswrap hidden"}>
+            <CosmosCanvas label="travel" onCosmos={setCosmosTravel} onSelect={() => {}} onHover={() => {}} onError={onCanvasError} onMode={onMode} />
+          </div>
 
-      <header className="topbar">
-        <span className="brand">
-          <SparkIcon size={13} /> MEMORY TRAVEL <span className="dim">· how machine memory remembers</span>
-        </span>
-        <nav>
-          <button className={tab === "cosmos" ? "on" : ""} onClick={() => setTab("cosmos")}>cosmos</button>
-          <button className={tab === "travel" ? "on" : ""} onClick={() => setTab("travel")}>travel</button>
-          <button className="doclink" onClick={() => setAbout(true)} title="what this is, data provenance, controls">
-            about · v1
-          </button>
-        </nav>
-      </header>
+          <header className="topbar">
+            <span className="brand">
+              <SparkIcon size={13} /> MEMORY TRAVEL <span className="dim">{t.brandSub}</span>
+            </span>
+            <nav>
+              <button className={tab === "cosmos" ? "on" : ""} onClick={() => setTab("cosmos")}>{t.tabCosmos}</button>
+              <button className={tab === "travel" ? "on" : ""} onClick={() => setTab("travel")}>{t.tabTravel}</button>
+              <button className="langtoggle" onClick={() => setLangL10n(lang === "ru" ? "en" : "ru")} title={lang === "ru" ? "Switch to English" : "Переключить на русский"}>
+                {lang.toUpperCase()}
+              </button>
+              <button className="doclink" onClick={() => setAbout(true)}>
+                {t.aboutLink}
+              </button>
+            </nav>
+          </header>
 
-      <QueryBar
-        asking={asking}
-        error={askError}
-        note={askNote}
-        ready={liveReady}
-        elapsedS={elapsedS}
-        history={history}
-        onAsk={askLive}
-        onCancel={cancelAsk}
-        onPickHistory={askLive}
-        onClearHistory={() => {
-          setHistory([]);
-          saveHistory([]);
-        }}
-      />
+          <QueryBar
+            asking={asking}
+            error={askError}
+            note={askNote}
+            ready={liveReady}
+            elapsedS={elapsedS}
+            history={history}
+            onAsk={askLive}
+            onCancel={cancelAsk}
+            onPickHistory={askLive}
+            onClearHistory={() => {
+              setHistory([]);
+              saveHistory([]);
+            }}
+          />
 
-      {tab === "cosmos" && (
-        <CosmosView
-          cosmos={cosmosFull}
-          graph={graph}
-          names={names}
-          loading={progress}
-          onTour={() => setTab("travel")}
-          focusNode={focusNode}
-          mode={renderMode}
-        />
+          {tab === "cosmos" && (
+            <CosmosView
+              cosmos={cosmosFull}
+              graph={graph}
+              names={names}
+              loading={progress}
+              onTour={() => setPresenting(true)}
+              focusNode={focusNode}
+              mode={renderMode}
+            />
+          )}
+          {tab === "travel" && <TravelView cosmos={cosmosTravel} manifest={manifest} liveTrace={liveTrace} />}
+        </>
       )}
-      {tab === "travel" && <TravelView cosmos={cosmosTravel} manifest={manifest} liveTrace={liveTrace} />}
 
       {about && <AboutModal onClose={() => setAbout(false)} />}
       {dataError && (
