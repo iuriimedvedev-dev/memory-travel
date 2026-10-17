@@ -98,6 +98,7 @@ export default function PresentationView({ onExit }: { onExit: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cosmosFull, graph, posByIdx, chViz]);
 
+  const [traceLoaded, setTraceLoaded] = useState(0);
   useEffect(() => {
     if (chViz !== "trace" || !cosmosTrace || !trace) return;
     let dead = false;
@@ -118,7 +119,13 @@ export default function PresentationView({ onExit }: { onExit: () => void }) {
           return p ? toWorld3(p) : null;
         }),
       )
-      .then(() => !dead && setProgress(null))
+      .then(() => {
+        if (dead) return;
+        setProgress(null);
+        // load() ends with fit(): re-run the chapter choreography so the
+        // chapter camera keyframe wins over the fit position
+        setTraceLoaded((v) => v + 1);
+      })
       .catch((e) => !dead && setProgress(String(e)));
     return () => {
       dead = true;
@@ -172,12 +179,13 @@ export default function PresentationView({ onExit }: { onExit: () => void }) {
     } else if (trace) {
       const stage = ch.stage ?? 0;
       const qpos = trace.query.xyz ?? null;
+      const W = (p: XYZ | null): XYZ | null => (p ? toWorld3(p) : null);
       const key = stageCamera(stage, {
-        query: qpos,
-        vecCluster: centroid(trace.vector_hits.slice(0, 12).map((h) => h.xyz).filter((p): p is XYZ => !!p)),
-        seeds: centroid(trace.graph.nodes.filter((n) => n.seed).map((n) => n.xyz).filter((p): p is XYZ => !!p)),
-        bm25: centroid(trace.bm25_hits.slice(0, 12).map((h) => h.xyz).filter((p): p is XYZ => !!p)),
-        scene: qpos,
+        query: W(qpos),
+        vecCluster: W(centroid(trace.vector_hits.slice(0, 12).map((h) => h.xyz).filter((p): p is XYZ => !!p))),
+        seeds: W(centroid(trace.graph.nodes.filter((n) => n.seed).map((n) => n.xyz).filter((p): p is XYZ => !!p))),
+        bm25: W(centroid(trace.bm25_hits.slice(0, 12).map((h) => h.xyz).filter((p): p is XYZ => !!p))),
+        scene: W(qpos),
       });
       if (j3d) j3d.cameraFly(key.pos, key.target, 1400, "inout");
       const paint = (names: string[], color: typeof INK.cyan) => {
@@ -247,7 +255,7 @@ export default function PresentationView({ onExit }: { onExit: () => void }) {
       });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chapter, trace, cosmosFull, cosmosTrace, chViz, posOf]);
+  }, [chapter, trace, cosmosFull, cosmosTrace, chViz, posOf, traceLoaded]);
 
   useEffect(() => {
     if (progress) return; // wait for data

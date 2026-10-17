@@ -40,7 +40,7 @@ export const CHAPTERS: PresentationChapter[] = [
     viz: "cosmos",
     title: { ru: "Что это", en: "What this is" },
     narration: ({ nodes, edges }) => ({
-      ru: `Перед вами долговременная память агента: ${MEASURED.docs.toLocaleString("ru-RU")} заметок превращены в ${nodes.toLocaleString("ru-RU")} сущностей и ${edges.toLocaleString("ru-RU")} связей. Это GraphRAG-гибрид: векторный поиск по смыслу + knowledge graph + BM25 по словам. Каждая звезда — реальная сущность продакшн-индекса, положение — 3D UMAP по 768-мерным векторам.`,
+      ru: `Перед вами долговременная память агента: ${MEASURED.docs.toLocaleString("ru-RU")} заметки превращены в ${nodes.toLocaleString("ru-RU")} сущностей и ${edges.toLocaleString("ru-RU")} связей. Это GraphRAG-гибрид: векторный поиск по смыслу + knowledge graph + BM25 по словам. Каждая звезда — реальная сущность продакшн-индекса, положение — 3D UMAP по 768-мерным векторам.`,
       en: `This is an agent's long-term memory: ${MEASURED.docs.toLocaleString("en-US")} notes distilled into ${nodes.toLocaleString("en-US")} entities and ${edges.toLocaleString("en-US")} relations. A GraphRAG hybrid: semantic vector search + a knowledge graph + BM25 over words. Every star is a real entity of the production index; positions are a 3D UMAP of 768-dim vectors.`,
     }),
     fact: ({ nodes, edges }) => ({

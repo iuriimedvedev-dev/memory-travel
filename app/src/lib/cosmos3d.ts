@@ -113,7 +113,7 @@ const POINT_FRAG = /* glsl */ `
     // Small per-star contribution: with 47k stars the GLOW comes from
     // additive overlap in dense clusters — vivid cores wash to white if
     // each sprite contributes too much.
-    float a = (core * 0.22 + halo * 0.08) * vAlpha;
+    float a = (core * 0.28 + halo * 0.10) * vAlpha;
     gl_FragColor = vec4(vColor * (0.72 + core * 0.55), a);
   }
 `;
@@ -162,6 +162,7 @@ const LINE_FRAG = /* glsl */ `
 
 const MARKER_VERT = POINT_VERT;
 const MARKER_FRAG = /* glsl */ `
+  uniform float uPulse; // seconds — beacons breathe
   varying vec3 vColor;
   varying float vAlpha;
   void main() {
@@ -264,7 +265,9 @@ export class Cosmos3D implements CosmosLike, Journey3D {
     }
     this.canvas = canvas;
     this.renderer = renderer;
-    this.dpr = Math.min(2, window.devicePixelRatio || 1);
+    // SwiftShader-class software rasterizers choke on dpr≥2 at 47k additive
+    // points; 1.5 keeps real-GPU sharpness while staying fast in software.
+    this.dpr = Math.min(1.5, window.devicePixelRatio || 1);
     renderer.setPixelRatio(this.dpr);
     renderer.setClearColor(BG, 1);
     this.camera = new THREE.PerspectiveCamera(55, 1, 0.1, 4000);
@@ -286,6 +289,10 @@ export class Cosmos3D implements CosmosLike, Journey3D {
     this.ro.observe(canvas);
     this.startPulseClock();
     this.renderer.setAnimationLoop(() => {
+      // hidden canvases (tab switches, presentation's inactive canvas) skip
+      // both the controls update and the render — keeps software rasterizers
+      // from burning frames on an invisible view
+      if (this.canvas && this.canvas.offsetParent === null) return;
       this.controls?.update();
       this.renderer?.render(this.scene, this.camera!);
     });
@@ -371,7 +378,7 @@ export class Cosmos3D implements CosmosLike, Journey3D {
       uniforms: {
         uScale: { value: this.pointScale() },
         uTime: { value: 0 },
-        uFog: { value: 0.55 },
+        uFog: { value: 0.4 },
         uFogRef: { value: this.fitDist },
       },
       transparent: true,

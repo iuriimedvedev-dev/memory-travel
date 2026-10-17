@@ -277,8 +277,11 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
     return arr;
   }, [trace, ringDepth]);
 
-  // journey-camera context per stage
+  // journey-camera context per stage (WORLD coords — stageCamera distances
+  // are world-scale; raw UMAP units would put the camera near the origin,
+  // staring at mostly empty space)
   const camCtx = useMemo(() => {
+    const W = (p: XYZ | null): XYZ | null => p ? toWorld3(p) : null;
     const vc = centroidOfList(trace?.vector_hits.slice(0, 12).map(hitPos).filter((p): p is XYZ => p !== null) ?? []);
     const seeds = trace?.graph.nodes.filter((n) => n.seed).map((n) => p3(n)).filter((p): p is XYZ => p !== null) ?? [];
     const bc = centroidOfList(trace?.bm25_hits.slice(0, 12).map(hitPos).filter((p): p is XYZ => p !== null) ?? []);
@@ -287,7 +290,7 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
       ...(vc ? [vc] : []),
       ...seeds,
     ]);
-    return { query: queryPos, vecCluster: vc, seeds: centroidOfList(seeds), bm25: bc, scene: all };
+    return { query: W(queryPos), vecCluster: W(vc), seeds: W(centroidOfList(seeds)), bm25: W(bc), scene: W(all) };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trace, posOf, queryPos]);
 
