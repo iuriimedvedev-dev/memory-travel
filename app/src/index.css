@@ -353,6 +353,14 @@ button { display: inline-flex; gap: 6px; align-items: center; justify-content: c
   border-top: 1px dashed var(--line); margin-top: 4px; padding-top: 7px; border-radius: 0;
 }
 
+/* ---- edges on/off + live zoom-adaptive intensity (cosmos legend area) ---- */
+.edgerow { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+.edgebtn { font-size: 11.5px; padding: 4px 9px; }
+.edgebtn.on { border-color: var(--accent); }
+.edgebtn.off { opacity: 0.5; }
+.edgebtn.off .icon { opacity: 0.6; }
+.edgepct { font-size: 10.5px; font-variant-numeric: tabular-nums; }
+
 /* ---- journey log (right side): visited nodes stream in per stage ---- */
 .jlog {
   position: absolute; top: 108px; right: 12px; width: 250px; max-height: 56vh;

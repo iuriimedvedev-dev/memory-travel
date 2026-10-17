@@ -28,6 +28,16 @@ interface HoverInfo {
 }
 
 const SEARCH_HIGHLIGHT_CAP = 3000;
+/** localStorage key for the edges on/off preference (default ON). */
+const EDGES_KEY = "mt.edges.v1";
+
+function readEdgesPref(): boolean {
+  try {
+    return localStorage.getItem(EDGES_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
 
 export default function CosmosView({ cosmos, graph, names, loading, onTour, focusNode, mode }: Props) {
   const { t } = useI18n();
@@ -38,6 +48,8 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [legendOpen, setLegendOpen] = useState(false);
   const [zoom, setZoom] = useState<number | null>(null);
+  const [edgesOn, setEdgesOn] = useState<boolean>(readEdgesPref);
+  const [edgePct, setEdgePct] = useState<number | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // ---- family census for the legend (counts + colours stay stable)
@@ -92,16 +104,29 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
     cosmos.setHiddenTypes(hidden);
   }, [cosmos, hidden]);
 
-  // ---- zoom readout for the HUD (cheap getView poll)
+  // ---- zoom + edge-intensity readout for the HUD (cheap poll)
   useEffect(() => {
     if (!cosmos) return;
     const id = window.setInterval(() => {
       try {
         setZoom(cosmos.currentZoom());
+        setEdgePct(Math.round(cosmos.edgeIntensity() * 100));
       } catch { /* noop */ }
     }, 600);
     return () => window.clearInterval(id);
   }, [cosmos]);
+
+  // ---- edges: zoom-adaptive in the cosmos overview (see cosmos3d.ts), plus
+  // the persisted HUD on/off switch. Adaptive mode is enabled ONLY here — the
+  // travel/presentation canvases keep their fixed journey opacity.
+  useEffect(() => {
+    if (!cosmos) return;
+    cosmos.setEdgeZoomAdaptive(true);
+    cosmos.setEdgesEnabled(edgesOn);
+    try {
+      localStorage.setItem(EDGES_KEY, edgesOn ? "1" : "0");
+    } catch { /* private mode — the preference just won't persist */ }
+  }, [cosmos, edgesOn]);
 
   // ---- leaving the view (tab switch) must clear highlights
   useEffect(() => {
@@ -111,6 +136,8 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
         cosmos.spotlight(null);
         cosmos.paint(null);
         cosmos.setHiddenTypes(new Set());
+        cosmos.setEdgeFocus(null);
+        cosmos.setEdgeHover(null);
       } catch { /* noop */ }
     };
   }, [cosmos]);
@@ -138,6 +165,8 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
     setQ("");
     setHi(0);
     cosmos?.setSelection(idx);
+    // incident edges light up (1-hop medium, rest dimmed), cleared on deselect
+    cosmos?.setEdgeFocus(idx);
     if (idx === null) {
       cosmos?.paint(null);
       return;
@@ -304,6 +333,19 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
             </div>
           </div>
         )}
+
+        {/* edges on/off + live zoom-adaptive intensity (persisted in localStorage) */}
+        <div className="edgerow">
+          <button
+            className={`edgebtn${edgesOn ? " on" : " off"}`}
+            onClick={() => setEdgesOn((o) => !o)}
+            aria-pressed={edgesOn}
+            title={t.hudEdges}
+          >
+            <LinkIcon size={11} /> {t.hudEdges}
+          </button>
+          {edgesOn && edgePct != null && <span className="dim edgepct">{edgePct}%</span>}
+        </div>
 
         {/* type legend with visibility toggles */}
         <div className="legend">

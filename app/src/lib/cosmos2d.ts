@@ -43,6 +43,28 @@ const NODE_K = 0.06;
 /** Above this many edges, skip edges while a pan/zoom gesture is active. */
 const EDGE_INTERACTION_CUTOFF = 5000;
 
+// ---- zoom-adaptive edge opacity (2D parity with cosmos3d) ------------------
+// Same intent as the 3D curve, keyed on the 2D camera scale (px per world
+// unit) relative to the fit scale: overview (1×) stays the familiar 0.09 haze,
+// a close-up (>= 8×) reaches 0.42 so incident edges read clearly. Log-smoothstep
+// between — monotone, no pops. Focus multiplies these by the per-edge weight.
+const EDGE2D_OVERVIEW = 0.09;
+const EDGE2D_CLOSE = 0.42;
+const EDGE2D_OVERVIEW_SCALE = 1;
+const EDGE2D_CLOSE_SCALE = 8;
+/** Unrelated edges keep this fraction of the base while a focus is active. */
+const EDGE2D_DIM = 0.3;
+/** Incident-edge boost (× base). */
+const EDGE2D_BOOST = 1.15;
+
+function edgeAlphaForScale(scale: number, fitScale: number): number {
+  const s = scale / Math.max(1e-6, fitScale);
+  if (s <= EDGE2D_OVERVIEW_SCALE) return EDGE2D_OVERVIEW;
+  if (s >= EDGE2D_CLOSE_SCALE) return EDGE2D_CLOSE;
+  const u = Math.log(s) / Math.log(EDGE2D_CLOSE_SCALE);
+  return EDGE2D_OVERVIEW + (EDGE2D_CLOSE - EDGE2D_OVERVIEW) * u * u * (3 - 2 * u);
+}
+
 export class Cosmos2D implements CosmosLike {
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
@@ -59,6 +81,16 @@ export class Cosmos2D implements CosmosLike {
   private edges: [number, number][] = [];
   private edgeAlpha = 0.09;
   private names: string[] = [];
+
+  // edge focus/hover + zoom-adaptive opacity (2D parity with cosmos3d)
+  private edgeAdaptive = false;
+  private edgeEnabled = true;
+  private fitScale = 5;
+  private edgeFocusIdx = -1;
+  private edgeHoverIdx = -1;
+  private adj: number[][] = [];
+  private edgeS = new Int32Array(0);
+  private edgeT = new Int32Array(0);
 
   // highlight state
   private paints = new Map<number, { color: RGBA; size?: number }>();
@@ -86,6 +118,7 @@ export class Cosmos2D implements CosmosLike {
   onHover: ((s: SelectedNode | null) => void) | null = null;
 
   private hoverRaf = 0;
+  private lastHoverT = 0;
 
   get ready(): boolean {
     return this.canvas !== null;
@@ -112,6 +145,7 @@ export class Cosmos2D implements CosmosLike {
     canvas.addEventListener("wheel", this.onWheel, { passive: false });
     canvas.addEventListener("click", this.onClick);
     canvas.addEventListener("pointermove", this.onMove);
+    canvas.addEventListener("pointerleave", this.onLeave);
     canvas.style.touchAction = "none";
     canvas.style.cursor = "grab";
     this.requestDraw();
@@ -151,6 +185,18 @@ export class Cosmos2D implements CosmosLike {
     }
     onProgress?.(n, n);
     this.edges = graph.edges.filter(([s, t]) => s >= 0 && t >= 0 && s < n && t < n);
+    // adjacency + endpoint arrays once, so focus changes are O(deg) not O(E)
+    this.edgeS = new Int32Array(this.edges.length);
+    this.edgeT = new Int32Array(this.edges.length);
+    this.adj = Array.from({ length: n }, () => [] as number[]);
+    this.edges.forEach(([s, t], k) => {
+      this.edgeS[k] = s;
+      this.edgeT[k] = t;
+      this.adj[s].push(k);
+      if (t !== s) this.adj[t].push(k);
+    });
+    this.edgeFocusIdx = -1;
+    this.edgeHoverIdx = -1;
     this.paints.clear();
     this.paintsResetAll = true;
     this.spot = null;
@@ -168,6 +214,9 @@ export class Cosmos2D implements CosmosLike {
     this.baseCss = [];
     this.types = [];
     this.edges = [];
+    this.adj = [];
+    this.edgeS = new Int32Array(0);
+    this.edgeT = new Int32Array(0);
     this.names = [];
     this.paints.clear();
     this.paintsResetAll = true;
@@ -236,8 +285,61 @@ export class Cosmos2D implements CosmosLike {
   }
 
   setEdgeOpacity(v: number): void {
+    // fixed base (journey/presentation) also cancels zoom-adaptive mode
     this.edgeAlpha = v;
+    this.edgeAdaptive = false;
     this.requestDraw();
+  }
+
+  setEdgeZoomAdaptive(on: boolean): void {
+    this.edgeAdaptive = on;
+    this.requestDraw();
+  }
+
+  setEdgesEnabled(on: boolean): void {
+    this.edgeEnabled = on;
+    this.requestDraw();
+  }
+
+  setEdgeFocus(idx: number | null): void {
+    const v = idx ?? -1;
+    if (v === this.edgeFocusIdx) return;
+    this.edgeFocusIdx = v;
+    this.requestDraw();
+  }
+
+  setEdgeHover(idx: number | null): void {
+    const v = idx ?? -1;
+    if (v === this.edgeHoverIdx) return;
+    this.edgeHoverIdx = v;
+    this.requestDraw();
+  }
+
+  edgeIntensity(): number {
+    if (!this.edgeEnabled) return 0;
+    return this.edgeAdaptive ? edgeAlphaForScale(this.scale, this.fitScale) : this.edgeAlpha;
+  }
+
+  /** Edge index -> highlight weight (1 incident, 0.5 one hop) for the focused
+   *  and hovered nodes; null when nothing is focused. Incident wins. */
+  private edgeHighlights(): Map<number, number> | null {
+    const foc = this.edgeFocusIdx;
+    const hov = this.edgeHoverIdx;
+    if (foc < 0 && hov < 0) return null;
+    const w = new Map<number, number>();
+    const add = (f: number) => {
+      if (f < 0 || f >= this.n) return;
+      const inc = this.adj[f] ?? [];
+      for (const k of inc) if ((w.get(k) ?? 0) < 1) w.set(k, 1);
+      for (const k of inc) {
+        const other = this.edgeS[k] === f ? this.edgeT[k] : this.edgeS[k];
+        if (other === f) continue;
+        for (const k2 of this.adj[other]) if (!w.has(k2)) w.set(k2, 0.5);
+      }
+    };
+    add(foc);
+    add(hov);
+    return w;
   }
 
   /** Eased camera flight (lerped center + zoom via rAF — no physics).
@@ -299,6 +401,7 @@ export class Cosmos2D implements CosmosLike {
     this.scale = Math.min(w / bw, h / bh) * (1 - padding);
     this.cx = (x0 + x1) / 2;
     this.cy = (y0 + y1) / 2;
+    this.fitScale = this.scale; // reference for the zoom-adaptive curve
     this.requestDraw();
   }
 
@@ -318,6 +421,7 @@ export class Cosmos2D implements CosmosLike {
       this.canvas.removeEventListener("wheel", this.onWheel);
       this.canvas.removeEventListener("click", this.onClick);
       this.canvas.removeEventListener("pointermove", this.onMove);
+      this.canvas.removeEventListener("pointerleave", this.onLeave);
     }
     this.canvas = null;
     this.ctx = null;
@@ -393,8 +497,7 @@ export class Cosmos2D implements CosmosLike {
   };
 
   private onMove = (e: PointerEvent) => {
-    if (this.drag || !this.onHover) return;
-    if (this.hoverRaf) return;
+    if (this.drag || (!this.onHover && !this.edgeAdaptive) || this.hoverRaf) return;
     const cx = e.clientX;
     const cy = e.clientY;
     this.hoverRaf = requestAnimationFrame(() => {
@@ -403,7 +506,17 @@ export class Cosmos2D implements CosmosLike {
       this.onHover?.(
         idx === null ? null : { gpuId: idx, graphIdx: idx, name: this.names[idx] ?? `#${idx}` },
       );
+      // reuse the SAME pick for the edge highlight, throttled to >= 30 ms
+      if (this.edgeAdaptive && idx !== this.edgeHoverIdx && performance.now() - this.lastHoverT >= 30) {
+        this.lastHoverT = performance.now();
+        this.setEdgeHover(idx);
+      }
     });
+  };
+
+  private onLeave = () => {
+    if (this.onHover) this.onHover(null);
+    if (this.edgeAdaptive) this.setEdgeHover(null);
   };
 
   /** Nearest node within 12px of the cursor (47k scan per click is <5ms). */
@@ -472,9 +585,17 @@ export class Cosmos2D implements CosmosLike {
     ctx.fillRect(0, 0, w, h);
     if (this.n === 0) return;
 
-    const showEdges = this.edgeAlpha > 0.001 && !(this.interacting && this.edges.length > EDGE_INTERACTION_CUTOFF);
+    const base = this.edgeEnabled
+      ? (this.edgeAdaptive ? edgeAlphaForScale(this.scale, this.fitScale) : this.edgeAlpha)
+      : 0;
+    const highlights = this.edgeHighlights();
+    const showEdges = base > 0.001 && !(this.interacting && this.edges.length > EDGE_INTERACTION_CUTOFF);
     if (showEdges && this.edges.length > 0) {
-      ctx.strokeStyle = `rgba(120,150,255,${this.edgeAlpha})`;
+      // pass 1: every edge at the (possibly dimmed) base alpha — ONE stroked
+      // path for all 54k segments; the raster is only repainted on idle static
+      // frames, so a pan/zoom gesture never re-strokes them (see draw()).
+      const dim = highlights ? EDGE2D_DIM : 1;
+      ctx.strokeStyle = `rgba(120,150,255,${(base * dim).toFixed(4)})`;
       ctx.lineWidth = 1;
       ctx.beginPath();
       for (let k = 0; k < this.edges.length; k++) {
@@ -494,6 +615,27 @@ export class Cosmos2D implements CosmosLike {
         }
       }
       ctx.stroke();
+      // pass 2: focused/hovered subset over-stroked brighter (incident bright,
+      // 1-hop medium). Small subset — never the full 54k during a gesture.
+      if (highlights) {
+        const incident: number[] = [];
+        const hop: number[] = [];
+        for (const [k, wt] of highlights) (wt >= 1 ? incident : hop).push(k);
+        const stroke = (ids: number[], alpha: number) => {
+          if (!ids.length) return;
+          ctx.strokeStyle = `rgba(188,210,255,${Math.min(0.92, alpha).toFixed(4)})`;
+          ctx.beginPath();
+          for (const k of ids) {
+            const s = this.edgeS[k];
+            const t = this.edgeT[k];
+            ctx.moveTo((this.wx[s] - this.cx) * this.scale + w / 2, (this.wy[s] - this.cy) * this.scale + h / 2);
+            ctx.lineTo((this.wx[t] - this.cx) * this.scale + w / 2, (this.wy[t] - this.cy) * this.scale + h / 2);
+          }
+          ctx.stroke();
+        };
+        stroke(hop, base * 0.7);
+        stroke(incident, base * EDGE2D_BOOST);
+      }
     }
 
     // Nodes, batched by fill color: one fillStyle per group, fillRect each.

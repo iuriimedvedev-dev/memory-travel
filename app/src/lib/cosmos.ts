@@ -80,7 +80,30 @@ export interface CosmosLike {
   setSelection(idx: number | null): void;
   /** Project a node to CSS px (screen-space tooltip placement). */
   projectNode(idx: number): { x: number; y: number; visible: boolean } | null;
+  /**
+   * Fixed base edge opacity (journey/presentation). Calling this also takes
+   * the renderer OUT of zoom-adaptive mode — the travel/presentation views
+   * want a stable haze, the cosmos overview wants the distance-driven curve.
+   */
   setEdgeOpacity(v: number): void;
+  /**
+   * Cosmos overview mode: edge opacity follows camera distance to the graph
+   * (subtle haze when far, clearly readable lines up close). One uniform (3D)
+   * or one idle-frame path repaint (2D) — never a geometry rebuild.
+   */
+  setEdgeZoomAdaptive(on: boolean): void;
+  /** Master on/off for the whole edge layer (HUD toggle). Cheap: draw skip. */
+  setEdgesEnabled(on: boolean): void;
+  /**
+   * Selection focus: edges incident to `idx` light up, its 1-hop neighbours'
+   * edges at medium strength, everything else dims. null clears. Attribute
+   * driven — one per-edge strength buffer, one draw call, no geometry rebuild.
+   */
+  setEdgeFocus(idx: number | null): void;
+  /** Hover focus: same treatment, milder, while a star is hovered. */
+  setEdgeHover(idx: number | null): void;
+  /** Current effective base edge opacity (0..1) for the HUD intensity hint. */
+  edgeIntensity(): number;
   /** Eased camera flight. x/y world coords; zoom is renderer-relative. */
   flyTo(x: number, y: number, zoom: number, ms?: number): void;
   fit(padding?: number): void;

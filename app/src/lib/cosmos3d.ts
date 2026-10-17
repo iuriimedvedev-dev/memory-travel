@@ -44,6 +44,53 @@ const BG = 0x03040c;
 /** Spotlight dim factor: non-matching stars drop to ~20% brightness. */
 const SPOT_DIM = 0.18;
 
+// ---- zoom-adaptive edge opacity -------------------------------------------
+// The single edge cloud used to run at a fixed 0.028 — a pleasant haze from
+// the overview, but effectively invisible once the camera dives to a node
+// (the cosmos view never called setEdgeOpacity, so it was stuck there).
+// The base opacity now follows the camera distance `d` to the graph:
+//
+//   d >= EDGE_FAR_FRAC * fitDist  -> EDGE_OPACITY_FAR  (0.028, unchanged look)
+//   d <= EDGE_NEAR_DIST           -> EDGE_OPACITY_NEAR (0.42, readable lines)
+//   in between                    -> smoothstep in LOG distance (even ramp
+//                                    across the ~2.5 orders of magnitude, no
+//                                    threshold pops; monotone by construction)
+//
+// Values are for NON-focused edges. A selection multiplies them by the
+// per-edge focus weight below, so incident edges land at ~0.42*1.15 ≈ 0.48
+// (the acceptance value) and unrelated edges keep 0.30 of the base
+// (>= 0.12 close-up — still readable, just quiet).
+const EDGE_OPACITY_FAR = 0.028;
+const EDGE_OPACITY_NEAR = 0.42;
+/** Camera→graph distance (world units) at which the close-up value is reached. */
+const EDGE_NEAR_DIST = 12;
+/** Far reference = this fraction of the fit distance (~190 at fit ≈ 350). */
+const EDGE_FAR_FRAC = 0.55;
+/** Unrelated edges keep this fraction of the base when a selection is active. */
+const EDGE_SEL_DIM = 0.3;
+/** Hover is milder than selection, but still clearly a highlight. */
+const EDGE_HOV_DIM = 0.35;
+/** Incident-edge boost (× base): the "lit up" look. */
+const EDGE_SEL_BOOST = 1.15;
+const EDGE_HOV_BOOST = 1.3;
+/** 1-hop neighbour edge structural weight (incident edges are 1.0). */
+const EDGE_HOP_W = 0.5;
+/** Uniform ease time constant (s): selection/hover/toggle fade, no popping. */
+const EDGE_EASE_TAU = 0.1;
+
+/**
+ * Base edge opacity for a camera distance `d` from the graph (see the block
+ * comment above). Pure + monotone — safe to call every frame.
+ */
+function edgeOpacityForDistance(d: number, fitDist: number): number {
+  const far = Math.max(EDGE_NEAR_DIST * 3, fitDist * EDGE_FAR_FRAC);
+  if (d >= far) return EDGE_OPACITY_FAR;
+  if (d <= EDGE_NEAR_DIST) return EDGE_OPACITY_NEAR;
+  const u = (Math.log(far) - Math.log(d)) / (Math.log(far) - Math.log(EDGE_NEAR_DIST));
+  const s = u * u * (3 - 2 * u); // smoothstep
+  return EDGE_OPACITY_FAR + (EDGE_OPACITY_NEAR - EDGE_OPACITY_FAR) * s;
+}
+
 export interface Journey3D {
   addMarker3(label: string, p: XYZ, size: number, color: RGBA): number;
   moveMarker3(id: number, p: XYZ, size?: number): void;
@@ -125,22 +172,44 @@ const POINT_FRAG = /* glsl */ `
 const EDGE_VERT = /* glsl */ `
   attribute vec3 aColor;
   attribute float aRing;
+  attribute float aFocus;  // selection weight: 0 unrelated, .5 1-hop, 1 incident
+  attribute float aHover;  // hover weight (same encoding)
   uniform float uRing; // reveal frontier (1e9 = everything visible)
   varying vec3 vColor;
   varying float vRingA;
+  varying float vFocus;
+  varying float vHover;
   void main() {
     vColor = aColor;
     vRingA = 1.0 - smoothstep(uRing - 0.6, uRing + 0.6, aRing);
+    vFocus = aFocus;
+    vHover = aHover;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `;
 
 const EDGE_FRAG = /* glsl */ `
-  uniform float uOpacity;
+  uniform float uOpacity; // zoom-adaptive base opacity
+  uniform float uFocus;   // eased selection focus strength 0..1
+  uniform float uHover;   // eased hover strength 0..1
+  uniform float uSelDim;  // unrelated-edge factor while selected
+  uniform float uHovDim;  // unrelated-edge factor while hovered
+  uniform float uSelBoost; // incident-edge boost while selected
+  uniform float uHovBoost; // incident-edge boost while hovered
   varying vec3 vColor;
   varying float vRingA;
+  varying float vFocus;
+  varying float vHover;
   void main() {
-    gl_FragColor = vec4(vColor, uOpacity * vRingA);
+    // Selection weight; hover folded in multiplicatively so an inactive focus
+    // is exactly 1.0 (no residue). Both are per-vertex attributes — the dim /
+    // highlight is pure attribute math, still one draw call.
+    float selW = mix(1.0, uSelDim + (uSelBoost - uSelDim) * vFocus, uFocus);
+    float hovW = mix(1.0, uHovDim + (uHovBoost - uHovDim) * vHover, uHover);
+    float w = min(selW * hovW, 1.35);
+    // focused/hovered edges glow: push colour toward white a touch
+    vec3 col = vColor * (1.0 + (vFocus * uFocus + vHover * uHover) * 0.6);
+    gl_FragColor = vec4(col, uOpacity * vRingA * w);
   }
 `;
 
@@ -217,6 +286,24 @@ export class Cosmos3D implements CosmosLike, Journey3D {
   private edges: THREE.LineSegments | null = null;
   private edgeMat: THREE.ShaderMaterial | null = null;
   private edgeCount = 0;
+  // edge focus/hover + zoom-adaptive opacity (all attribute/uniform driven)
+  private edgeS = new Int32Array(0);
+  private edgeT = new Int32Array(0);
+  private adj: number[][] = [];
+  private focusAttr: THREE.BufferAttribute | null = null;
+  private hoverAttr: THREE.BufferAttribute | null = null;
+  private focusIdx = -1;
+  private hoverIdx = -1;
+  private edgeAdaptive = false;
+  private edgeEnabled = true;
+  private edgeFixed = 0.028;
+  /** Eased base opacity written into uOpacity every frame (never jumps). */
+  private edgeOpacity = 0.028;
+  /** Eased focus/hover strengths (0..1) — see updateEdgeUniforms. */
+  private focusStrength = 0;
+  private hoverStrength = 0;
+  private lastFrameT = 0;
+  private lastHoverT = 0;
 
   // highlights
   private baseAlpha: Float32Array = new Float32Array(0);
@@ -308,7 +395,11 @@ export class Cosmos3D implements CosmosLike, Journey3D {
       // both the controls update and the render — keeps software rasterizers
       // from burning frames on an invisible view
       if (this.canvas && this.canvas.offsetParent === null) return;
-      const t = (performance.now() - this.pulseT0) / 1000;
+      const now = performance.now();
+      const dt = this.lastFrameT ? Math.min(0.25, (now - this.lastFrameT) / 1000) : 0.016;
+      this.lastFrameT = now;
+      this.updateEdgeUniforms(dt);
+      const t = (now - this.pulseT0) / 1000;
       this.animateRing(t);
       // a camera tween calls controls.update() itself; two writers per frame
       // is how the arrival pose used to get nudged off the node
@@ -316,6 +407,7 @@ export class Cosmos3D implements CosmosLike, Journey3D {
       this.renderer?.render(this.scene, this.camera!);
     });
     canvas.addEventListener("pointermove", this.onMove);
+    canvas.addEventListener("pointerleave", this.onLeave);
     canvas.addEventListener("click", this.onClick);
     canvas.addEventListener("pointerdown", this.onDown);
     canvas.style.touchAction = "none";
@@ -417,8 +509,16 @@ export class Cosmos3D implements CosmosLike, Journey3D {
       const ep = new Float32Array(edges.length * 6);
       const ec = new Float32Array(edges.length * 6);
       const er = new Float32Array(edges.length * 2);
+      // adjacency (node -> incident edge indices) for O(deg) focus rebuilds
+      this.edgeS = new Int32Array(edges.length);
+      this.edgeT = new Int32Array(edges.length);
+      this.adj = Array.from({ length: n }, () => [] as number[]);
       for (let k = 0; k < edges.length; k++) {
         const [s, t] = edges[k];
+        this.edgeS[k] = s;
+        this.edgeT[k] = t;
+        this.adj[s].push(k);
+        if (t !== s) this.adj[t].push(k);
         for (let c = 0; c < 3; c++) {
           ep[k * 6 + c] = this.pos[s * 3 + c];
           ep[k * 6 + 3 + c] = this.pos[t * 3 + c];
@@ -433,18 +533,43 @@ export class Cosmos3D implements CosmosLike, Journey3D {
       eg.setAttribute("position", new THREE.BufferAttribute(ep, 3));
       eg.setAttribute("aColor", new THREE.BufferAttribute(ec, 3));
       eg.setAttribute("aRing", new THREE.BufferAttribute(er, 1));
+      // per-edge focus strength (duplicated onto both vertices): 0 unrelated,
+      // 0.5 = 1-hop neighbour, 1 = incident. Written on (de)selection only.
+      this.focusAttr = new THREE.BufferAttribute(new Float32Array(edges.length * 2), 1);
+      this.hoverAttr = new THREE.BufferAttribute(new Float32Array(edges.length * 2), 1);
+      eg.setAttribute("aFocus", this.focusAttr);
+      eg.setAttribute("aHover", this.hoverAttr);
       this.edgeGeo = eg;
       this.edgeMat = new THREE.ShaderMaterial({
         vertexShader: EDGE_VERT,
         fragmentShader: EDGE_FRAG,
-        uniforms: { uOpacity: { value: 0.028 }, uRing: { value: 1e9 } },
+        uniforms: {
+          uOpacity: { value: this.edgeFixed },
+          uRing: { value: 1e9 },
+          uFocus: { value: 0 },
+          uHover: { value: 0 },
+          uSelDim: { value: EDGE_SEL_DIM },
+          uHovDim: { value: EDGE_HOV_DIM },
+          uSelBoost: { value: EDGE_SEL_BOOST },
+          uHovBoost: { value: EDGE_HOV_BOOST },
+        },
         transparent: true,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
       });
+      this.edgeOpacity = this.edgeEnabled ? this.edgeFixed : 0;
+      this.focusIdx = -1;
+      this.hoverIdx = -1;
+      this.focusStrength = 0;
+      this.hoverStrength = 0;
       this.edges = new THREE.LineSegments(eg, this.edgeMat);
       this.edges.frustumCulled = false;
+      this.edges.visible = this.edgeEnabled;
       this.scene.add(this.edges);
+    } else {
+      this.adj = [];
+      this.edgeS = new Int32Array(0);
+      this.edgeT = new Int32Array(0);
     }
 
     this.paints.clear();
@@ -469,6 +594,12 @@ export class Cosmos3D implements CosmosLike, Journey3D {
     }
     this.geo = this.points = null;
     this.edges = this.edgeGeo = this.edgeMat = null;
+    this.focusAttr = this.hoverAttr = null;
+    this.adj = [];
+    this.edgeS = new Int32Array(0);
+    this.edgeT = new Int32Array(0);
+    this.focusIdx = -1;
+    this.hoverIdx = -1;
     this.ptsMat = null;
     this.selAttr = null;
     if (this.selRing) {
@@ -576,7 +707,100 @@ export class Cosmos3D implements CosmosLike, Journey3D {
   }
 
   setEdgeOpacity(v: number): void {
-    if (this.edgeMat) this.edgeMat.uniforms.uOpacity.value = v;
+    // fixed base (journey/presentation) also cancels zoom-adaptive mode
+    this.edgeFixed = v;
+    this.edgeAdaptive = false;
+  }
+
+  setEdgeZoomAdaptive(on: boolean): void {
+    this.edgeAdaptive = on;
+  }
+
+  setEdgesEnabled(on: boolean): void {
+    this.edgeEnabled = on;
+    if (this.edges) this.edges.visible = on;
+  }
+
+  /**
+   * Selection focus. The per-edge strength lives in the `aFocus` attribute,
+   * so switching focus is one CPU pass over the edges (adjacency, ~0.2ms) and
+   * one buffer upload — the draw stays a single LineSegments call. The uniform
+   * uFocus is eased in updateEdgeUniforms, so the transition has no pop.
+   */
+  setEdgeFocus(idx: number | null): void {
+    const v = idx ?? -1;
+    if (v === this.focusIdx) return;
+    this.focusIdx = v;
+    this.rebuildFocusAttr();
+  }
+
+  setEdgeHover(idx: number | null): void {
+    const v = idx ?? -1;
+    if (v === this.hoverIdx) return;
+    this.hoverIdx = v;
+    this.rebuildHoverAttr();
+  }
+
+  edgeIntensity(): number {
+    return this.edgeOpacity;
+  }
+
+  /** Fill one strength buffer: incident edges = 1, 1-hop neighbours = 0.5. */
+  private fillFocusAttr(attr: THREE.BufferAttribute, f: number): void {
+    const a = attr.array as Float32Array;
+    a.fill(0);
+    if (f >= 0 && f < this.n) {
+      const inc = this.adj[f] ?? [];
+      for (const k of inc) {
+        a[k * 2] = 1;
+        a[k * 2 + 1] = 1;
+      }
+      // 1-hop: every edge touching a neighbour of f (not f itself)
+      for (const k of inc) {
+        const other = this.edgeS[k] === f ? this.edgeT[k] : this.edgeS[k];
+        if (other === f) continue;
+        const nb = this.adj[other] ?? [];
+        for (const k2 of nb) {
+          if (a[k2 * 2] === 0) {
+            a[k2 * 2] = EDGE_HOP_W;
+            a[k2 * 2 + 1] = EDGE_HOP_W;
+          }
+        }
+      }
+    }
+    attr.needsUpdate = true;
+  }
+
+  private rebuildFocusAttr(): void {
+    if (this.focusAttr) this.fillFocusAttr(this.focusAttr, this.focusIdx);
+  }
+
+  private rebuildHoverAttr(): void {
+    if (this.hoverAttr) this.fillFocusAttr(this.hoverAttr, this.hoverIdx);
+  }
+
+  /**
+   * Per-frame edge uniforms (cheap: three uniform writes):
+   *  - uOpacity: eased toward the zoom-adaptive curve (or the fixed value);
+   *  - uFocus / uHover: eased toward 0/1 so selection & hover fade, no pop.
+   */
+  private updateEdgeUniforms(dt: number): void {
+    if (!this.edgeMat) return;
+    let target = this.edgeFixed;
+    if (!this.edgeEnabled) {
+      target = 0;
+    } else if (this.edgeAdaptive && this.camera) {
+      const tgt = this.controls?.target ?? new THREE.Vector3();
+      target = edgeOpacityForDistance(this.camera.position.distanceTo(tgt), this.fitDist);
+    }
+    const k = dt > 0 ? 1 - Math.exp(-dt / EDGE_EASE_TAU) : 1;
+    this.edgeOpacity += (target - this.edgeOpacity) * k;
+    this.focusStrength += ((this.focusIdx >= 0 ? 1 : 0) - this.focusStrength) * k;
+    this.hoverStrength += ((this.hoverIdx >= 0 ? 1 : 0) - this.hoverStrength) * k;
+    const u = this.edgeMat.uniforms;
+    u.uOpacity.value = this.edgeOpacity;
+    u.uFocus.value = this.focusStrength;
+    u.uHover.value = this.hoverStrength;
   }
 
   // ---- Journey3D ----
@@ -950,6 +1174,7 @@ export class Cosmos3D implements CosmosLike, Journey3D {
     this.ro = null;
     if (this.canvas) {
       this.canvas.removeEventListener("pointermove", this.onMove);
+      this.canvas.removeEventListener("pointerleave", this.onLeave);
       this.canvas.removeEventListener("click", this.onClick);
       this.canvas.removeEventListener("pointerdown", this.onDown);
     }
@@ -1089,14 +1314,33 @@ export class Cosmos3D implements CosmosLike, Journey3D {
   }
 
   private onMove = (e: PointerEvent) => {
-    if (!this.onHover || this.hoverRaf) return;
+    // pick only when a consumer needs it: the hover callback (cosmos view) or
+    // the edge-hover highlight (adaptive edge mode). Keeps travel/presentation
+    // (small subgraphs, no hover callback) from scanning on every move.
+    if ((!this.onHover && !this.edgeAdaptive) || this.hoverRaf) return;
     const cx = e.clientX;
     const cy = e.clientY;
     this.hoverRaf = requestAnimationFrame(() => {
       this.hoverRaf = 0;
       const idx = this.pick(cx, cy);
-      this.onHover?.(idx === null ? null : this.selOf(idx));
+      if (this.onHover) this.onHover(idx === null ? null : this.selOf(idx));
+      // reuse the SAME pick (no extra raycast) for the edge highlight
+      if (this.edgeAdaptive) this.updateEdgeHover(idx);
     });
+  };
+
+  /** Edge-hover from the existing pick, throttled to >= 30 ms. */
+  private updateEdgeHover(idx: number | null): void {
+    if (idx === this.hoverIdx) return;
+    const now = performance.now();
+    if (now - this.lastHoverT < 30) return;
+    this.lastHoverT = now;
+    this.setEdgeHover(idx);
+  }
+
+  private onLeave = () => {
+    if (this.onHover) this.onHover(null);
+    if (this.edgeAdaptive) this.setEdgeHover(null);
   };
 
   private onDown = (e: PointerEvent) => {
