@@ -8,12 +8,21 @@ frontend can subscribe to a recall's stage events instead of replaying fixtures.
 
 Spec only — the live service is deliberately NOT modified (no branch, no patch).
 
+> **Implemented 2026-10-17.** The "PREFER extending the existing server" path
+> was not possible: the service is a stdio MCP server wrapped by supergateway
+> (Node), which hosts no extra HTTP route. The trace surface now runs on a
+> **sibling SSE port** in the MCP process itself. Implementation contract +
+> measured/derived tables: `hars-longterm-memory/docs/trace-api.md`. Deviations
+> from this draft are listed at the bottom of this file.
+
 ## Endpoint
 
 ```
-GET /mcp/trace?question=...&mode=hybrid&top_k=10&...   (Streamable HTTP, same auth as /mcp)
-Accept: text/event-stream
+GET http://10.66.66.99:8098/trace?question=...&mode=hybrid&top_k=10&...   (SSE)
 ```
+
+The draft's `GET /mcp/trace` on the Streamable-HTTP surface is **not** what
+shipped — see "Implemented / deviations" below.
 
 Semantics: behaves exactly like `tools/call memory_recall` with
 `context_only=true`, except that **before** the final result it emits one SSE
@@ -57,3 +66,31 @@ no component changes.
   travels only in `result`, as today.
 - Read-only: this endpoint performs zero index writes; safe to expose next to
   the existing MCP bridge without new auth.
+
+## Implemented / deviations (2026-10-17)
+
+Canonical: `hars-longterm-memory/docs/trace-api.md`. Changes from this draft:
+
+1. **Transport**: `GET /trace` on a sibling port (default `8098`, WireGuard-only
+   in the service, CORS `*`), not `GET /mcp/trace` — supergateway cannot host
+   extra routes. Buffered `?format=json` variant added.
+2. **Event order** is real **execution** order, not the UI order in the table
+   above: `trace_start → bm25_hits (sparse) → vector_hits (dense) → fusion →
+   rerank → graph_expand → context → result → done`. The code measures sparse
+   before dense and runs the LightRAG graph pass after the hybrid block; a live
+   stream must reflect that. Events are identified by **name**, and each carries
+   `seq`/`t_ms`, so the client animates by arrival regardless of index.
+3. **Terminal frames**: `result` (unchanged full JSON) **plus** a tiny `done`
+   (`{trace_id, ok, total_ms, has_context}`) or `error`. `result` carries no
+   trace fields (byte-identical JSON); correlate via `done.trace_id`.
+4. **`embed` event dropped** (and `query_xy_hint`): embedding latency is not
+   separable from the dense call — it is folded into `vector_hits.latency_ms`
+   with `embedder` as the only extra field. No persisted UMAP reducer exists.
+5. **`trace_start` subsumes the keywords/mode stage** and adds `lightrag_mode`,
+   `mode_fallback`, `ll_keywords`, `hl_keywords`, `index_id`, `last_ingest`.
+6. **True pre-rerank order**: `fusion.order` and `rerank.before` are measured
+   where diversity selection runs, not reconstructed from dense scores.
+7. **Derived fields are labelled**: `graph_expand`/`context` entity/relation/
+   source rows are parsed from the rendered context (`derived_from`); a skipped
+   rerank emits `applied=false` with its real reason and `latency_ms: null`.
+
