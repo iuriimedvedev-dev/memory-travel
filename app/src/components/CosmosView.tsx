@@ -6,7 +6,7 @@ import { FAMILY_COLORS, FAMILY_LABEL, LEGEND_ORDER, colorForType, familyOf } fro
 import { fmt } from "../i18n/strings";
 import { useI18n } from "../i18n/useI18n";
 import { AnimatedCard } from "./AnimatedCard";
-import { CompassIcon, LayersIcon, LinkIcon, SearchIcon, SparkIcon, XIcon } from "./icons";
+import { LayersIcon, LinkIcon, SearchIcon, SparkIcon, XIcon } from "./icons";
 
 interface Props {
   cosmos: AnyCosmos | null;
@@ -254,6 +254,7 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
                     role="option"
                     aria-selected={ri === hi}
                     className={ri === hi ? "on" : ""}
+                    // hover only moves the row highlight; node info + fly-to are CLICK only
                     onMouseEnter={() => setHi(ri)}
                     onClick={() => select(i)}
                   >
@@ -302,11 +303,6 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
               </button>
             </div>
           </div>
-        )}
-        {hover && !node && (
-          <p className="hover">
-            <CompassIcon size={12} /> {hover.name}
-          </p>
         )}
 
         {/* type legend with visibility toggles */}
