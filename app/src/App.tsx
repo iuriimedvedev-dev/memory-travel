@@ -14,6 +14,7 @@ import { compileLiveTrace } from "./lib/compileLive";
 import { loadChunkCoords, loadEntityCoords, loadGraph, loadManifest, loadNodeIndex } from "./lib/data";
 import { memoryRecallLive, keywordsFor, estimateSteps, emptySteps, markStepsError, parseRecallTelemetry, stepsFromTelemetry, probeTraceSupport, streamRecallTrace, applyTraceEvent, BRIDGE_PROXY_PATH, type RecallStep } from "./lib/live";
 import type { CosmosGraph, TraceManifestEntry, TravelTrace } from "./lib/types";
+import { fmt } from "./i18n/strings";
 import { useI18n } from "./i18n/useI18n";
 
 const HISTORY_KEY = "mt.history.v1";
@@ -44,7 +45,7 @@ export default function App() {
   const [graph, setGraph] = useState<CosmosGraph | null>(null);
   const [names, setNames] = useState<string[] | null>(null);
   const [manifest, setManifest] = useState<TraceManifestEntry[] | null>(null);
-  const [progress, setProgress] = useState<string | null>("loading index…");
+  const [progress, setProgress] = useState<string | null>(t.loadingIndex);
   const [dataError, setDataError] = useState<string | null>(null);
   const [canvasError, setCanvasError] = useState<string | null>(null);
   const [renderMode, setRenderMode] = useState<string | null>(null);
@@ -108,14 +109,14 @@ export default function App() {
           return v ? toWorld3(v) : null;
         });
         setPosByIdx(aligned);
-        setProgress((p) => (g ? `${p} coord coverage ${(100 * hit / g.nodes.length).toFixed(1)}%` : p));
+        setProgress((p) => (g ? fmt(t.coordCoverage, { p: (100 * hit / g.nodes.length).toFixed(1) }) : p));
       })
       .catch((e: unknown) => {
         if (dead) return;
         // getJSON() names the file in its message: `fetch <path>: <status>`.
         const msg = e instanceof Error ? e.message : String(e);
         setDataError(msg);
-        setProgress(`data load failed: ${msg}`);
+        setProgress(fmt(t.dataLoadFailed, { e: msg }));
       });
     return () => {
       dead = true;
@@ -125,17 +126,17 @@ export default function App() {
   useEffect(() => {
     if (!cosmosFull || !graph || !posByIdx) return;
     let dead = false;
-    setProgress("lighting up 47k stars…");
+    setProgress(t.loadingStars);
     cosmosFull
       .load(graph, posByIdx, (done, total) => {
-        if (!dead) setProgress(`lighting up 47k stars… ${((done / total) * 100).toFixed(0)}%`);
+        if (!dead) setProgress(`${t.loadingStars} ${((done / total) * 100).toFixed(0)}%`);
       })
       .then(() => !dead && setProgress(null))
       .catch((e: unknown) => {
         if (dead) return;
         const msg = e instanceof Error ? e.message : String(e);
-        setCanvasError(`cosmos subgraph load failed: ${msg}`);
-        setProgress(`cosmos load failed: ${msg}`);
+        setCanvasError(fmt(t.canvasLoadFailed, { e: msg }));
+        setProgress(fmt(t.canvasLoadFailed, { e: msg }));
       });
     return () => {
       dead = true;
@@ -267,17 +268,21 @@ export default function App() {
           cosmosFull.paint(paints);
           focusNode(hits[0]);
           setAskNote(
-            `live answer in Travel (${tookS.toFixed(1)}s via ${endpoint === "/api/memory" ? "dev proxy" : "direct"}); ${hits.length} hit nodes lit in Cosmos`,
+            fmt(t.askNoteHits, {
+              s: tookS.toFixed(1),
+              via: endpoint === "/api/memory" ? t.askViaProxy : t.askViaDirect,
+              n: hits.length,
+            }),
           );
         } else if (!cosmosFull) {
-          setAskNote(`live answer in Travel (${tookS.toFixed(1)}s); Cosmos canvas unavailable (no renderer), so no highlight`);
+          setAskNote(fmt(t.askNoteNoCanvas, { s: tookS.toFixed(1) }));
         } else {
-          setAskNote(`live answer in Travel (${tookS.toFixed(1)}s); no graph hits to highlight`);
+          setAskNote(fmt(t.askNoteNoHits, { s: tookS.toFixed(1) }));
         }
       } catch (e) {
         tracingRef.current = true; // lock the estimator: keep the error state
         if (e instanceof DOMException && e.name === "AbortError") {
-          setAskError("live recall cancelled — fixtures still playable below.");
+          setAskError(t.askCancelled);
           setSteps((prev) => markStepsError(prev, "cancelled"));
         } else {
           const msg = e instanceof Error ? e.message : String(e);
@@ -289,7 +294,7 @@ export default function App() {
         setAsking(false);
       }
     },
-    [graph, names, posByIdx, chunkXyz, cosmosFull, focusNode],
+    [graph, names, posByIdx, chunkXyz, cosmosFull, focusNode, t],
   );
 
   const cancelAsk = useCallback(() => {
@@ -316,7 +321,7 @@ export default function App() {
             <nav>
               <button className={tab === "cosmos" ? "on" : ""} onClick={() => setTab("cosmos")}>{t.tabCosmos}</button>
               <button className={tab === "travel" ? "on" : ""} onClick={() => setTab("travel")}>{t.tabTravel}</button>
-              <button className="langtoggle" onClick={() => setLangL10n(lang === "ru" ? "en" : "ru")} title={lang === "ru" ? "Switch to English" : "Переключить на русский"}>
+              <button className="langtoggle" onClick={() => setLangL10n(lang === "ru" ? "en" : "ru")} title={t.langSwitch}>
                 {lang.toUpperCase()}
               </button>
               <button className="doclink" onClick={() => setAbout(true)}>
@@ -360,25 +365,22 @@ export default function App() {
       {about && <AboutModal onClose={() => setAbout(false)} />}
       {dataError && (
         <ErrorOverlay
-          title="Index data failed to load"
-          body="The app fetches its data files with relative paths (data/graph.json, coords, traces/manifest.json). One of them failed — check the file named below exists in app/public/data/ and the dev server is serving it."
+          title={t.errIndexTitle}
+          body={t.errIndexBody}
           detail={dataError}
         />
       )}
       {!dataError && canvasError && (
         <ErrorOverlay
-          title="Canvas initialisation failed"
-          body="Neither the WebGL2 renderer nor the Canvas2D fallback could start — this browser cannot provide any GPU canvas at all. The text panels stay readable. (On any browser from the last decade this path should be unreachable.)"
+          title={t.errCanvasTitle}
+          body={t.errCanvasBody}
           detail={canvasError}
         />
       )}
       {!dataError && !canvasError && renderMode === "canvas2d" && !modeDismissed && (
         <div className={`modebadge ${tab === "travel" ? "raised" : ""}`} role="status">
-          <span>
-            <b>canvas2d fallback</b> — no WebGL2 in this browser, so the 3D starfield can't run;
-            same data, same journey, flat projection.
-          </span>
-          <button className="ghostbtn" onClick={() => setModeDismissed(true)} title="dismiss">
+          <span>{t.fallbackBadge}</span>
+          <button className="ghostbtn" onClick={() => setModeDismissed(true)} title={t.commonDismiss}>
             <XIcon size={11} />
           </button>
         </div>

@@ -97,13 +97,13 @@ function StageInspector({
     return (
       <div className="insptable">
         <p className="q">“{m.question}”</p>
-        <Meta k="mode" v={`${m.mode ?? "?"} / LightRAG ${m.lightrag_mode ?? "?"}${m.mode_fallback ? ` (fallback: ${m.mode_fallback})` : ""}`} />
-        <Meta k="ll keywords" v={m.ll_keywords.join(" · ") || "—"} />
-        <Meta k="hl keywords" v={m.hl_keywords.join(" · ") || "—"} />
-        <Meta k="candidate pool" v={String(m.candidate_pool ?? "?")} />
-        <Meta k="top_k" v={String(m.top_k ?? "?")} />
-        <Meta k="latency dense/sparse/rerank" v={`${m.latency_ms.dense ?? "?"}ms / ${m.latency_ms.sparse ?? "?"}ms / ${m.latency_ms.rerank ?? "?"}ms`} />
-        <Meta k="confidence" v={m.confidence.low ? `LOW (< ${m.confidence.threshold})` : `ok (top dense ${m.confidence.top_dense})`} />
+        <Meta k={t.inspMode} v={`${m.mode ?? "?"} / LightRAG ${m.lightrag_mode ?? "?"}${m.mode_fallback ? ` (fallback: ${m.mode_fallback})` : ""}`} />
+        <Meta k={t.inspLlKeywords} v={m.ll_keywords.join(" · ") || "—"} />
+        <Meta k={t.inspHlKeywords} v={m.hl_keywords.join(" · ") || "—"} />
+        <Meta k={t.inspCandidatePool} v={String(m.candidate_pool ?? "?")} />
+        <Meta k={t.inspTopK} v={String(m.top_k ?? "?")} />
+        <Meta k={t.inspLatency} v={`${m.latency_ms.dense ?? "?"}ms / ${m.latency_ms.sparse ?? "?"}ms / ${m.latency_ms.rerank ?? "?"}ms`} />
+        <Meta k={t.inspConfidence} v={m.confidence.low ? `LOW (< ${m.confidence.threshold})` : `ok (top dense ${m.confidence.top_dense})`} />
       </div>
     );
   }
@@ -160,7 +160,7 @@ function StageInspector({
         {[...counts.keys()].sort().map((d) => (
           <Meta key={d} k={fmt(t.ringAdded, { d, n: counts.get(d) ?? 0 })} v={`${Math.round((100 * (counts.get(d) ?? 0)) / trace.graph.nodes.length)}%`} />
         ))}
-        <h4>seeds</h4>
+        <h4>{t.inspSeeds}</h4>
         <ul className="insplist">
           {trace.graph.nodes
             .filter((n) => n.seed)
@@ -213,7 +213,7 @@ function StageInspector({
           <thead>
             <tr>
               <th>{t.rank}</th>
-              <th>chunk</th>
+              <th>{t.inspColChunk}</th>
               <th>{t.scoreDense}</th>
               <th>{t.scoreSparse}</th>
               <th>{t.scoreFused}</th>
@@ -277,7 +277,7 @@ function StageInspector({
         </div>
         <p className="dim">
           {trace.rerank.applied
-            ? `${trace.rerank.backend} · pool ${trace.rerank.pool} · ${trace.rerank.latency_ms}ms · ${trace.rerank.blocked_inversions} inversions blocked`
+            ? `${trace.rerank.backend} · ${fmt(t.inspPoolShort, { n: trace.rerank.pool ?? "?" })} · ${trace.rerank.latency_ms}ms · ${fmt(t.inspInversions, { n: trace.rerank.blocked_inversions ?? "?" })}`
             : fmt(t.rerankSkipped, { reason: trace.rerank.fallback_reason ?? "?" })}
         </p>
       </div>
@@ -288,7 +288,7 @@ function StageInspector({
     return (
       <div className="insptable">
         <p>{fmt(t.contextBudget, { used: totalChars.toLocaleString(), total: "15 000" })}</p>
-        <h4>entities ({trace.context_blocks.entities.length})</h4>
+        <h4>{fmt(t.inspEntitiesN, { n: trace.context_blocks.entities.length })}</h4>
         <ul className="insplist">
           {trace.context_blocks.entities.slice(0, showAll ? 100 : 12).map((e, i) => (
             <li key={i}>
@@ -296,7 +296,7 @@ function StageInspector({
             </li>
           ))}
         </ul>
-        <h4>relations ({trace.context_blocks.relations.length})</h4>
+        <h4>{fmt(t.inspRelationsN, { n: trace.context_blocks.relations.length })}</h4>
         <ul className="insplist">
           {trace.context_blocks.relations.slice(0, 10).map((r, i) => (
             <li key={i} className="dim">
@@ -304,7 +304,7 @@ function StageInspector({
             </li>
           ))}
         </ul>
-        <h4>sources ({trace.context_blocks.source_count})</h4>
+        <h4>{fmt(t.inspSourcesN, { n: trace.context_blocks.source_count })}</h4>
         <ul className="insplist">
           {trace.context_blocks.sources.slice(0, 10).map((s, i) => (
             <li key={`${s.ref}-${i}`} className="dim">
@@ -321,7 +321,7 @@ function StageInspector({
   // stage 7
   return (
     <div className="insptable">
-      <p className="dim">extractive preview — verbatim quotes</p>
+      <p className="dim">{t.inspExtractive}</p>
       {trace.answer_preview.map((b, i) => (
         <div key={i} className="bullet">
           <p>“{b.quote}…”</p>
@@ -329,7 +329,7 @@ function StageInspector({
             <button className="linkish" onClick={() => b.chunk_id && onOpenChunk(b.chunk_id)}>
               [A{i + 1} {b.doc}]
             </button>{" "}
-            <span className="dim">via {b.entities.slice(0, 3).join(", ")}</span>
+            <span className="dim">{t.inspVia} {b.entities.slice(0, 3).join(", ")}</span>
           </p>
         </div>
       ))}
@@ -371,7 +371,7 @@ function HitTable({
         <thead>
           <tr>
             <th>{t.rank}</th>
-            <th>chunk</th>
+            <th>{t.inspColChunk}</th>
             <th>
               <button className="linkish" onClick={() => setSortDesc((s) => !s)}>
                 {scoreKey} {sortDesc ? "↓" : "↑"}
@@ -448,19 +448,19 @@ function ChunkViewer({
             <td>{t.scoreRerank}</td>
             <td>
               {sc.beforePos >= 0
-                ? `#${sc.beforePos + 1} → #${sc.afterPos + 1}${sc.moved ? " ↑ moved" : ""}`
+                ? `#${sc.beforePos + 1} → #${sc.afterPos + 1}${sc.moved ? ` ↑ ${t.inspMoved}` : ""}`
                 : "—"}
             </td>
           </tr>
           <tr className={sc.served ? "" : "off"}>
-            <td>context</td>
+            <td>{t.inspContext}</td>
             <td>{sc.served ? t.inFinalContext : t.notInFinalContext}</td>
           </tr>
         </tbody>
       </table>
       {hit && hit.entities.length > 0 && (
         <p className="dim">
-          entities:{" "}
+          {t.inspEntitiesShort}:{" "}
           {[...new Set(hit.entities)].slice(0, 8).map((e) => (
             <button
               key={e}
@@ -477,7 +477,7 @@ function ChunkViewer({
         </p>
       )}
       <h4>{t.chunkTitle}</h4>
-      <pre className="chunktext">{full?.content ?? "(content not in trace — served chunks only)"}</pre>
+      <pre className="chunktext">{full?.content ?? t.inspContentMissing}</pre>
     </div>
   );
 }

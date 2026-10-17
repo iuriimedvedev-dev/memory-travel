@@ -4,9 +4,11 @@ A guided 9-chapter walkthrough of how the HARS long-term memory works, driven
 entirely by real data (the exported 47k-entity graph + one real `memory_recall`
 trace). Launched from the tour button on the cosmos panel; `Esc` exits.
 
-Bilingual from day one: RU (default) and EN, switchable mid-presentation via
+Bilingual from day one: **EN (default)** and RU, switchable mid-presentation via
 the RU/EN toggle (top-right) — the chapter position is kept, only the strings
-swap. Language persists in `localStorage` (`mt.lang.v1`).
+swap. Language persists in `localStorage` (`mt.lang.v1`); a fresh browser (or a
+cleared key) boots in English, and only an explicitly stored `ru` switches to
+Russian.
 
 ## Controls
 

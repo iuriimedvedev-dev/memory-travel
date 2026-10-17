@@ -1,3 +1,4 @@
+import { useI18n } from "../i18n/useI18n";
 import { AlertIcon, XIcon } from "./icons";
 
 interface Props {
@@ -9,8 +10,10 @@ interface Props {
 }
 
 /** Full-view readable failure card. Replaces the silent black canvas: any
- *  init / data-load / render failure funnels here with stage + detail. */
+ *  init / data-load / render failure funnels here with stage + detail.
+ *  The default dismiss label is localised; callers may still override it. */
 export default function ErrorOverlay({ title, body, detail, onDismiss, dismissLabel }: Props) {
+  const { t } = useI18n();
   return (
     <div className="errwrap" role="alert">
       <div className="errcard">
@@ -21,7 +24,7 @@ export default function ErrorOverlay({ title, body, detail, onDismiss, dismissLa
         {detail && <pre className="errdetail">{detail}</pre>}
         {onDismiss && (
           <button onClick={onDismiss}>
-            <XIcon size={12} /> {dismissLabel ?? "continue anyway (text only)"}
+            <XIcon size={12} /> {dismissLabel ?? t.errDismiss}
           </button>
         )}
       </div>

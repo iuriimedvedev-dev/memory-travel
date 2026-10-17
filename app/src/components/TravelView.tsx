@@ -7,7 +7,7 @@ import { stageCamera } from "../lib/journeyCam";
 import { makeTimeline, type Timeline } from "../lib/reveal";
 import { STAGES } from "../lib/stages";
 import type { ChunkHit, CosmosGraph, TraceManifestEntry, TravelTrace } from "../lib/types";
-import { pick } from "../i18n/strings";
+import { pick, fmt, type Dict } from "../i18n/strings";
 import { useI18n } from "../i18n/useI18n";
 import { AlertIcon, CameraIcon, ChevronLeftIcon, ChevronRightIcon, GearIcon, HandIcon, PauseIcon, PlayIcon } from "./icons";
 import { buildJourneyLog, JourneyLog, type LogEntry } from "./JourneyLog";
@@ -97,7 +97,7 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
     const useLive = traceId === LIVE_ID;
     if (useLive && !liveTrace) return;
     let dead = false;
-    setStatus(useLive ? "compiling live answer…" : t.travelLoadingTrace);
+    setStatus(useLive ? t.travelCompilingLive : t.travelLoadingTrace);
     setStatusErr(false);
     setTrace(null);
     const entry = manifest?.find((e) => e.id === traceId);
@@ -137,7 +137,7 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
           );
         } catch (e) {
           if (!dead) {
-            setStatus(`subgraph render failed: ${e instanceof Error ? e.message : String(e)}`);
+            setStatus(fmt(t.travelRenderFail, { e: e instanceof Error ? e.message : String(e) }));
             setStatusErr(true);
           }
           return;
@@ -148,7 +148,7 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
       })
       .catch((e) => {
         if (!dead) {
-          setStatus(`trace load failed (stage=fetch ${entry?.file ?? `traces/${traceId}.json`}): ${String(e)}`);
+          setStatus(fmt(t.travelTraceFail, { f: entry?.file ?? `traces/${traceId}.json`, e: String(e) }));
           setStatusErr(true);
         }
       });
@@ -585,16 +585,16 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
         )}
         {trace && (
           <div className="meta">
-            <p className="metarow"><span className="dim">mode</span> {trace.meta.mode} / LightRAG {trace.meta.lightrag_mode}</p>
-            <p className="metarow"><span className="dim">pool</span> {trace.meta.candidate_pool} → top-{trace.meta.top_k}</p>
+            <p className="metarow"><span className="dim">{t.metaMode}</span> {trace.meta.mode} / LightRAG {trace.meta.lightrag_mode}</p>
+            <p className="metarow"><span className="dim">{t.metaPool}</span> {trace.meta.candidate_pool} → top-{trace.meta.top_k}</p>
             <p className="metarow">
-              <span className="dim">latency</span> dense {trace.meta.latency_ms.dense}ms · sparse {trace.meta.latency_ms.sparse}ms · rerank{" "}
+              <span className="dim">{t.metaLatency}</span> dense {trace.meta.latency_ms.dense}ms · sparse {trace.meta.latency_ms.sparse}ms · rerank{" "}
               {trace.meta.latency_ms.rerank == null ? "?" : `${(trace.meta.latency_ms.rerank / 1000).toFixed(1)}s`}
             </p>
           </div>
         )}
         <div className="stagebody" key={stage}>
-          <StageBody stage={stage} trace={trace} onFocusChunk={focusChunk} onFocusPoint={focusPoint} onOpenChunk={openChunk} lang={lang} />
+          <StageBody stage={stage} trace={trace} onFocusChunk={focusChunk} onFocusPoint={focusPoint} onOpenChunk={openChunk} t={t} />
         </div>
         <div className="row">
           <button className="inspectbtn" onClick={() => { setPlaying(false); setInsp({ kind: "stage", stage }); }}>
@@ -628,7 +628,7 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
         className="timeline"
         tabIndex={0}
         role="group"
-        aria-label="Journey playback controls"
+        aria-label={t.timelineAria}
         onKeyDown={(e) => {
           if (e.key === "ArrowRight") { goTo(stage + 1, true); e.preventDefault(); }
           else if (e.key === "ArrowLeft") { goTo(stage - 1, true); e.preventDefault(); }
@@ -705,24 +705,23 @@ function centroidOfList(ps: XYZ[]): XYZ | null {
 }
 
 function StageBody({
-  stage, trace, onFocusChunk, onFocusPoint, onOpenChunk, lang,
+  stage, trace, onFocusChunk, onFocusPoint, onOpenChunk, t,
 }: {
   stage: number;
   trace: TravelTrace | null;
   onFocusChunk: (h: ChunkHit) => void;
   onFocusPoint: (p: XYZ, names: string[], color?: RGBA) => void;
   onOpenChunk: (id: string) => void;
-  lang: "ru" | "en";
+  t: Dict;
 }) {
   if (!trace) return <p className="dim">…</p>;
-  const ru = lang === "ru";
   if (stage === 0) {
     const m = trace.meta;
     return (
       <div>
         <p className="q">“{m.question}”</p>
-        <p><span className="dim">{ru ? "ключевые слова low-level" : "low-level keywords"}</span> {m.ll_keywords.join(" · ")}</p>
-        <p><span className="dim">{ru ? "high-level" : "high-level keywords"}</span> {m.hl_keywords.join(" · ")}</p>
+        <p><span className="dim">{t.kwLow}</span> {m.ll_keywords.join(" · ")}</p>
+        <p><span className="dim">{t.kwHigh}</span> {m.hl_keywords.join(" · ")}</p>
       </div>
     );
   }
@@ -743,7 +742,7 @@ function StageBody({
     const seeds = trace.graph.nodes.filter((n) => n.seed);
     return (
       <div>
-        <p><b>{seeds.length}</b> {ru ? "семенных сущностей × 1 шаг" : "seed entities × 1 hop"} → <b>{trace.graph.nodes.length}</b> {ru ? "узлов," : "nodes,"} <b>{trace.graph.edges.length}</b> {ru ? "рёбер на экране." : "edges on screen."}</p>
+        <p>{fmt(t.stage2Summary, { seeds: seeds.length, nodes: trace.graph.nodes.length, edges: trace.graph.edges.length })}</p>
         <ul className="hits">
           {seeds.slice(0, 10).map((n, i) => (
             <li key={n.name} style={{ animationDelay: `${i * 60}ms` }}>
@@ -787,11 +786,11 @@ function StageBody({
     return (
       <div className="cols">
         <div>
-          <h4>{ru ? "порядок fusion (до)" : "fusion order (in)"}</h4>
+          <h4>{t.beforeAfter_in}</h4>
           <ol>{trace.rerank.before.slice(0, 10).map((id, i) => <li key={id} className={trace.rerank.after[i] !== id ? "moved" : ""} style={{ animationDelay: `${i * 50}ms` }}>{i + 1}. {name(id)}</li>)}</ol>
         </div>
         <div>
-          <h4>{ru ? "порядок подачи (после)" : "served order (out)"}</h4>
+          <h4>{t.beforeAfter_out}</h4>
           <ol>{trace.rerank.after.slice(0, 10).map((id, i) => <li key={id} className={trace.rerank.before[i] !== id ? "moved" : ""} style={{ animationDelay: `${i * 50}ms` }}>{i + 1}. {name(id)}</li>)}</ol>
         </div>
       </div>
@@ -800,7 +799,7 @@ function StageBody({
   if (stage === 6) {
     return (
       <div className="ctx">
-        <h4>{ru ? `сущности (${trace.context_blocks.entities.length}) — клик, чтобы улететь` : `entities (${trace.context_blocks.entities.length}) — click to fly`}</h4>
+        <h4>{fmt(t.ctxEntitiesClick, { n: trace.context_blocks.entities.length })}</h4>
         <ul>
           {trace.context_blocks.entities.slice(0, 6).map((e, i) => {
             const node = trace.graph.nodes.find((n) => n.name === e.entity);
@@ -818,14 +817,14 @@ function StageBody({
             );
           })}
         </ul>
-        <h4>{ru ? "источники" : "sources"} ({trace.context_blocks.source_count})</h4>
+        <h4>{t.ctxSourcesTitle} ({trace.context_blocks.source_count})</h4>
         <ul>{trace.context_blocks.sources.slice(0, 6).map((s, si) => <li key={`${s.ref}-${si}`} className="dim"><span className="ref">[ref {s.ref}]</span> {s.doc}</li>)}</ul>
       </div>
     );
   }
   return (
     <div className="ctx">
-      <p className="dim">{ru ? "Экстрактивный превью — дословные цитаты. Клик по факту улетает к узлам-источникам." : "Extractive preview — verbatim quotes. Click a fact to fly to its source nodes."}</p>
+      <p className="dim">{t.answerExtractive}</p>
       {trace.answer_preview.map((b, i) => {
         const ps = b.entities.map((e) => posOfLocal(trace).get(e)).filter((p): p is XYZ => p !== undefined);
         const p = centroidOfList(ps);

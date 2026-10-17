@@ -161,9 +161,9 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
     <>
       {/* HUD: counts + live zoom + actual render backend. Read-only, never blocks the canvas. */}
       <div className="hud" aria-hidden="true">
-        <span className="hudnum">{graph ? graph.nodes.length.toLocaleString("en-US") : "…"}</span> nodes
+        <span className="hudnum">{graph ? graph.nodes.length.toLocaleString("en-US") : "…"}</span> {t.hudNodes}
         <i>·</i>
-        <span className="hudnum">{graph ? graph.edges.length.toLocaleString("en-US") : "…"}</span> edges
+        <span className="hudnum">{graph ? graph.edges.length.toLocaleString("en-US") : "…"}</span> {t.hudEdges}
         {zoom != null && (
           <>
             <i>·</i>
@@ -180,7 +180,7 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
           <b>{hover.name}</b>
           <span className="tipsub">
             <i className="swatch" style={{ background: colorForType(hover.type) }} />
-            {hover.type} · {hover.deg} links
+            {hover.type} · {hover.deg} {t.linksWord}
           </span>
         </div>
       )}
@@ -222,7 +222,7 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
                 if (pickIdx !== undefined) select(pickIdx);
               }
             }}
-            aria-label="Search entities"
+            aria-label={t.searchAria}
             role="combobox"
             aria-expanded={results.length > 0}
             aria-controls="search-results"
@@ -287,7 +287,7 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
               </button>
             </div>
             <p className="dim cardtype">
-              {node.t} · degree {node.deg} · {node.deg === 1 ? t.degreeLinks1 : fmt(t.degreeLinksN, { n: node.deg })}
+              {node.t} · {node.deg === 1 ? t.degreeLinks1 : fmt(t.degreeLinksN, { n: node.deg })}
             </p>
             <p className="carddesc">{node.d ? snippet(node.d, 240) : t.noDesc}</p>
             <div className="row">
@@ -326,7 +326,7 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
                   key={family}
                   className={hidden.has(family) ? "legrow off" : "legrow"}
                   onClick={() => toggleFamily(family)}
-                  title={hidden.has(family) ? "show this family" : "hide this family"}
+                  title={hidden.has(family) ? t.legendShowFamily : t.legendHideFamily}
                 >
                   <i className="swatch" style={{ background: FAMILY_COLORS[family] }} />
                   <span className="leglabel">{FAMILY_LABEL[family] ?? family}</span>
