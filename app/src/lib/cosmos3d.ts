@@ -34,6 +34,7 @@ import {
   type SelectedNode,
   type XYZ,
 } from "./cosmos";
+import { applyEase, solveArrival, type CamEase } from "./camPose";
 import { colorForType, familyOf, hexToRGBA } from "./palette";
 import type { CosmosGraph } from "./types";
 
@@ -230,6 +231,11 @@ export class Cosmos3D implements CosmosLike, Journey3D {
 
   // camera flight
   private camRaf = 0;
+  /** true while a tween owns the camera: the render loop must not also run
+   *  OrbitControls.update() then (one writer per frame, always). */
+  private camBusy = false;
+  /** OrbitControls state to restore when the (possibly chained) flight ends. */
+  private camPrev: { enabled: boolean; auto: boolean } | null = null;
   private fitDist = 150;
 
   // picking (screen-space projection cache)
@@ -302,7 +308,9 @@ export class Cosmos3D implements CosmosLike, Journey3D {
       if (this.canvas && this.canvas.offsetParent === null) return;
       const t = (performance.now() - this.pulseT0) / 1000;
       this.animateRing(t);
-      this.controls?.update();
+      // a camera tween calls controls.update() itself; two writers per frame
+      // is how the arrival pose used to get nudged off the node
+      if (!this.camBusy) this.controls?.update();
       this.renderer?.render(this.scene, this.camera!);
     });
     canvas.addEventListener("pointermove", this.onMove);
@@ -651,6 +659,9 @@ export class Cosmos3D implements CosmosLike, Journey3D {
 
   setControlsEnabled(on: boolean): void {
     if (this.controls) this.controls.enabled = on;
+    // an explicit state change with no flight in progress retires any pending
+    // restore, so a later flight can't resurrect an old enabled/autoRotate
+    if (!this.camRaf) this.camPrev = null;
   }
 
   /**
@@ -742,116 +753,145 @@ export class Cosmos3D implements CosmosLike, Journey3D {
     };
   }
 
-  cameraSet(pos: XYZ, target: XYZ): void {
-    this.stopCamRaf();
-    this.camera!.position.set(pos[0], pos[1], pos[2]);
-    if (this.controls) {
-      this.controls.target.set(target[0], target[1], target[2]);
-      this.controls.update();
-    } else {
-      this.camera!.lookAt(target[0], target[1], target[2]);
-    }
-    this.screenDirty = true;
-  }
-
-  cameraFly(pos: XYZ, target: XYZ, ms = 1400, ease: "out" | "inout" | "linear" = "inout"): void {
+  /**
+   * THE camera flight. Every camera move goes through here so there is
+   * exactly one writer per frame and one easing convention.
+   *
+   * - The arrival pose is solved by the caller (`toPos`/`toTgt`) and never
+   *   changes mid-flight, so the eased 0→1 parameter cannot overshoot.
+   * - OrbitControls is taken out of the loop for the whole flight: damping /
+   *   pan / dolly residuals are drained first (with `enableDamping` off,
+   *   OrbitControls.update() zeroes them — its own else-branch), autoRotate
+   *   is suspended and `enabled` is false so no input can inject more. The
+   *   tween is the only thing that calls update(), once per frame.
+   * - At t=1 the previous control state is restored and re-synced exactly
+   *   once, leaving the target on the node so OrbitControls orbits THE NODE.
+   */
+  private tweenCamera(toPosV: THREE.Vector3, toTgtV: THREE.Vector3, ms: number, ease: CamEase): void {
     if (!this.camera) return;
     this.stopCamRaf();
-    const controls = this.controls;
-    const auto = controls?.autoRotate ?? false;
-    if (controls) {
-      controls.autoRotate = false;
-      controls.enabled = false; // no damping/autoRotate fighting the tween
+    const cam = this.camera;
+    const ctl = this.controls;
+    const fromPos = cam.position.clone();
+    const fromTgt = ctl ? ctl.target.clone() : new THREE.Vector3();
+    // remember the control state only on the FIRST flight of a chain, so a
+    // second fly-to mid-flight cannot latch controls disabled forever
+    if (ctl && this.camPrev === null) this.camPrev = { enabled: ctl.enabled, auto: ctl.autoRotate };
+    if (ctl) {
+      const damp = ctl.enableDamping;
+      ctl.enableDamping = false;
+      ctl.update();
+      ctl.enableDamping = damp;
+      ctl.autoRotate = false;
+      ctl.enabled = false;
     }
-    const from = this.camera.position.clone();
-    const fromT = controls ? controls.target.clone() : new THREE.Vector3();
-    const to = new THREE.Vector3(pos[0], pos[1], pos[2]);
-    const toT = new THREE.Vector3(target[0], target[1], target[2]);
+    const finish = () => {
+      this.camBusy = false;
+      const prev = this.camPrev;
+      this.camPrev = null;
+      if (ctl && prev) {
+        ctl.enabled = prev.enabled;
+        ctl.autoRotate = prev.auto;
+        ctl.update();
+      }
+      this.screenDirty = true;
+    };
+    if (ms <= 0) {
+      cam.position.copy(toPosV);
+      if (ctl) ctl.target.copy(toTgtV);
+      cam.lookAt(toTgtV);
+      finish();
+      return;
+    }
+    this.camBusy = true;
     const t0 = performance.now();
     const step = (t: number) => {
       const p = Math.min(1, (t - t0) / ms);
-      const e =
-        ease === "out" ? 1 - Math.pow(1 - p, 3) : ease === "linear" ? p : easeInOut(p);
-      this.camera!.position.lerpVectors(from, to, e);
-      if (controls) {
-        controls.target.lerpVectors(fromT, toT, e);
-        controls.update(); // keep OrbitControls' internal state synced each frame
+      const e = applyEase(p, ease);
+      cam.position.lerpVectors(fromPos, toPosV, e);
+      if (ctl) {
+        ctl.target.lerpVectors(fromTgt, toTgtV, e);
+        ctl.update();
       } else {
-        this.camera!.lookAt(toT);
+        cam.lookAt(toTgtV);
       }
       this.screenDirty = true;
       if (p < 1) {
         this.camRaf = requestAnimationFrame(step);
-      } else if (controls) {
-        controls.enabled = true;
-        controls.autoRotate = auto;
+      } else {
+        this.camRaf = 0;
+        finish();
       }
     };
     this.camRaf = requestAnimationFrame(step);
+  }
+
+  cameraSet(pos: XYZ, target: XYZ): void {
+    this.tweenCamera(
+      new THREE.Vector3(pos[0], pos[1], pos[2]),
+      new THREE.Vector3(target[0], target[1], target[2]),
+      0,
+      "linear",
+    );
+  }
+
+  cameraFly(pos: XYZ, target: XYZ, ms = 1400, ease: "out" | "inout" | "linear" = "inout"): void {
+    this.tweenCamera(
+      new THREE.Vector3(pos[0], pos[1], pos[2]),
+      new THREE.Vector3(target[0], target[1], target[2]),
+      ms,
+      ease,
+    );
   }
 
   /**
-   * Eased flight TO A NODE. controls.target tweens onto the node's world
-   * position and the camera ends `dist` units away along the current line
-   * of sight — the node lands exactly centred on screen. This is the only
-   * correct way to focus a node in 3D: the 2D-style flyTo(x, y, zoom) aims
-   * at (x, y, 0), dropping the node's (flattened) z, so the camera flew
-   * "куда-то" and left OrbitControls orbiting the wrong point.
+   * THE node focus. The arrival pose is solved ONCE: target → the node,
+   * camera → the node plus the current line of sight × `dist`. The node ends
+   * dead-centre, the requested distance is honoured exactly, and — because
+   * the eased parameter is monotonic — the camera can never overshoot or
+   * arrive somewhere else.
    */
   flyToNode(p: XYZ, dist = 9.5, ms = 850): void {
-    if (!this.camera || !this.controls) return;
-    this.stopCamRaf();
-    const controls = this.controls;
-    const auto = controls.autoRotate;
-    controls.autoRotate = false;
-    controls.enabled = false; // no fighting during the tween
-    const fromPos = this.camera.position.clone();
-    const fromTgt = controls.target.clone();
-    // arrive along the current line of sight (a dive-in, not a cut)
-    const dir = fromPos.clone().sub(fromTgt);
-    if (dir.lengthSq() < 1e-4) dir.set(0, 0.35, 1);
-    dir.normalize().multiplyScalar(dist);
-    const toTgt = new THREE.Vector3(p[0], p[1], p[2]);
-    const toPos = toTgt.clone().add(dir);
-    const t0 = performance.now();
-    const step = (t: number) => {
-      const q = Math.min(1, (t - t0) / ms);
-      const e = easeInOut(q);
-      this.camera!.position.lerpVectors(fromPos, toPos, e);
-      controls.target.lerpVectors(fromTgt, toTgt, e);
-      controls.update(); // sync OrbitControls' internal state every frame
-      this.screenDirty = true;
-      if (q < 1) {
-        this.camRaf = requestAnimationFrame(step);
-      } else {
-        controls.enabled = true;
-        controls.autoRotate = auto; // orbiting now circles THE NODE
-      }
-    };
-    this.camRaf = requestAnimationFrame(step);
+    const cam = this.camera;
+    if (!cam) return;
+    const tgt = this.controls?.target ?? new THREE.Vector3();
+    const arrive = solveArrival(
+      [p[0], p[1], p[2]],
+      [cam.position.x, cam.position.y, cam.position.z],
+      [tgt.x, tgt.y, tgt.z],
+      dist,
+    );
+    this.tweenCamera(
+      new THREE.Vector3(arrive.pos[0], arrive.pos[1], arrive.pos[2]),
+      new THREE.Vector3(arrive.tgt[0], arrive.tgt[1], arrive.tgt[2]),
+      ms,
+      "inout",
+    );
   }
 
+  /**
+   * Instant camera placement on the surface of a sphere around `center`.
+   *
+   * Deliberately does NOT cancel an in-flight tween: a user fly-to must win
+   * over cinematic camera choreography. The choreography itself must stop
+   * driving the camera when the user takes over (the caller owns that — see
+   * TravelView's cancellable camera track).
+   */
   orbitAround(center: XYZ, dist: number, azimuth: number, elevation: number): void {
     if (!this.camera) return;
     const ce = Math.cos(elevation);
-    this.camera.position.set(
+    const pos: XYZ = [
       center[0] + dist * ce * Math.sin(azimuth),
       center[1] + dist * Math.sin(elevation),
       center[2] + dist * ce * Math.cos(azimuth),
-    );
-    if (this.controls) {
-      this.controls.target.set(center[0], center[1], center[2]);
-      this.controls.update();
-    } else {
-      this.camera.lookAt(center[0], center[1], center[2]);
-    }
-    this.screenDirty = true;
+    ];
+    this.tweenCamera(new THREE.Vector3(pos[0], pos[1], pos[2]), new THREE.Vector3(center[0], center[1], center[2]), 0, "linear");
   }
 
   /** 2D-compat flight: hover the camera above (x, y, 0) at the zoom-implied distance. */
   flyTo(x: number, y: number, zoom: number, ms = 1400): void {
     const dist = this.distForZoom(zoom);
-    this.cameraFly([x, y, dist], [x, y, 0], ms, "inout");
+    this.tweenCamera(new THREE.Vector3(x, y, dist), new THREE.Vector3(x, y, 0), ms, "inout");
   }
 
   fit(padding = 0.12): void {
@@ -887,6 +927,8 @@ export class Cosmos3D implements CosmosLike, Journey3D {
 
   destroy(): void {
     this.stopCamRaf();
+    this.camBusy = false;
+    this.camPrev = null;
     cancelAnimationFrame(this.hoverRaf);
     cancelAnimationFrame(this.pulseRaf);
     this.renderer?.setAnimationLoop(null);
@@ -1051,8 +1093,11 @@ export class Cosmos3D implements CosmosLike, Journey3D {
     // a user grab always wins over any in-flight camera tween
     if (this.camRaf) {
       this.stopCamRaf();
+      this.camBusy = false;
+      const prev = this.camPrev;
+      this.camPrev = null;
       if (this.controls) {
-        this.controls.enabled = true;
+        this.controls.enabled = prev ? prev.enabled : true;
         this.controls.update();
       }
     }
@@ -1074,10 +1119,6 @@ export class Cosmos3D implements CosmosLike, Journey3D {
   private selOf(idx: number): SelectedNode {
     return { gpuId: idx, graphIdx: idx, name: this.names[idx] ?? `#${idx}` };
   }
-}
-
-function easeInOut(t: number): number {
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
 /** Does this renderer support the 3D journey extensions? */

@@ -19,6 +19,7 @@
 // - DPR-aware backing store; pan/zoom/click-select with mouse reusing the
 //   same world mapping as the 3D path (toWorld / WORLD_SCALE in cosmos.ts).
 import { WORLD_SCALE, type CosmosLike, type RGBA, type SelectedNode, type XYZ } from "./cosmos";
+import { applyEase } from "./camPose";
 import { colorForType, familyOf } from "./palette";
 import type { CosmosGraph } from "./types";
 
@@ -153,6 +154,9 @@ export class Cosmos2D implements CosmosLike {
     this.paints.clear();
     this.paintsResetAll = true;
     this.spot = null;
+    // debug/verification handle (mirrors cosmos3d): only a renderer with DATA
+    // loaded claims it, so the hidden duplicate canvas can't shadow it
+    (window as unknown as { __cosmos2d?: Cosmos2D }).__cosmos2d = this;
     this.fit(0.12);
   }
 
@@ -236,24 +240,42 @@ export class Cosmos2D implements CosmosLike {
     this.requestDraw();
   }
 
-  /** Eased camera flight (lerped center + zoom via rAF — no physics). */
+  /** Eased camera flight (lerped center + zoom via rAF — no physics).
+   *  The path is a straight interpolation of both endpoints with one eased
+   *  0→1 parameter, so it cannot overshoot; it stops exactly on (x, y, zoom)
+   *  with the node dead-centre. Any user gesture cancels it (see onDown /
+   *  onWheel) so an in-flight camera can never fight the pointer. */
   flyTo(x: number, y: number, zoom: number, ms = 1400): void {
     cancelAnimationFrame(this.flyRaf);
     const fromX = this.cx;
     const fromY = this.cy;
     const fromZ = this.scale;
     const toZ = Math.max(0.05, zoom);
+    if (ms <= 0) {
+      this.cx = x;
+      this.cy = y;
+      this.scale = toZ;
+      this.requestDraw();
+      return;
+    }
     const t0 = performance.now();
     const step = (t: number) => {
       const p = Math.min(1, (t - t0) / ms);
-      const e = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+      const e = applyEase(p, "inout");
       this.cx = fromX + (x - fromX) * e;
       this.cy = fromY + (y - fromY) * e;
       this.scale = fromZ + (toZ - fromZ) * e;
       this.requestDraw();
       if (p < 1) this.flyRaf = requestAnimationFrame(step);
+      else this.flyRaf = 0;
     };
     this.flyRaf = requestAnimationFrame(step);
+  }
+
+  /** A user gesture takes the camera away from any in-flight flight. */
+  private stopFly(): void {
+    cancelAnimationFrame(this.flyRaf);
+    this.flyRaf = 0;
   }
 
   fit(padding = 0.12): void {
@@ -313,6 +335,7 @@ export class Cosmos2D implements CosmosLike {
   private drag: { px: number; py: number; moved: number } | null = null;
 
   private onDown = (e: PointerEvent) => {
+    this.stopFly(); // a user grab always wins over an in-flight fly-to
     this.drag = { px: e.clientX, py: e.clientY, moved: 0 };
     this.canvas?.setPointerCapture(e.pointerId);
     if (this.canvas) this.canvas.style.cursor = "grabbing";
@@ -342,6 +365,7 @@ export class Cosmos2D implements CosmosLike {
 
   private onWheel = (e: WheelEvent) => {
     e.preventDefault();
+    this.stopFly(); // user input cancels an in-flight fly-to
     const c = this.canvas;
     if (!c) return;
     const rect = c.getBoundingClientRect();

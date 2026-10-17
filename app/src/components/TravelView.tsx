@@ -43,6 +43,12 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
   const [insp, setInsp] = useState<Inspection | null>(null);
   const markers = useRef<number[]>([]);
   const timeline = useRef<Timeline | null>(null);
+  /** Camera choreography lives on its own timeline so an explicit user fly-to
+   *  can cancel it without killing the stage reveal. They used to both write
+   *  the camera every frame: the flight won while it ran, and the instant it
+   *  finished the still-running cinematic orbit yanked the camera off the
+   *  node (measured: a ~100-unit teleport right after a correct arrival). */
+  const camTl = useRef<Timeline | null>(null);
   /** false only when the user jumped (scrubber/dots): those skip straight to the end state */
   const animateNext = useRef(true);
   const cosmosRef = useRef<AnyCosmos | null>(null);
@@ -330,6 +336,8 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
 
     // camera: eased flight to the stage keyframe (journey mode), or instant
     const key = stageCamera(stage, camCtx);
+    camTl.current?.cancel();
+    camTl.current = null;
     if (j3d) {
       if (animate && camMode === "journey") j3d.cameraFly(key.pos, key.target, 1150 / speed, "inout");
       else if (camMode === "journey") j3d.cameraSet(key.pos, key.target);
@@ -338,8 +346,10 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
       cosmos.flyTo(key.target[0], key.target[1], 12, animate ? 1200 : 0);
     }
 
-    // slow cinematic orbit around the stage target (journey mode only)
-    if (j3d && camMode === "journey") {
+    // slow cinematic orbit around the stage target (journey mode only).
+    // Own timeline — cancelled by a user fly-to (focusPoint) so it can never
+    // fight or override the user's arrival.
+    if (j3d && camMode === "journey" && animate) {
       const d0 = Math.hypot(
         key.pos[0] - key.target[0],
         key.pos[1] - key.target[1],
@@ -349,9 +359,12 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
       const el0 = Math.asin(
         Math.max(-1, Math.min(1, (key.pos[1] - key.target[1]) / Math.max(1, d0))),
       );
-      tl.tween(1200, 5200, (tt) => {
+      const ct = makeTimeline(speed, false);
+      camTl.current = ct;
+      ct.tween(1200, 5200, (tt) => {
         j3d.orbitAround(key.target, d0, az0 + tt * 0.55, el0);
       });
+      ct.start();
     }
 
     const ringPaint = (depth: number, color: RGBA, boost: number) => {
@@ -469,7 +482,11 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
       });
     }
     tl.start();
-    return () => tl.cancel();
+    return () => {
+      tl.cancel();
+      camTl.current?.cancel();
+      camTl.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage, trace, cosmos, speed, camMode, edgeRings]);
 
@@ -494,6 +511,10 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
 
   const focusPoint = (p: XYZ, names: string[], color: RGBA = INK.white) => {
     if (!cosmos) return;
+    // the user asked for THIS node: stop the cinematic camera choreography so
+    // it cannot drag the camera away when the flight ends
+    camTl.current?.cancel();
+    camTl.current = null;
     paintEntities(names, color, 2.6);
     const w = toWorld3(p);
     if (j3d) j3d.flyToNode(w, 30, 850);
