@@ -5,6 +5,7 @@ import { INK } from "../lib/cosmos";
 import { FAMILY_COLORS, FAMILY_LABEL, LEGEND_ORDER, colorForType, familyOf } from "../lib/palette";
 import { fmt } from "../i18n/strings";
 import { useI18n } from "../i18n/useI18n";
+import { AnimatedCard } from "./AnimatedCard";
 import { CompassIcon, LayersIcon, LinkIcon, SearchIcon, SparkIcon, XIcon } from "./icons";
 
 interface Props {
@@ -127,11 +128,22 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
     return [...starts, ...includes].slice(0, 8);
   }, [names, q]);
 
-  const select = (idx: number) => {
+  /**
+   * Single entry point for (de)selection, whatever the source (canvas click,
+   * search, node card close): the card, the star's boost+ring in the renderer
+   * and the gold paint all move together — select(null) reverses all three.
+   */
+  const select = (idx: number | null) => {
     setSel(idx);
     setQ("");
     setHi(0);
+    cosmos?.setSelection(idx);
+    if (idx === null) {
+      cosmos?.paint(null);
+      return;
+    }
     focusNode(idx);
+    cosmos?.paint(new Map([[idx, { color: [1.0, 0.85, 0.3, 1] as [number, number, number, number] }]]));
   };
 
   const node = sel !== null && graph ? graph.nodes[sel] : null;
@@ -270,7 +282,7 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
             <div className="cardhead">
               <i className="swatch big" style={{ background: colorForType(node.t) }} />
               <h3>{node.id}</h3>
-              <button className="ghostbtn" onClick={() => { setSel(null); }} title={t.inspectClose}>
+              <button className="ghostbtn" onClick={() => select(null)} title={t.inspectClose}>
                 <XIcon size={11} />
               </button>
             </div>
@@ -282,8 +294,7 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
               <button onClick={() => focusNode(sel!)}>{t.flyTo}</button>
               <button
                 onClick={() => {
-                  setSel(null);
-                  cosmos?.paint(null);
+                  select(null);
                   cosmos?.spotlight(null);
                 }}
               >
@@ -338,7 +349,72 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
         <p className="hint">{t.hintOrbit}</p>
         <SelectBridge select={select} setHover={setHover} cosmos={cosmos} graph={graph} />
       </div>
+      <SelectionTooltip cosmos={cosmos} sel={sel} graph={graph} onClose={() => select(null)} />
     </>
+  );
+}
+
+/**
+ * Node-anchored selection tooltip: the AnimatedCard two-phase animation
+ * (gradient frame draws on -> content slides in), positioned at the star's
+ * projected screen position each frame, flipped before the right edge so it
+ * never covers the selected node. Reverse: quick fade (AnimatedCard exit).
+ */
+function SelectionTooltip({
+  cosmos,
+  sel,
+  graph,
+  onClose,
+}: {
+  cosmos: AnyCosmos | null;
+  sel: number | null;
+  graph: CosmosGraph | null;
+  onClose: () => void;
+}) {
+  const { t } = useI18n();
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    if (sel === null) {
+      setPos(null);
+      return;
+    }
+    let raf = 0;
+    const tick = () => {
+      const p = cosmos?.projectNode(sel);
+      if (p) setPos({ x: p.x, y: p.y });
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [cosmos, sel]);
+  if (sel === null || !graph || !pos) return null;
+  const node = graph.nodes[sel];
+  if (!node) return null;
+  const flip = pos.x > window.innerWidth - 390;
+  const top = Math.max(72, Math.min(window.innerHeight - 150, pos.y - 26));
+  return (
+    <AnimatedCard
+      open
+      variant="accent"
+      size="sm"
+      title={node.id}
+      onClose={onClose}
+      className="seltip"
+      style={{
+        position: "fixed",
+        left: flip ? pos.x - 330 : pos.x + 20,
+        top,
+        width: 310,
+        zIndex: 28,
+      }}
+    >
+      <div className="seltiprow">
+        <i className="swatch" style={{ background: colorForType(node.t) }} />
+        <span>{node.t}</span>
+        <span className="dim">· {node.deg === 1 ? t.degreeLinks1 : fmt(t.degreeLinksN, { n: node.deg })}</span>
+      </div>
+      {node.d && <p className="dim seltipdesc">{snippet(node.d, 110)}</p>}
+    </AnimatedCard>
   );
 }
 
@@ -364,7 +440,7 @@ function SelectBridge({
 }: {
   cosmos: AnyCosmos | null;
   graph: CosmosGraph | null;
-  select: (i: number) => void;
+  select: (i: number | null) => void;
   setHover: (h: HoverInfo | null) => void;
 }) {
   useEffect(() => {
@@ -378,12 +454,8 @@ function SelectBridge({
     };
     window.addEventListener("pointermove", onMove, { passive: true });
     cosmos.onSelect = (s) => {
-      if (!s) return;
-      select(s.graphIdx);
-      const paints = new Map<number, { color: [number, number, number, number] }>([
-        [s.graphIdx, { color: [1.0, 0.85, 0.3, 1] }],
-      ]);
-      cosmos.paint(paints);
+      // select() owns the star treatment (boost/ring/paint) and the card
+      select(s ? s.graphIdx : null);
     };
     cosmos.onHover = (s) => {
       if (!s) {

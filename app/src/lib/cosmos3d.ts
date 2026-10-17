@@ -80,6 +80,7 @@ const POINT_VERT = /* glsl */ `
   attribute vec3 aColor;
   attribute float aAlpha;
   attribute float aTwinkle;
+  attribute float aSel;   // 1 on the selected star: size + brightness boost
   uniform float uScale;   // px-per-world at unit distance (set on resize)
   uniform float uTime;    // seconds, for the gentle twinkle
   uniform float uFog;     // fog density (depth cue)
@@ -90,12 +91,12 @@ const POINT_VERT = /* glsl */ `
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     float dist = max(0.1, -mv.z);
     // size attenuation: farther stars are smaller…
-    float px = aSize * uScale / dist;
+    float px = aSize * (1.0 + aSel * 1.1) * uScale / dist;
     // …and slightly dimmer (exponential fog) — subtle depth cue
     float fog = exp(-uFog * (dist - uFogRef) / max(1.0, uFogRef));
     float tw = 0.92 + 0.08 * sin(uTime * (0.6 + aTwinkle * 1.7) + aTwinkle * 40.0);
-    vColor = aColor;
-    vAlpha = aAlpha * tw * clamp(fog, 0.55, 1.0);
+    vColor = aColor + vec3(1.0) * aSel * 0.35; // emissive push toward white
+    vAlpha = aAlpha * tw * clamp(fog, 0.55, 1.0) * (1.0 + aSel * 0.9);
     gl_PointSize = clamp(px, 1.0, 90.0);
     gl_Position = projectionMatrix * mv;
   }
@@ -161,6 +162,9 @@ const LINE_FRAG = /* glsl */ `
 `;
 
 const MARKER_VERT = POINT_VERT;
+
+/** Minimum on-screen radius (CSS px) of the selection ring — see animateRing. */
+const RING_MIN_PX = 12;
 const MARKER_FRAG = /* glsl */ `
   uniform float uPulse; // seconds — beacons breathe
   varying vec3 vColor;
@@ -196,6 +200,9 @@ export class Cosmos3D implements CosmosLike, Journey3D {
   private colAttr: THREE.BufferAttribute | null = null;
   private alphaAttr: THREE.BufferAttribute | null = null;
   private sizeAttr: THREE.BufferAttribute | null = null;
+  private selAttr: THREE.BufferAttribute | null = null;
+  private selIdx = -1;
+  private selRing: THREE.Mesh | null = null;
   private baseSize: Float32Array = new Float32Array(0);
   private baseCol: Float32Array = new Float32Array(0);
   private types: string[] = [];
@@ -293,6 +300,8 @@ export class Cosmos3D implements CosmosLike, Journey3D {
       // both the controls update and the render — keeps software rasterizers
       // from burning frames on an invisible view
       if (this.canvas && this.canvas.offsetParent === null) return;
+      const t = (performance.now() - this.pulseT0) / 1000;
+      this.animateRing(t);
       this.controls?.update();
       this.renderer?.render(this.scene, this.camera!);
     });
@@ -371,6 +380,7 @@ export class Cosmos3D implements CosmosLike, Journey3D {
     geo.setAttribute("aSize", this.sizeAttr);
     geo.setAttribute("aAlpha", this.alphaAttr);
     geo.setAttribute("aTwinkle", new THREE.BufferAttribute(twinkle, 1));
+    geo.setAttribute("aSel", this.selAttr = new THREE.BufferAttribute(new Float32Array(n), 1));
     this.geo = geo;
     this.ptsMat = new THREE.ShaderMaterial({
       vertexShader: POINT_VERT,
@@ -450,6 +460,14 @@ export class Cosmos3D implements CosmosLike, Journey3D {
     this.geo = this.points = null;
     this.edges = this.edgeGeo = this.edgeMat = null;
     this.ptsMat = null;
+    this.selAttr = null;
+    if (this.selRing) {
+      this.scene.remove(this.selRing);
+      this.selRing.geometry.dispose();
+      (this.selRing.material as THREE.Material).dispose();
+      this.selRing = null;
+    }
+    this.selIdx = -1;
     this.n = 0;
     this.pos = new Float32Array(0);
     this.screen = new Float32Array(0);
@@ -480,6 +498,7 @@ export class Cosmos3D implements CosmosLike, Journey3D {
     g.setAttribute("aSize", new THREE.BufferAttribute(new Float32Array([size]), 1));
     g.setAttribute("aAlpha", new THREE.BufferAttribute(new Float32Array([1]), 1));
     g.setAttribute("aTwinkle", new THREE.BufferAttribute(new Float32Array([0]), 1));
+    g.setAttribute("aSel", new THREE.BufferAttribute(new Float32Array([0]), 1));
     const mat = new THREE.ShaderMaterial({
       vertexShader: MARKER_VERT,
       fragmentShader: MARKER_FRAG,
@@ -634,6 +653,86 @@ export class Cosmos3D implements CosmosLike, Journey3D {
     if (this.controls) this.controls.enabled = on;
   }
 
+  /**
+   * Star selection treatment: brightness/size boost on the star (aSel
+   * attribute) + a thin animated billboard ring around it. Monochrome
+   * (single accent colour), matches the icon language.
+   */
+  setSelection(idx: number | null): void {
+    if (!this.selAttr || !this.geo) return;
+    const arr = this.selAttr.array as Float32Array;
+    if (this.selIdx >= 0 && this.selIdx < this.n) arr[this.selIdx] = 0;
+    this.selIdx = idx ?? -1;
+    if (this.selIdx >= 0 && this.selIdx < this.n) {
+      arr[this.selIdx] = 1;
+      this.selAttr.needsUpdate = true;
+      this.ensureRing();
+      const ring = this.selRing!;
+      // radius is screen-space sized per frame in animateRing(); just place it
+      ring.scale.setScalar(1);
+      ring.position.set(this.pos[this.selIdx * 3], this.pos[this.selIdx * 3 + 1], this.pos[this.selIdx * 3 + 2]);
+      ring.visible = true;
+    } else {
+      this.selAttr.needsUpdate = true;
+      if (this.selRing) this.selRing.visible = false;
+    }
+  }
+
+  /** Project a node to CSS px (for the screen-space selection tooltip). */
+  projectNode(idx: number): { x: number; y: number; visible: boolean } | null {
+    if (!this.camera || !this.canvas || idx < 0 || idx >= this.n) return null;
+    this.projectAll();
+    return {
+      x: this.screen[idx * 2],
+      y: this.screen[idx * 2 + 1],
+      visible: this.screen[idx * 2] > -50 && this.screen[idx * 2] < (this.canvas.clientWidth || 1) + 50,
+    };
+  }
+
+  private ensureRing(): void {
+    if (this.selRing || !this.renderer) return;
+    // thin judged-on-screen annulus: thickness is a fraction of the radius
+    const g = new THREE.RingGeometry(0.8, 1.0, 64);
+    const m = new THREE.MeshBasicMaterial({
+      color: new THREE.Color(0.49, 0.95, 1.0),
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      depthTest: false,
+    });
+    const ring = new THREE.Mesh(g, m);
+    ring.visible = false;
+    ring.frustumCulled = false;
+    ring.renderOrder = 4; // over the starfield, under the HTML tooltip
+    this.scene.add(ring);
+    this.selRing = ring;
+  }
+
+  /**
+   * Animate the selection ring: billboard to camera, slow spin, subtle breathe.
+   * Sized in SCREEN px (a fixed world radius is sub-pixel on a zoomed-out view —
+   * the star sprite is only a few px there, so the ring would never be seen):
+   * radius hugs the sprite but never drops below RING_MIN_PX.
+   */
+  private animateRing(t: number): void {
+    if (!this.selRing || !this.selRing.visible || this.selIdx < 0 || !this.ptsMat) return;
+    const r = this.selRing;
+    r.quaternion.copy(this.camera!.quaternion);
+    const size = (this.geo!.getAttribute("aSize") as THREE.BufferAttribute).getX(this.selIdx);
+    // the vertex shader boosts the selected sprite: aSize * (1 + aSel*1.1)
+    const uScale = this.ptsMat.uniforms.uScale.value as number;
+    const dist = Math.max(0.1, this.camera!.position.distanceTo(r.position));
+    const spritePx = (size * 2.1 * uScale) / dist;
+    // hug the star sprite (the shader clamps sprites at 90 device px, so the
+    // nominal size can overshoot) but never below RING_MIN_PX
+    const targetPx = Math.max(RING_MIN_PX * this.dpr, Math.min(spritePx, 90) * 0.62) * (1 + 0.05 * Math.sin(t * 2.6));
+    r.scale.setScalar((targetPx * dist) / uScale);
+    r.rotateZ(t * 0.6);
+    (r.material as THREE.MeshBasicMaterial).opacity = 0.7 + 0.2 * Math.sin(t * 2.6);
+  }
+
   cameraNow(): { pos: XYZ; target: XYZ } {
     const c = this.camera!;
     const t = this.controls?.target ?? new THREE.Vector3();
@@ -699,7 +798,7 @@ export class Cosmos3D implements CosmosLike, Journey3D {
    * at (x, y, 0), dropping the node's (flattened) z, so the camera flew
    * "куда-то" and left OrbitControls orbiting the wrong point.
    */
-  flyToNode(p: XYZ, dist = 30, ms = 850): void {
+  flyToNode(p: XYZ, dist = 9.5, ms = 850): void {
     if (!this.camera || !this.controls) return;
     this.stopCamRaf();
     const controls = this.controls;
@@ -801,6 +900,12 @@ export class Cosmos3D implements CosmosLike, Journey3D {
     this.clearMarkers();
     this.clearContextLines();
     this.clearTrail();
+    if (this.selRing) {
+      this.scene.remove(this.selRing);
+      this.selRing.geometry.dispose();
+      (this.selRing.material as THREE.Material).dispose();
+      this.selRing = null;
+    }
     this.controls?.dispose();
     this.controls = null;
     this.geo?.dispose();
@@ -962,7 +1067,8 @@ export class Cosmos3D implements CosmosLike, Journey3D {
       if (dx * dx + dy * dy > 36) return;
     }
     const idx = this.pick(e.clientX, e.clientY);
-    if (idx !== null) this.onSelect(this.selOf(idx));
+    // empty space deselects; a star selects
+    this.onSelect(idx === null ? null : this.selOf(idx));
   };
 
   private selOf(idx: number): SelectedNode {

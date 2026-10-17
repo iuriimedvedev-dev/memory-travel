@@ -76,6 +76,10 @@ export interface CosmosLike {
   paint(paints: Map<number, { color: RGBA; size?: number }> | null): void;
   /** Dim everything except the given indices (search spotlight). */
   spotlight(keep: Set<number> | null): void;
+  /** Selection treatment: boost + ring on the star; null clears. */
+  setSelection(idx: number | null): void;
+  /** Project a node to CSS px (screen-space tooltip placement). */
+  projectNode(idx: number): { x: number; y: number; visible: boolean } | null;
   setEdgeOpacity(v: number): void;
   /** Eased camera flight. x/y world coords; zoom is renderer-relative. */
   flyTo(x: number, y: number, zoom: number, ms?: number): void;

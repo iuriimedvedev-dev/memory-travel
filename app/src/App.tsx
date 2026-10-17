@@ -142,8 +142,10 @@ export default function App() {
       const j = asJourney3D(cosmosFull);
       if (j) {
         // posByIdx already holds WORLD coords (toWorld3 applied at load);
-        // focus = target tweens onto the node, camera ends 28 units away.
-        j.flyToNode(p, 28, 850);
+        // focus = target tweens onto the node, camera ends 9.5 units away
+        // (3x closer than the old 28 — the star fills the frame with its
+        // selection ring and the node card beside it).
+        j.flyToNode(p, 9.5, 850);
       } else {
         // 2D fallback: z doesn't exist there, plain eased zoom.
         cosmosFull.flyTo(p[0], p[1], cosmosFull.currentZoom() * 3.2, 1400);

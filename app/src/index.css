@@ -315,6 +315,10 @@ button { display: inline-flex; gap: 6px; align-items: center; justify-content: c
 .results button .dim { font-size: 10.5px; flex: none; }
 .results mark { background: rgba(125, 243, 255, 0.3); color: inherit; border-radius: 2px; padding: 0 1px; }
 
+/* ---- selection tooltip (node-anchored AnimatedCard) ---- */
+.seltip .seltiprow { display: flex; gap: 6px; align-items: center; font-size: 11.5px; }
+.seltip .seltipdesc { margin: 4px 0 0; font-size: 11px; line-height: 1.45; }
+
 /* ---- node info card ---- */
 .cardhead { display: flex; gap: 8px; align-items: center; }
 .cardhead h3 { margin: 0; font-size: 14px; flex: 1; overflow-wrap: anywhere; }
@@ -415,6 +419,63 @@ button { display: inline-flex; gap: 6px; align-items: center; justify-content: c
 
 /* ---- language toggle ---- */
 .langtoggle { font-size: 11px; min-width: 40px; padding: 4px 8px; border-radius: 20px; font-variant-numeric: tabular-nums; }
+
+/* ---- AnimatedCard: two-phase entrance (frame draws on -> content slides) ---- */
+.acard {
+  position: relative;
+  background: rgba(6, 9, 24, 0.92);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.acard-frame {
+  position: absolute; inset: 0; border-radius: 12px; pointer-events: none;
+  padding: 1px;
+  background: conic-gradient(from var(--acard-angle, 0deg),
+    rgba(125, 243, 255, 0.05), var(--accent), rgba(125, 243, 255, 0.05));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  opacity: 0;
+  animation: acard-frame-in 0.3s ease var(--acard-delay, 0s) forwards, acard-spin 6s linear infinite calc(var(--acard-delay, 0s) + 0.3s);
+}
+.acard-gold .acard-frame {
+  background: conic-gradient(from var(--acard-angle, 0deg),
+    rgba(255, 209, 102, 0.05), var(--gold), rgba(255, 209, 102, 0.05));
+}
+.acard-plain .acard-frame {
+  background: conic-gradient(from var(--acard-angle, 0deg),
+    rgba(120, 150, 255, 0.08), rgba(120, 150, 255, 0.5), rgba(120, 150, 255, 0.08));
+}
+@keyframes acard-frame-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes acard-spin {
+  to { --acard-angle: 360deg; }
+}
+@property --acard-angle {
+  syntax: "<angle>"; initial-value: 0deg; inherits: false;
+}
+.acard-body { position: relative; }
+.acard-content {
+  opacity: 0; transform: translateY(6px);
+  animation: acard-content-in 0.22s ease calc(var(--acard-delay, 0s) + 0.26s) forwards; /* phase 2 */
+}
+@keyframes acard-content-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.acard-out { opacity: 0; transform: scale(0.97); transition: opacity 0.18s ease, transform 0.18s ease; }
+.acard-head { display: flex; gap: 8px; align-items: center; }
+.acard-titlewrap { flex: 1; min-width: 0; }
+.acard-title { margin: 0; font-size: 12.5px; letter-spacing: 0.05em; color: var(--ink); }
+.acard-meta { font-size: 10.5px; color: var(--dim); }
+.acard-sm { padding: 8px 10px; }
+.acard-md { padding: 10px 13px; }
+.acard-lg { padding: 14px 18px; }
+.acard-sm .acard-content { margin-top: 4px; font-size: 11.5px; }
+.acard-md .acard-content { margin-top: 5px; font-size: 12px; }
+.acard-lg .acard-content { margin-top: 6px; font-size: 13px; }
 
 /* ---- presentation mode ---- */
 .pres { position: absolute; inset: 0; z-index: 30; background: var(--bg); }

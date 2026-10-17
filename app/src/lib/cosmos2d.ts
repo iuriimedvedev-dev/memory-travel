@@ -68,6 +68,7 @@ export class Cosmos2D implements CosmosLike {
 
   private markers = new Map<number, Marker>();
   private nextMarker = 1;
+  private selIdx = -1;
 
   // camera: world center + px-per-world-unit
   private cx = 0;
@@ -216,6 +217,20 @@ export class Cosmos2D implements CosmosLike {
     this.requestDraw();
   }
 
+  /** Selection in 2D: the star gets a halo + ring when next drawn. */
+  setSelection(idx: number | null): void {
+    this.selIdx = idx ?? -1;
+    this.requestDraw();
+  }
+
+  /** Screen position of a node (CSS px within the canvas). */
+  projectNode(idx: number): { x: number; y: number; visible: boolean } | null {
+    if (idx < 0 || idx >= this.n) return null;
+    const [sx, sy] = this.toScreen(this.wx[idx], this.wy[idx]);
+    const w = this.canvas?.clientWidth || 1;
+    return { x: sx, y: sy, visible: sx > -50 && sx < w + 50 };
+  }
+
   setEdgeOpacity(v: number): void {
     this.edgeAlpha = v;
     this.requestDraw();
@@ -349,8 +364,8 @@ export class Cosmos2D implements CosmosLike {
   private onClick = (e: MouseEvent) => {
     if (this.drag && this.drag.moved > 6) return; // was a drag, not a click
     const idx = this.pick(e.clientX, e.clientY);
-    if (idx === null || !this.onSelect) return;
-    this.onSelect({ gpuId: idx, graphIdx: idx, name: this.names[idx] ?? `#${idx}` });
+    if (!this.onSelect) return;
+    this.onSelect(idx === null ? null : { gpuId: idx, graphIdx: idx, name: this.names[idx] ?? `#${idx}` });
   };
 
   private onMove = (e: PointerEvent) => {
@@ -494,6 +509,23 @@ export class Cosmos2D implements CosmosLike {
         if (x < -30 || y < -30 || x > w + 30 || y > h + 30) continue;
         ctx.fillRect(x - s / 2, y - s / 2, s, s);
       }
+    }
+
+    // selection ring: thin animated halo around the selected star
+    if (this.selIdx >= 0 && this.selIdx < this.n) {
+      const x = (this.wx[this.selIdx] - this.cx) * this.scale + w / 2;
+      const y = (this.wy[this.selIdx] - this.cy) * this.scale + h / 2;
+      const t = (performance.now() % 2400) / 2400;
+      const r = 10 + 2 * Math.sin((performance.now() / 1000) * 2.6);
+      ctx.save();
+      ctx.strokeStyle = "rgba(125, 243, 255, 0.9)";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 5]);
+      ctx.lineDashOffset = -t * 44;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
     }
 
     // Markers (query point, chunk hits): glowing-ish dot via layered circles + label.
