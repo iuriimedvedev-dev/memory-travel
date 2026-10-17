@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "node ../scripts/no-emoji-check.mjs",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "lint:no-emoji": "node ../scripts/no-emoji-check.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

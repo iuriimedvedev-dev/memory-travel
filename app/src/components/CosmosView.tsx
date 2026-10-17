@@ -5,7 +5,7 @@ import { INK } from "../lib/cosmos";
 import { FAMILY_COLORS, FAMILY_LABEL, LEGEND_ORDER, colorForType, familyOf } from "../lib/palette";
 import { fmt } from "../i18n/strings";
 import { useI18n } from "../i18n/useI18n";
-import { CompassIcon, LayersIcon, SearchIcon, SparkIcon, XIcon } from "./icons";
+import { CompassIcon, LayersIcon, LinkIcon, SearchIcon, SparkIcon, XIcon } from "./icons";
 
 interface Props {
   cosmos: AnyCosmos | null;
@@ -257,7 +257,7 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
                         name
                       )}
                     </b>
-                    <span className="dim">{graph!.nodes[i].t} · {graph!.nodes[i].deg}◆</span>
+                    <span className="dim">{graph!.nodes[i].t} · {graph!.nodes[i].deg}<LinkIcon size={10} /></span>
                   </button>
                 </li>
               );

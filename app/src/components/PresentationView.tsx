@@ -14,6 +14,7 @@ import { CHAPTERS, type PresCtx } from "../lib/presentation";
 import type { CosmosGraph, TravelTrace } from "../lib/types";
 import { pick } from "../i18n/strings";
 import { useI18n } from "../i18n/useI18n";
+import { ChevronLeftIcon, ChevronRightIcon, GearIcon, PauseIcon, PlayIcon, XIcon } from "./icons";
 import { Inspector, type Inspection } from "./Inspector";
 
 interface IngestFixture {
@@ -308,7 +309,9 @@ export default function PresentationView({ onExit }: { onExit: () => void }) {
           {lang.toUpperCase()}
         </button>
         <button onClick={() => setMenuOpen((o) => !o)}>{t.presMenu}</button>
-        <button onClick={onExit} title={t.presExit}>✕ {t.presExit}</button>
+        <button onClick={onExit} title={t.presExit}>
+          <XIcon size={11} /> {t.presExit}
+        </button>
       </div>
 
       {menuOpen && (
@@ -354,12 +357,16 @@ export default function PresentationView({ onExit }: { onExit: () => void }) {
           </div>
         )}
         <div className="pres-controls">
-          <button onClick={() => goto(chapter - 1)} disabled={chapter === 0} title={t.presPrev}>←</button>
-          <button className="primary" onClick={() => setPlaying((p) => !p)}>{playing ? "⏸" : "▶"}</button>
-          <button onClick={() => goto(chapter + 1)} disabled={chapter === CHAPTERS.length - 1} title={t.presNext}>→</button>
+          <button onClick={() => goto(chapter - 1)} disabled={chapter === 0} title={t.presPrev}>
+            <ChevronLeftIcon size={12} />
+          </button>
+          <button className="primary" onClick={() => setPlaying((p) => !p)}>{playing ? <PauseIcon size={12} /> : <PlayIcon size={12} />}</button>
+          <button onClick={() => goto(chapter + 1)} disabled={chapter === CHAPTERS.length - 1} title={t.presNext}>
+            <ChevronRightIcon size={12} />
+          </button>
           <span className="spacer" />
           {traceCanvasActive && trace && (
-            <button onClick={() => setInsp({ kind: "stage", stage: ch.stage ?? 0 })}>{t.inspectOpen} ⚙</button>
+            <button onClick={() => setInsp({ kind: "stage", stage: ch.stage ?? 0 })}>{t.inspectOpen} <GearIcon size={13} /></button>
           )}
           <span className="dim" style={{ fontSize: 11 }}>
             ←/→ · space · F · Esc

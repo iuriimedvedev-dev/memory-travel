@@ -138,3 +138,43 @@ export function ClockIcon(p: IconProps) {
     </Base>
   );
 }
+
+/** Direct relations / degree of a node (replaces the old diamond-bullet glyph). */
+export function LinkIcon(p: IconProps) {
+  return (
+    <Base {...p}>
+      <path d="M10.2 13.8 L13.8 10.2" />
+      <path d="M8.4 8.4 L6.2 10.6 a2.9 2.9 0 0 0 4.1 4.1 l1.3 -1.3" />
+      <path d="M15.6 15.6 L17.8 13.4 a2.9 2.9 0 0 0 -4.1 -4.1 l-1.3 1.3" />
+    </Base>
+  );
+}
+
+export function GearIcon(p: IconProps) {
+  return (
+    <Base {...p}>
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M12 2.8 v3 M12 18.2 v3 M2.8 12 h3 M18.2 12 h3 M5.5 5.5 l2.1 2.1 M16.4 16.4 l2.1 2.1 M18.5 5.5 l-2.1 2.1 M7.6 16.4 l-2.1 2.1" />
+    </Base>
+  );
+}
+
+export function CameraIcon(p: IconProps) {
+  return (
+    <Base {...p}>
+      <rect x="2.8" y="7" width="12.4" height="10" rx="2" />
+      <path d="M15.2 11.2 L21.2 8 V16 L15.2 12.8" />
+    </Base>
+  );
+}
+
+export function HandIcon(p: IconProps) {
+  return (
+    <Base {...p}>
+      <path d="M9 11 V5.5 a1.4 1.4 0 0 1 2.8 0 V11" />
+      <path d="M11.8 11 V4.6 a1.4 1.4 0 0 1 2.8 0 V11" />
+      <path d="M14.6 11.4 V6.6 a1.4 1.4 0 0 1 2.8 0 V13" />
+      <path d="M9 11.4 V9.6 a1.4 1.4 0 0 0 -2.8 0 V14 a6.4 6.4 0 0 0 6.4 6.4 h1.2 A5 5 0 0 0 19 15.4 V12" />
+    </Base>
+  );
+}

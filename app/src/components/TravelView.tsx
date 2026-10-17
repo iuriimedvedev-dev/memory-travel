@@ -9,7 +9,7 @@ import { STAGES } from "../lib/stages";
 import type { ChunkHit, CosmosGraph, TraceManifestEntry, TravelTrace } from "../lib/types";
 import { pick } from "../i18n/strings";
 import { useI18n } from "../i18n/useI18n";
-import { AlertIcon, ChevronLeftIcon, ChevronRightIcon, PauseIcon, PlayIcon } from "./icons";
+import { AlertIcon, CameraIcon, ChevronLeftIcon, ChevronRightIcon, GearIcon, HandIcon, PauseIcon, PlayIcon } from "./icons";
 import { buildJourneyLog, JourneyLog, type LogEntry } from "./JourneyLog";
 import { Inspector, type Inspection } from "./Inspector";
 
@@ -577,7 +577,7 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
         </div>
         <div className="row">
           <button className="inspectbtn" onClick={() => { setPlaying(false); setInsp({ kind: "stage", stage }); }}>
-            {t.inspectOpen} ⚙
+            {t.inspectOpen} <GearIcon size={13} />
           </button>
         </div>
       </div>
@@ -658,7 +658,7 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
             onClick={() => setCamMode((m) => (m === "journey" ? "free" : "journey"))}
             title={camMode === "journey" ? t.cameraJourney : t.cameraFree}
           >
-            {camMode === "journey" ? "🎥" : "🖐"}
+            {camMode === "journey" ? <CameraIcon size={14} /> : <HandIcon size={14} />}
           </button>
           <button className="speed" onClick={cycleSpeed} title={t.speedTitle}>
             {speed}×
