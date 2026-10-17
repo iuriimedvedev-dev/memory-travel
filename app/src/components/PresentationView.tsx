@@ -11,18 +11,17 @@ import { loadChunkCoords, loadEntityCoords, loadGraph, loadIngestFixture, loadMa
 import { stageCamera } from "../lib/journeyCam";
 import { makeTimeline, type Timeline } from "../lib/reveal";
 import { CHAPTERS, type PresCtx } from "../lib/presentation";
-import type { CosmosGraph, TravelTrace } from "../lib/types";
+import type { CosmosGraph, IngestFixture, TravelTrace } from "../lib/types";
 import { pick } from "../i18n/strings";
 import { useI18n } from "../i18n/useI18n";
+import { AnimatedCard } from "./AnimatedCard";
+import { IngestPanel } from "./IngestPanel";
+import { PresStageCards } from "./PresStageCards";
 import { ChevronLeftIcon, ChevronRightIcon, GearIcon, PauseIcon, PlayIcon, XIcon } from "./icons";
 import { Inspector, type Inspection } from "./Inspector";
 
-interface IngestFixture {
-  doc: { file_path: string; size_chars: number; preview: string };
-  chunks: { chunk_id: string; section: string; start_line: number | null; end_line: number | null; tokens: number | null; preview: string }[];
-  entities: { name: string; type: string; desc: string }[];
-  relations: { source: string; target: string; desc: string; weight: string }[];
-}
+/** Chapters whose data is owed a docked card row (3–8 = the transformation). */
+const CARD_CHAPTERS = new Set(["embed", "channels", "fusion", "rerank", "context", "answer"]);
 
 export default function PresentationView({ onExit }: { onExit: () => void }) {
   const { t, lang, setLangL10n } = useI18n();
@@ -324,6 +323,14 @@ export default function PresentationView({ onExit }: { onExit: () => void }) {
         </div>
       )}
 
+      {/* chapter 2: two-panel ingest (records | parameterised split preview) */}
+      {ch.id === "ingest" && fixture && <IngestPanel fixture={fixture} lang={lang} t={t} />}
+
+      {/* chapters 3-8: the chapter's real data docked at the top of the cosmos */}
+      {CARD_CHAPTERS.has(ch.id) && (
+        <PresStageCards chapterId={ch.id} trace={trace} t={t} lang={lang} />
+      )}
+
       <div className="pres-bottom">
         <div className="pres-progress" aria-hidden="true">
           {CHAPTERS.map((c, i) => (
@@ -333,40 +340,35 @@ export default function PresentationView({ onExit }: { onExit: () => void }) {
         <div className="pres-chapternum">
           {fmtT(t.presChapter, { n: chapter + 1, total: CHAPTERS.length })} · {ch.viz === "trace" ? "trace" : "cosmos"}
         </div>
-        <h2 className="pres-title">{pick(ch.title, lang)}</h2>
-        <p className="pres-narr">{pick(ch.narration(ctx), lang)}</p>
-        <p className="pres-fact">{pick(ch.fact(ctx), lang)}</p>
-        {ch.id === "ingest" && fixture && (
-          <div className="pres-fixture">
-            <b className="dim">{fixture.doc.file_path}</b> <span className="dim">({fixture.doc.size_chars.toLocaleString(lang === "ru" ? "ru-RU" : "en-US")} chars)</span>
-            <ul>
-              {fixture.chunks.slice(0, 5).map((c) => (
-                <li key={c.chunk_id}>
-                  <span className="ref">§{c.section || "—"}</span> {c.start_line}–{c.end_line} · {c.tokens} tok · <span className="dim">{c.preview.slice(0, 70)}…</span>
-                </li>
-              ))}
-            </ul>
-            <p className="dim">teacher extractions:</p>
-            <ul>
-              {fixture.entities.slice(0, 5).map((e, i) => (
-                <li key={i}>
-                  <i className="swatch" style={{ background: "#a292d3" }} /> <b>{e.name}</b> <span className="dim">[{e.type}] {e.desc.slice(0, 80)}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        {/* narration + fact render through AnimatedCard (remount per chapter = replay) */}
+        <AnimatedCard
+          key={ch.id}
+          open
+          variant="plain"
+          size="lg"
+          className="pres-narrcard"
+          title={pick(ch.title, lang)}
+        >
+          <p className="pres-narr">{pick(ch.narration(ctx), lang)}</p>
+        </AnimatedCard>
+        <AnimatedCard key={`${ch.id}-fact`} open variant="accent" size="md" className="pres-factcard" delayMs={120}>
+          <p className="pres-fact">{pick(ch.fact(ctx), lang)}</p>
+        </AnimatedCard>
         <div className="pres-controls">
           <button onClick={() => goto(chapter - 1)} disabled={chapter === 0} title={t.presPrev}>
             <ChevronLeftIcon size={12} />
           </button>
-          <button className="primary" onClick={() => setPlaying((p) => !p)}>{playing ? <PauseIcon size={12} /> : <PlayIcon size={12} />}</button>
+          <button className="primary" onClick={() => setPlaying((p) => !p)} title={playing ? t.stagePause : t.stagePlay}>
+            {playing ? <PauseIcon size={12} /> : <PlayIcon size={12} />}
+          </button>
           <button onClick={() => goto(chapter + 1)} disabled={chapter === CHAPTERS.length - 1} title={t.presNext}>
             <ChevronRightIcon size={12} />
           </button>
           <span className="spacer" />
           {traceCanvasActive && trace && (
-            <button onClick={() => setInsp({ kind: "stage", stage: ch.stage ?? 0 })}>{t.inspectOpen} <GearIcon size={13} /></button>
+            <button onClick={() => setInsp({ kind: "stage", stage: ch.stage ?? 0 })}>
+              {t.inspectOpen} <GearIcon size={13} />
+            </button>
           )}
           <span className="dim" style={{ fontSize: 11 }}>
             ←/→ · space · F · Esc

@@ -1,0 +1,9 @@
+$ npm run lint:no-emoji    # also runs as prebuild, before npm run build
+  no-emoji: scanned 43 files (app/src, app/index.html, app/public/data)
+  no-emoji: clean (0 hits)
+$ echo $?
+  0
+
+# gate self-test: inject one emoji into app/src/index.css ->
+#   app/src/index.css:648:20  U+1F680 "🚀"
+#   no-emoji: 1 HIT(S) -> exit 1

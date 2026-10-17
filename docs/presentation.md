@@ -17,8 +17,49 @@ swap. Language persists in `localStorage` (`mt.lang.v1`).
 | `F` | fullscreen |
 | `Esc` | close chapter menu, or exit the presentation |
 | «Главы» button | chapter menu overlay |
-| «данные этапа ⚙» | opens the stage inspector over the live scene (trace chapters) |
+| «данные этапа» button (gear icon) | opens the stage inspector over the live scene (trace chapters) |
 | RU / EN toggle | switch narration language without losing position |
+
+Every control glyph is a monochrome inline SVG (`components/icons.tsx`): the
+presentation ships **zero emoji**, enforced by `npm run lint:no-emoji`
+(also wired as `prebuild`, so `npm run build` fails on a pasted emoji).
+
+## Cards (AnimatedCard)
+
+One reusable card component (`components/AnimatedCard.tsx`) draws the frame and
+the content in two phases (gradient frame sweeps on → content slides in; quick
+fade on exit). It is used for:
+
+- the **narration** card (`plain` / `lg`) and the **fact** card (`accent` / `md`)
+  in the bottom panel — keyed by chapter id, so every chapter change replays
+  the entrance;
+- the **node selection tooltip** in the cosmos view (`accent` / `sm`);
+- the **docked chapter cards** (below);
+- the two **ingest panels** (chapter 2).
+
+Props/slots: `open`, `children`, `title`, `meta`, `variant` (`accent|gold|plain`),
+`size` (`sm|md|lg`), `className`, `style`, `delayMs` (stagger), `onClose`,
+`closeTitle`.
+
+## Docked chapter cards (chapters 3–8)
+
+Chapters 3–8 (the transformation chapters) dock a row of AnimatedCards at the
+top of the cosmos view, staggered left→right (`delayMs = i * 110`) while the
+camera flight keeps playing behind them. Every number comes straight out of the
+loaded trace (`components/PresStageCards.tsx`), never invented:
+
+| Chapter | Cards |
+| --- | --- |
+| 3 question→embedding | question text; embedding (model/dim + real UMAP x,y,z strip, candidate pool, dense ms, top score, top-12 dense score bars) |
+| 4 channels | vector channel (hits/top score/dense ms + bars), BM25 channel (hits/top score/sparse ms/BM25 chunks + bars), graph channel (seeds/nodes/edges traversed + degree bars) |
+| 5 fusion | fused ranking (fused bars + per-channel dense/sparse contribution bars with dense/sparse ranks, α from the trace) |
+| 6 rerank | before/after top-5 ordering with moved rows, backend/pool/blocked inversions/moved count (or the honest skip reason) |
+| 7 context | assembled chars / 15 000 budget, entity facts, relations, sources, preview quotes + entity list |
+| 8 synthesis | answer quote + client latency, quotes/citations counts, citation list (`[A1]…`, `[ref n]`) |
+
+Model identity (EmbeddingGemma 768-d, Qwen3-Reranker-0.6B on iGPU) is a shared
+constant in `app/src/lib/presentation.ts` (`PIPELINE`) — the same facts the
+narrations state, not per-trace telemetry.
 
 ## Chapters (viz source: `cosmos` = full 47k starfield, `trace` = the recall subgraph)
 
@@ -33,10 +74,35 @@ runtime.
 - **Fact:** `47 355 сущностей · 54 502 связей — не мокап, а живой индекс.`
 
 ### 2. Как знание попадает в память / How knowledge enters memory — `cosmos`
-- Shows a REAL note (`docs-specs-demo-alignment-task.spec.md`), its REAL
-  md_struct section chunks (heading path / line ranges / tokens), and the
-  teacher's REAL extraction records — exported verbatim from the index kv
-  stores by `scripts/export_ingest_fixture.py` into `app/public/data/ingest_fixture.json`.
+- Two panels (`components/IngestPanel.tsx`): LEFT the teacher's REAL extraction
+  records (entities/relations from the index `llm_response_cache`, in
+  AnimatedCards); RIGHT the REAL note (`docs-specs-demo-alignment-task.spec.md`)
+  rendered as structured text with the **chunk windows visualised** — each
+  index window's line range tinted (alternating), overlapping ranges marked
+  with a striped band, heading boundaries tagged, and per-window token counts.
+- **Parameterised split preview**: the parameter table is derived from
+  `app/src/lib/chunkingParams.ts` (`chunk_token_size` 2048,
+  `chunk_overlap_token_size` 64, `mode` `md_struct`, `min_section_merge`
+  200 chars, derived `target_chars` = tokens × 4). The numbers are editable in
+  place and the note is re-split live by `splitNote()` — a client-side mirror of
+  the production splitter `hars_memory/ingest/md_structure.py` (section
+  boundaries → paragraph/table/fence blocks, `[A > B]` breadcrumb repeated,
+  runt sections merged up), labelled as an illustration.
+- **Two lanes, on purpose**: "как в индексе" shows the verbatim index windows
+  (the sampled note was ingested by LightRAG's token chunker: five windows of
+  exactly 2048 / 2048 / 2048 / 2048 / 308 tokens with real line overlaps at
+  186–217, 476–520, 760–793, 1035–1068), while "md_struct, по параметрам выше"
+  shows the mirror split (25 section-aligned windows, no overlap unless the
+  overlap parameter is raised). The caption states this difference instead of
+  pretending one splitter explains the other.
+- **Hover works both ways**: a window lights its extraction records (by
+  `chunk_id` for index windows, by line-range intersection for mirror windows)
+  and dims the rest of the note; hovering a record lights its window and its
+  lines. Clicking a window pins the highlight and scrolls the note to its first
+  line.
+- Data: `scripts/export_ingest_fixture.py` (read-only) → `app/public/data/ingest_fixture.json`,
+  which now carries the note's full `doc.text` + `doc.line_count` so the panel
+  can render the same lines the chunk ranges index into (32 227 chars / 1 074 lines).
 - **RU:** «Заметка разрезается md_struct-чанкером по секциям (заголовки → секции → чанки с номерами строк). Учитель — локальная 27B модель — извлекает из каждого чанка сущности и связи; мердж идёт в общий граф. Справа в карточке — настоящая заметка и её настоящие extraction-записи из кэша учителя.»
 
 ### 3. Вопрос → эмбеддинг / Question → embedding — `trace` (stage: query)
@@ -72,7 +138,21 @@ runtime.
 - Trace: `app/public/data/traces/trace_01.json` — compiled from a captured
   `memory_recall` fixture.
 - Ingest fixture: `app/public/data/ingest_fixture.json` — verbatim index
-  records (no synthesis).
+  records (no synthesis): the note text, its index chunk windows and the
+  teacher's extraction records.
+
+## Zero-emoji gate
+
+`npm run lint:no-emoji` (`scripts/no-emoji-check.mjs`, stdlib only) sweeps
+`app/src` (ts/tsx/css/html), `app/index.html` and `app/public/data` JSON and
+fails on any emoji/pictograph codepoint (emoji blocks, dingbats, misc symbols,
+geometric shapes, flags, variation selectors). It runs as `prebuild`, so
+`npm run build` cannot go green with an emoji in the tree. Typographic glyphs
+the copy legitimately uses are not hits (arrows `← → ↑ ↓`, `· — – … « » × ≤ ≥ ≈ α §`);
+in data fixtures the geometric-shapes block is allowed because it appears in
+verbatim markdown ASCII-art diagrams (box drawing), while UI sources are
+scanned with the full class. Replace a hit with an icon from
+`app/src/components/icons.tsx`.
 
 ## Reduced motion / fallback
 

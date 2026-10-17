@@ -99,3 +99,32 @@ export interface TraceManifestEntry {
   file: string;
   kb: number;
 }
+
+/**
+ * app/public/data/ingest_fixture.json — one real note with its real md_struct /
+ * token-chunker records and the teacher's extraction records (presentation
+ * chapter 2). Exported read-only by scripts/export_ingest_fixture.py.
+ */
+export interface IngestFixture {
+  doc: {
+    file_path: string;
+    size_chars: number;
+    /** 1-based line count of `text` (chunk start_line/end_line index into it). */
+    line_count: number;
+    /** Verbatim note text as stored in the index (kv_store_full_docs). */
+    text: string;
+    /** First 1200 chars of `text` (compact captions). */
+    preview: string;
+  };
+  chunks: {
+    chunk_id: string;
+    section: string;
+    heading_path: string[];
+    start_line: number;
+    end_line: number;
+    tokens: number;
+    preview: string;
+  }[];
+  entities: { name: string; type: string; desc: string; chunk: string }[];
+  relations: { source: string; target: string; desc: string; keywords?: string; weight: string }[];
+}

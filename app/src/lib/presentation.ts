@@ -34,6 +34,17 @@ export const MEASURED = {
   edgesTotal: 60117,
 };
 
+/**
+ * Model/pipeline identity shown on the presentation cards. These are the same
+ * facts the chapter narrations state (docs/presentation.md): the embedder and
+ * the cross-encoder of this deployment. Not per-trace telemetry — hence a
+ * constant, so no card invents a model name or a dimension.
+ */
+export const PIPELINE = {
+  embedder: { model: "EmbeddingGemma", dim: 768, via: "llama.cpp" },
+  reranker: { model: "Qwen3-Reranker-0.6B", device: "iGPU" },
+} as const;
+
 export const CHAPTERS: PresentationChapter[] = [
   {
     id: "what",
