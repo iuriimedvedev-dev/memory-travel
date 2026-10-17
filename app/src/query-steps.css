@@ -116,6 +116,17 @@
   color: var(--ink);
 }
 
+/* Honest branch note under the list: fusion does not depend on graph
+ * expansion — both converge in context assembly (see lib/live's row order,
+ * which is only pedagogical; the rendered order here is the dependency order). */
+.qsteps-note {
+  margin: 3px 0 0;
+  padding-left: 20px;
+  color: var(--dim);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
 /* row states */
 .qstep-pending { opacity: 0.45; }
 .qstep-active .qstep-name, .qstep-active .qstep-ms { color: var(--accent); }

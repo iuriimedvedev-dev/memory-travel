@@ -39,7 +39,7 @@ type L10n = { en: string; ru: string };
 const PHASES: [number, L10n][] = [
   [0, { en: "connecting to the memory bridge…", ru: "подключаюсь к мосту памяти…" }],
   [3, { en: "embedding the question · extracting keywords…", ru: "эмбеддинг вопроса · извлечение ключевых слов…" }],
-  [10, { en: "dense + sparse retrieval · graph walk · fusion…", ru: "dense + sparse поиск · обход графа · fusion…" }],
+  [10, { en: "dense + sparse retrieval · fusion · graph walk…", ru: "dense + sparse поиск · fusion · обход графа…" }],
   [25, { en: "rerank + context assembly — recalls can take up to 120s…", ru: "реранк + сборка контекста — recall может занять до 120с…" }],
 ];
 
@@ -54,10 +54,30 @@ const STEP_LABEL: Record<StepId, L10n> = {
   dense: { en: "Dense / vector search", ru: "Dense / векторный поиск" },
   sparse: { en: "Sparse / BM25", ru: "Sparse / BM25" },
   graph: { en: "Graph expansion", ru: "Обход графа" },
-  fusion: { en: "Fusion", ru: "Смешение / fusion" },
+  fusion: { en: "Fusion (dense+sparse)", ru: "Смешение (dense+sparse)" },
   rerank: { en: "Rerank", ru: "Реранк" },
   context: { en: "Context assembly", ru: "Сборка контекста" },
   total: { en: "Total", ru: "Итого" },
+};
+
+/** Rendered row order = the real dependency order, NOT lib/live's row order.
+ *
+ *  `lib/live.ts` ships its rows as keywords → dense → sparse → graph → fusion →
+ *  rerank → context, which reads as "graph feeds fusion". It does not. The
+ *  service fuses dense+sparse only (`fusion` carries `alpha`/pool from the
+ *  dense/BM25 channels and has no graph field) and runs LightRAG's
+ *  entity/relation pass (`graph_expand`, `derived_from: "context_string"`) as a
+ *  SEPARATE branch that completes afterwards; the two branches converge only in
+ *  context assembly (`context_priority=merged`). Rows are therefore rendered in
+ *  completion order so the list stops implying a graph → fusion edge. See
+ *  `hars-longterm-memory/docs/trace-api.md` ("Dependency DAG vs wire order").
+ *  (That array order lives in lib/live.ts, outside this component's ownership.) */
+const DISPLAY_ORDER: StepId[] = [
+  "keywords", "dense", "sparse", "fusion", "rerank", "graph", "context", "total",
+];
+const displayIndex = (id: StepId): number => {
+  const i = DISPLAY_ORDER.indexOf(id);
+  return i === -1 ? DISPLAY_ORDER.length : i;
 };
 
 const COPY = {
@@ -74,6 +94,10 @@ const COPY = {
   toggle: { en: "collapse / expand the pipeline steps", ru: "свернуть / развернуть шаги конвейера" },
   estimated: { en: "estimated", ru: "оценка" },
   ms: { en: "ms", ru: "мс" },
+  branches: {
+    en: "fusion blends dense+sparse and does not depend on graph expansion; both branches converge in context assembly",
+    ru: "fusion смешивает dense+sparse и не зависит от обхода графа; обе ветви сходятся на сборке контекста",
+  },
 };
 
 function StepGlyph({ status }: { status: StepStatus }) {
@@ -177,17 +201,22 @@ export default function QueryBar({
             {estimatedNow && <span className="qsteps-est">{c("estimated")}</span>}
           </button>
           {stepsOpen && (
-            <ol className="qstep-list" aria-label={c("steps")}>
-              {steps.map((s, i) => (
-                <li key={s.id} className={`qstep qstep-${s.status}${s.estimated ? " qstep-est" : ""}`}>
-                  <span className="qstep-ico"><StepGlyph status={s.status} /></span>
-                  <span className="qstep-num">{i + 1}</span>
-                  <span className="qstep-name">{label(s.id)}</span>
-                  <span className="qstep-detail">{s.detail}</span>
-                  <span className="qstep-ms">{s.ms == null ? "—" : `${Math.round(s.ms)} ${c("ms")}`}</span>
-                </li>
-              ))}
-            </ol>
+            <>
+              <ol className="qstep-list" aria-label={c("steps")}>
+                {[...steps]
+                  .sort((a, b) => displayIndex(a.id) - displayIndex(b.id))
+                  .map((s, i) => (
+                    <li key={s.id} className={`qstep qstep-${s.status}${s.estimated ? " qstep-est" : ""}`}>
+                      <span className="qstep-ico"><StepGlyph status={s.status} /></span>
+                      <span className="qstep-num">{i + 1}</span>
+                      <span className="qstep-name">{label(s.id)}</span>
+                      <span className="qstep-detail">{s.detail}</span>
+                      <span className="qstep-ms">{s.ms == null ? "—" : `${Math.round(s.ms)} ${c("ms")}`}</span>
+                    </li>
+                  ))}
+              </ol>
+              <p className="qsteps-note">{c("branches")}</p>
+            </>
           )}
         </div>
       )}
