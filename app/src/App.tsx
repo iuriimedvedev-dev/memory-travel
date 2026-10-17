@@ -6,6 +6,7 @@ import ErrorOverlay from "./components/ErrorOverlay";
 import PresentationView from "./components/PresentationView";
 import QueryBar, { type HistoryEntry } from "./components/QueryBar";
 import TravelView from "./components/TravelView";
+import UiScaleSlider from "./components/UiScaleSlider";
 import { SparkIcon, XIcon } from "./components/icons";
 import { INK, toWorld3, type RGBA, type XYZ } from "./lib/cosmos";
 import type { AnyCosmos } from "./lib/cosmos2d";
@@ -321,6 +322,7 @@ export default function App() {
             <nav>
               <button className={tab === "cosmos" ? "on" : ""} onClick={() => setTab("cosmos")}>{t.tabCosmos}</button>
               <button className={tab === "travel" ? "on" : ""} onClick={() => setTab("travel")}>{t.tabTravel}</button>
+              <UiScaleSlider />
               <button className="langtoggle" onClick={() => setLangL10n(lang === "ru" ? "en" : "ru")} title={t.langSwitch}>
                 {lang.toUpperCase()}
               </button>
