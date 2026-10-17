@@ -43,12 +43,6 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
   const [insp, setInsp] = useState<Inspection | null>(null);
   const markers = useRef<number[]>([]);
   const timeline = useRef<Timeline | null>(null);
-  /** Camera choreography lives on its own timeline so an explicit user fly-to
-   *  can cancel it without killing the stage reveal. They used to both write
-   *  the camera every frame: the flight won while it ran, and the instant it
-   *  finished the still-running cinematic orbit yanked the camera off the
-   *  node (measured: a ~100-unit teleport right after a correct arrival). */
-  const camTl = useRef<Timeline | null>(null);
   /** false only when the user jumped (scrubber/dots): those skip straight to the end state */
   const animateNext = useRef(true);
   const cosmosRef = useRef<AnyCosmos | null>(null);
@@ -225,7 +219,10 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
     });
     tl.tween(delay, dur, (tt) => {
       if (mid === null) return;
-      const z = (w[2] + zFrom) * (1 - tt);
+      // settle exactly on the node's world z (not z=0): the marker drops from
+      // zFrom above its node, so a camera framing the true focus points frames
+      // the markers as they actually render.
+      const z = w[2] + zFrom * (1 - tt);
       if (j3d) j3d.moveMarker3(mid, [w[0], w[1], z], from + (size - from) * tt);
       else cosmos?.moveMarker(mid, w[0], w[1], from + (size - from) * tt);
     });
@@ -283,20 +280,42 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
     return arr;
   }, [trace, ringDepth]);
 
-  // journey-camera context per stage (WORLD coords — stageCamera distances
-  // are world-scale; raw UMAP units would put the camera near the origin,
-  // staring at mostly empty space)
+  // journey-camera context per stage (WORLD coords). Each stage carries the
+  // exact set of focus points it reveals, so stageCamera can solve an explicit
+  // arrival POSE that frames that content (centroid + fit distance) instead of
+  // aiming at a fixed offset and hoping.
   const camCtx = useMemo(() => {
     const W = (p: XYZ | null): XYZ | null => p ? toWorld3(p) : null;
-    const vc = centroidOfList(trace?.vector_hits.slice(0, 12).map(hitPos).filter((p): p is XYZ => p !== null) ?? []);
-    const seeds = trace?.graph.nodes.filter((n) => n.seed).map((n) => p3(n)).filter((p): p is XYZ => p !== null) ?? [];
-    const bc = centroidOfList(trace?.bm25_hits.slice(0, 12).map(hitPos).filter((p): p is XYZ => p !== null) ?? []);
+    const Ws = (ps: (XYZ | null)[]): XYZ[] =>
+      ps.filter((p): p is XYZ => p !== null).map((p) => toWorld3(p));
+    const vecPts = trace?.vector_hits.slice(0, 12).map(hitPos).filter((p): p is XYZ => p !== null) ?? [];
+    const bmPts = trace?.bm25_hits.slice(0, 12).map(hitPos).filter((p): p is XYZ => p !== null) ?? [];
+    const fusPts = trace?.fusion.map(hitPos).filter((p): p is XYZ => p !== null) ?? [];
+    const seedPts = trace?.graph.nodes.filter((n) => n.seed).map((n) => p3(n)).filter((p): p is XYZ => p !== null) ?? [];
+    const ctxPts = trace?.context_blocks.entities
+      .map((e) => posOf.get(e.entity))
+      .filter((p): p is XYZ => p !== undefined) ?? [];
+    const scenePts = trace?.graph.nodes.map((n) => p3(n)).filter((p): p is XYZ => p !== null) ?? [];
+    const vc = centroidOfList(vecPts);
+    const bc = centroidOfList(bmPts);
     const all = centroidOfList([
       ...(queryPos ? [queryPos] : []),
       ...(vc ? [vc] : []),
-      ...seeds,
+      ...seedPts,
     ]);
-    return { query: W(queryPos), vecCluster: W(vc), seeds: W(centroidOfList(seeds)), bm25: W(bc), scene: W(all) };
+    return {
+      query: W(queryPos),
+      vecCluster: W(vc),
+      seeds: W(centroidOfList(seedPts)),
+      bm25: W(bc),
+      scene: W(all),
+      vecHits: Ws(vecPts),
+      seedPts: Ws(seedPts),
+      bm25Hits: Ws(bmPts),
+      fusionHits: Ws(fusPts),
+      ctxPts: Ws(ctxPts),
+      scenePts: Ws(scenePts),
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trace, posOf, queryPos]);
 
@@ -334,37 +353,22 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
     timeline.current = tl;
     const Q = queryPos;
 
-    // camera: eased flight to the stage keyframe (journey mode), or instant
-    const key = stageCamera(stage, camCtx);
-    camTl.current?.cancel();
-    camTl.current = null;
+    // camera: ONE writer per frame. Every journey keyframe is an explicit pose
+    // {pos, target} solved from the stage's focus; the transition is the
+    // canonical eased tween that stops exactly on that pose (monotone, no
+    // overshoot). Scrubbing jumps instantly (no flight). There is NO separate
+    // orbit writer — a free-running orbit used to walk the camera off the
+    // arrival pose after every stage (the "flies past the content" report).
+    const view = j3d?.viewInfo();
+    const key = stageCamera(stage, { ...camCtx, fov: view?.fov, aspect: view?.aspect });
     if (j3d) {
       if (animate && camMode === "journey") j3d.cameraFly(key.pos, key.target, 1150 / speed, "inout");
       else if (camMode === "journey") j3d.cameraSet(key.pos, key.target);
     } else {
-      // 2D fallback: plain zoom toward the keyframe target
-      cosmos.flyTo(key.target[0], key.target[1], 12, animate ? 1200 : 0);
-    }
-
-    // slow cinematic orbit around the stage target (journey mode only).
-    // Own timeline — cancelled by a user fly-to (focusPoint) so it can never
-    // fight or override the user's arrival.
-    if (j3d && camMode === "journey" && animate) {
-      const d0 = Math.hypot(
-        key.pos[0] - key.target[0],
-        key.pos[1] - key.target[1],
-        key.pos[2] - key.target[2],
-      );
-      const az0 = Math.atan2(key.pos[0] - key.target[0], key.pos[2] - key.target[2]);
-      const el0 = Math.asin(
-        Math.max(-1, Math.min(1, (key.pos[1] - key.target[1]) / Math.max(1, d0))),
-      );
-      const ct = makeTimeline(speed, false);
-      camTl.current = ct;
-      ct.tween(1200, 5200, (tt) => {
-        j3d.orbitAround(key.target, d0, az0 + tt * 0.55, el0);
-      });
-      ct.start();
+      // 2D fallback: single-eased flight to the stage centre; zoom derived from
+      // the solved framing distance so the content, not empty space, is framed.
+      const zoom = Math.max(1.5, 380 / Math.max(1, key.dist));
+      cosmos.flyTo(key.target[0], key.target[1], zoom, animate ? 1200 : 0);
     }
 
     const ringPaint = (depth: number, color: RGBA, boost: number) => {
@@ -484,8 +488,6 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
     tl.start();
     return () => {
       tl.cancel();
-      camTl.current?.cancel();
-      camTl.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage, trace, cosmos, speed, camMode, edgeRings]);
@@ -511,10 +513,8 @@ export default function TravelView({ cosmos, manifest, liveTrace }: Props) {
 
   const focusPoint = (p: XYZ, names: string[], color: RGBA = INK.white) => {
     if (!cosmos) return;
-    // the user asked for THIS node: stop the cinematic camera choreography so
-    // it cannot drag the camera away when the flight ends
-    camTl.current?.cancel();
-    camTl.current = null;
+    // the user asked for THIS node: flyToNode re-enters the canonical tween,
+    // which cancels any stage flight in progress (one camera writer).
     paintEntities(names, color, 2.6);
     const w = toWorld3(p);
     if (j3d) j3d.flyToNode(w, 30, 850);

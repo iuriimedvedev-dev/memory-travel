@@ -50,6 +50,8 @@ export interface Journey3D {
   cameraFly(pos: XYZ, target: XYZ, ms: number, ease?: "out" | "inout" | "linear"): void;
   cameraSet(pos: XYZ, target: XYZ): void;
   cameraNow(): { pos: XYZ; target: XYZ };
+  /** Current perspective FOV (deg) and canvas aspect — for framing keyframes. */
+  viewInfo(): { fov: number; aspect: number };
   /** Eased flight TO A NODE: target tweens onto the node, camera ends at a
    *  comfortable viewing distance along the current line of sight. */
   flyToNode(p: XYZ, dist?: number, ms?: number): void;
@@ -658,7 +660,15 @@ export class Cosmos3D implements CosmosLike, Journey3D {
   }
 
   setControlsEnabled(on: boolean): void {
-    if (this.controls) this.controls.enabled = on;
+    if (this.controls) {
+      this.controls.enabled = on;
+      // The cosmos overview wants its gentle auto-orbit; a scripted travel /
+      // presentation camera must be the ONLY writer, so autoRotate follows the
+      // same switch. An always-on autoRotate is a hidden second writer that
+      // slowly drifts the camera off a solved pose (measured as late-stage
+      // overshoot that grows with dwell time).
+      this.controls.autoRotate = on;
+    }
     // an explicit state change with no flight in progress retires any pending
     // restore, so a later flight can't resurrect an old enabled/autoRotate
     if (!this.camRaf) this.camPrev = null;
@@ -751,6 +761,10 @@ export class Cosmos3D implements CosmosLike, Journey3D {
       pos: [c.position.x, c.position.y, c.position.z],
       target: [t.x, t.y, t.z],
     };
+  }
+
+  viewInfo(): { fov: number; aspect: number } {
+    return { fov: this.camera?.fov ?? 55, aspect: this.camera?.aspect ?? 1.6 };
   }
 
   /**

@@ -6,7 +6,13 @@ import {
   applyEase,
   lerp3,
   solveArrival,
+  CAM_DIR,
+  centroid3,
+  boundingRadius,
+  fitDistance,
+  solveFocusPose,
 } from "../app/src/lib/camPose.ts";
+import { stageCamera } from "../app/src/lib/journeyCam.ts";
 
 let failures = 0;
 const ok = (cond, msg) => {
@@ -108,6 +114,175 @@ for (const ease of ["inout", "out", "linear"]) {
       (Math.hypot(...look) * Math.hypot(...toNode) || 1),
   );
   ok(close(par, 1, 1e-9), `${ease}: camera looks exactly at the node (dead-centre)`);
+}
+
+// ---- keyframe-sequence math -------------------------------------------------
+// The journey stage camera is a sequence of explicit poses {pos, target}.
+// These tests pin the guarantees: fitDistance frames the content, each key's
+// arrival pose is exact, and the path between two consecutive keys can never
+// leave the bounding sphere of their endpoints or overshoot the arrival.
+
+// tiny deterministic PRNG so the synthetic graph is reproducible
+let seed = 12345;
+const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+const scatter = (n, cx, cy, cz, r) =>
+  Array.from({ length: n }, () => {
+    const th = rnd() * Math.PI * 2;
+    const ph = Math.acos(2 * rnd() - 1);
+    const rr = r * (0.3 + 0.7 * rnd());
+    return [cx + rr * Math.sin(ph) * Math.cos(th), cy + rr * Math.sin(ph) * Math.sin(th), cz + rr * Math.cos(ph)];
+  });
+
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const norm = (a) => { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+
+/** Project `p` through a pinhole camera at `pos` looking at `tgt` (up = +y). */
+function projectNDC(pos, tgt, p, fovDeg, aspect) {
+  const f = norm(sub(tgt, pos));
+  let right = cross(f, [0, 1, 0]);
+  if (Math.hypot(...right) < 1e-6) right = [1, 0, 0];
+  right = norm(right);
+  const up = cross(right, f);
+  const v = sub(p, pos);
+  const z = dot(v, f);
+  const x = dot(v, right);
+  const y = dot(v, up);
+  const tanV = Math.tan((fovDeg * Math.PI) / 180 / 2);
+  if (z <= 1e-6) return [Infinity, Infinity];
+  return [x / (z * tanV * aspect), y / (z * tanV)];
+}
+
+// ---- fitDistance: monotone in radius, honours minDist
+{
+  const a = fitDistance(0, 55, 1.6, 0.15, 20);
+  ok(close(a, 20), `fitDistance: radius 0 -> minDist (${a})`);
+  let mono = true;
+  let prev = -Infinity;
+  for (let r = 0; r <= 200; r += 5) {
+    const d = fitDistance(r, 55, 1.6, 0.15, 20);
+    if (d < prev - 1e-9) mono = false;
+    prev = d;
+  }
+  ok(mono, "fitDistance: monotone non-decreasing in radius");
+  ok(Number.isFinite(fitDistance(NaN, NaN, NaN, 0.15, 6)), "fitDistance: bad inputs stay finite");
+}
+
+// ---- solveFocusPose: frames EVERY focus point inside the frustum
+{
+  const pts = scatter(40, 12, -6, 3, 60);
+  const fov = 55;
+  const aspect = 1.9;
+  const pose = solveFocusPose(pts, fov, aspect, 0.16, 24);
+  ok(vClose(pose.tgt, centroid3(pts)), "solveFocusPose: target === centroid of focus");
+  ok(close(pose.dist, Math.hypot(...sub(pose.pos, pose.tgt))), "solveFocusPose: |pos-target| === dist");
+  let worst = 0;
+  for (const p of pts) {
+    const ndc = projectNDC(pose.pos, pose.tgt, p, fov, aspect);
+    worst = Math.max(worst, Math.abs(ndc[0]), Math.abs(ndc[1]));
+  }
+  ok(worst <= 1, `solveFocusPose: all focus points framed (worst |NDC| = ${worst.toFixed(3)} <= 1)`);
+}
+
+// ---- stageCamera: explicit poses solved from the stage's focus
+const ctx = {
+  query: [28, -13, -22],
+  vecCluster: [29, -13, -23],
+  seeds: [-61, 13, 3],
+  bm25: [35, -9, -7],
+  scene: [-42, 12, 6],
+  fov: 55,
+  aspect: 1.9,
+  vecHits: scatter(12, 29, -13, -23, 40),
+  seedPts: scatter(90, -61, 13, 3, 55),
+  bm25Hits: scatter(12, 35, -9, -7, 28),
+  fusionHits: scatter(14, 31, -14, -12, 24),
+  ctxPts: scatter(20, 20, 0, 0, 35),
+  scenePts: scatter(350, -42, 12, 6, 64),
+};
+const focusFor = (s) => {
+  const wq = (ps) => (ctx.query ? [ctx.query, ...ps] : ps);
+  switch (s) {
+    case 0: return ctx.query ? [ctx.query] : [];
+    case 1: return wq(ctx.vecHits);
+    case 2: return wq(ctx.seedPts);
+    case 3: return wq(ctx.bm25Hits);
+    case 4: return wq(ctx.fusionHits);
+    case 5: return wq(ctx.fusionHits);
+    case 6: return wq(ctx.ctxPts);
+    default: return wq(ctx.scenePts);
+  }
+};
+
+const keys = [];
+for (let s = 0; s < 8; s++) {
+  const k = stageCamera(s, ctx);
+  keys.push(k);
+  const focus = focusFor(s);
+  ok(k.pos.every(Number.isFinite) && k.target.every(Number.isFinite), `stage ${s}: finite pose`);
+  ok(vClose(k.target, centroid3(focus), 1e-9), `stage ${s}: target === focus centroid`);
+  ok(close(Math.hypot(...sub(k.pos, k.target)), k.dist, 1e-9), `stage ${s}: |pos-target| === dist`);
+  ok(close(dist(k.pos, k.target), k.dist, 1e-9), `stage ${s}: honoured distance (${k.dist.toFixed(1)})`);
+  let worst = 0;
+  for (const p of focus) {
+    const ndc = projectNDC(k.pos, k.target, p, ctx.fov, ctx.aspect);
+    worst = Math.max(worst, Math.abs(ndc[0]), Math.abs(ndc[1]));
+  }
+  ok(worst <= 1, `stage ${s}: focus content framed (worst |NDC| = ${worst.toFixed(3)})`);
+}
+
+// ---- consecutive keys: monotone segment, no overshoot, inside bounding sphere
+for (let s = 0; s < 7; s++) {
+  const A = keys[s];
+  const B = keys[s + 1];
+  const total = dist(A.pos, B.pos);
+  const axis = total > 1e-9 ? sub(B.pos, A.pos).map((v) => v / total) : [0, 0, 0];
+  const mid = [(A.pos[0] + B.pos[0]) / 2, (A.pos[1] + B.pos[1]) / 2, (A.pos[2] + B.pos[2]) / 2];
+  const R = total / 2;
+  for (const ease of ["inout", "out", "linear"]) {
+    let prevAhead = -Infinity;
+    let backwards = false;
+    let maxAhead = -Infinity;
+    let maxFromMid = -Infinity;
+    let finalPos = null;
+    let finalTgt = null;
+    for (let i = 0; i <= 200; i++) {
+      const e = applyEase(i / 200, ease);
+      const p = lerp3(A.pos, B.pos, e);
+      const t = lerp3(A.target, B.target, e);
+      const ahead = dot(sub(p, A.pos), axis);
+      if (ahead < prevAhead - 1e-9) backwards = true;
+      prevAhead = ahead;
+      maxAhead = Math.max(maxAhead, ahead);
+      maxFromMid = Math.max(maxFromMid, dist(p, mid));
+      finalPos = p;
+      finalTgt = t;
+    }
+    ok(!backwards, `key ${s}->${s + 1} ${ease}: monotone along travel axis`);
+    ok(maxAhead <= total + 1e-9, `key ${s}->${s + 1} ${ease}: no overshoot past arrival`);
+    ok(maxFromMid <= R + 1e-9, `key ${s}->${s + 1} ${ease}: path inside bounding sphere of endpoints`);
+    ok(vClose(finalPos, B.pos), `key ${s}->${s + 1} ${ease}: lands exactly on next pose`);
+    ok(vClose(finalTgt, B.target), `key ${s}->${s + 1} ${ease}: target lands exactly on next target`);
+  }
+}
+
+// ---- legacy fallback (no fov/aspect): PresentationView path unchanged
+{
+  const legacyCtx = {
+    query: [28, -13, -22],
+    vecCluster: [29, -13, -23],
+    seeds: [-61, 13, 3],
+    bm25: [35, -9, -7],
+    scene: [0, 0, 0],
+  };
+  for (let s = 0; s < 8; s++) {
+    const k = stageCamera(s, legacyCtx);
+    ok(k.pos.every(Number.isFinite) && k.target.every(Number.isFinite), `legacy stage ${s}: finite`);
+    ok(k.dist > 0 && Number.isFinite(k.dist), `legacy stage ${s}: positive distance`);
+  }
+  const k0 = stageCamera(0, legacyCtx);
+  ok(vClose(k0.target, legacyCtx.query), "legacy stage 0: target === query");
 }
 
 if (failures) {

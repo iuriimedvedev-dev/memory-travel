@@ -39,6 +39,7 @@ const OUT = args.get("out") ?? "";
 const AS_JSON = args.has("json");
 const FORCE_2D = args.has("2d");
 const ONLY = args.get("scenarios") ? new Set(args.get("scenarios").split(",")) : null;
+const DWELL = Number(args.get("dwell") ?? 1600) || 1600;
 const want = (s) => !ONLY || ONLY.has(s);
 
 function loadPlaywright() {
@@ -526,18 +527,44 @@ async function main() {
       results.scenarios.journeyLog.push({ error: String(e).slice(0, 160) });
     }
     try {
-      // journey-mode stage keyframes
+      // journey-mode stage keyframes. Each click advances one stage; the stage
+      // driver flies the camera to that stage's solved keyframe pose. We
+      // measure, per transition: overshoot past the arrival pose along the
+      // travel axis, the honoured distance to the stage's focus target, and how
+      // well the camera frames that focus (the focus is the stage's key
+      // content: query / vector cluster / seeds / bm25 centroid …).
       await page.waitForSelector(".scrub button", { timeout: 20000 });
-      for (let i = 0; i < 3; i++) {
+      // deterministically start at stage 0 so labels match real stages
+      await page.focus(".timeline");
+      await page.keyboard.press("Home");
+      await sleep(700);
+      // stage 0 is current; sweep all 8 stages by pressing "next".
+      for (let i = 0; i < 8; i++) {
         const pre = await page.evaluate(() => { const c = window.__cosmos3d; return [c.camera.position.toArray(), c.controls.target.toArray()]; });
         await page.evaluate(() => { window.__probe.samples = []; window.__probe.node = [0, 0, 0]; window.__probe.sampling = true; });
         await page.click(".scrub > button:nth-child(3)");
-        await sleep(1400);
+        await sleep(DWELL);
         const s = await stopSample();
+        const stageNo = (i + 1) % 8;
+        const endTgt = s[s.length - 1]?.tgt ?? [0, 0, 0];
+        // the stage focus IS the final controls.target (the keyframe target);
+        // measure the trajectory against it for overshoot + honoured distance.
+        const a = analyze(s, endTgt);
+        const framed = await page.evaluate((t) => {
+          const c = window.__cosmos3d;
+          const cam = c.camera;
+          cam.updateMatrixWorld();
+          cam.matrixWorldInverse.copy(cam.matrixWorld).invert();
+          const ndc = window.__probe.projNDC(cam, t[0], t[1], t[2]);
+          return { ndc, abs: Math.hypot(ndc[0], ndc[1]), tgtOff: Math.hypot(c.controls.target.x - t[0], c.controls.target.y - t[1], c.controls.target.z - t[2]) };
+        }, endTgt);
         results.scenarios.travelStages.push({
-          label: `stage→${i + 1}`, frames: s.length,
-          startPos: s[0]?.pos, endPos: s[s.length - 1]?.pos, endTgt: s[s.length - 1]?.tgt,
-          travel: s.length ? dist3(s[0].pos, s[s.length - 1].pos) : null,
+          label: `stage${stageNo}`, stage: stageNo, frames: s.length,
+          overshoot: a.overshoot, minDist: a.minDist, finalDist: a.finalDist,
+          finalNDC: framed.ndc, finalNDCabs: framed.abs, tgtOff: framed.tgtOff,
+          maxAbsNDC: a.maxAbsNDC,
+          startPos: s[0]?.pos, endPos: s[s.length - 1]?.pos, endTgt,
+          travel: a.travelLen,
           prePos: pre?.[0], preTgt: pre?.[1],
         });
       }
@@ -610,6 +637,17 @@ function printReport(r) {
     console.log(cols.map((c) => "-".repeat(c.w)).join(" "));
     for (const row of rows) console.log(cols.map((c) => String(c.f(row)).padEnd(c.w)).join(" "));
   };
+  const STAGE_COLS = [
+    { h: "label", w: 8, f: (x) => x.label ?? "" },
+    { h: "frames", w: 6, f: (x) => x.frames ?? "skip" },
+    { h: "overshoot", w: 9, f: (x) => fmtN(x.overshoot) },
+    { h: "minDist", w: 8, f: (x) => fmtN(x.minDist) },
+    { h: "finalDist", w: 9, f: (x) => fmtN(x.finalDist) },
+    { h: "tgtOff", w: 8, f: (x) => fmtN(x.tgtOff) },
+    { h: "finalNDC", w: 16, f: (x) => (x.finalNDC ? `(${fmtN(x.finalNDC[0])},${fmtN(x.finalNDC[1])})` : "—") },
+    { h: "travel", w: 8, f: (x) => fmtN(x.travel) },
+    { h: "note", w: 20, f: (x) => (x.error ? String(x.error).slice(0, 20) : "") },
+  ];
   const DRIFT_COLS = [
     { h: "label", w: 10, f: (x) => x.label ?? "" },
     { h: "frames", w: 6, f: (x) => x.frames },
@@ -621,7 +659,8 @@ function printReport(r) {
   ];
   for (const [k, v] of Object.entries(r.scenarios)) {
     if (!v.length) { table(k, v, NODE_COLS); continue; }
-    if (k === "travelStages" || k === "presentation") table(k, v, CAM_COLS);
+    if (k === "travelStages") table(k, v, STAGE_COLS);
+    else if (k === "presentation") table(k, v, CAM_COLS);
     else if (k === "drift2D") table("2D fallback: user gesture cancels the fly (no drift)", v, DRIFT_COLS);
     else table(k, v, NODE_COLS);
   }
