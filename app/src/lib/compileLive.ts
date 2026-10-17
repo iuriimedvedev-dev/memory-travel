@@ -37,11 +37,16 @@ interface RawChunk {
   fused_score?: number | null;
   file_path?: string;
 }
-
-function docOf(content: string): { doc: string; section: string } {
+function docOf(content: string, filePath = ""): { doc: string; section: string } {
   const m = DOC_HDR.exec(content ?? "");
-  if (!m) return { doc: "unknown", section: "" };
-  return { doc: m[1].trim(), section: m[2].trim() };
+  if (m) return { doc: m[1].trim(), section: m[2].trim() };
+  // Same fallback as scripts/compile_trace.py: no [Document:] header ->
+  // use the real file reference instead of the literal "unknown".
+  if (filePath) {
+    const base = filePath.includes("/") ? filePath.slice(filePath.lastIndexOf("/") + 1) : filePath;
+    return { doc: base.replace(/^(docs-|docs_spec-|plans-|archive-old_reports-)/, ""), section: "" };
+  }
+  return { doc: "unknown", section: "" };
 }
 
 function parseContext(ctx: string): {
@@ -125,7 +130,7 @@ export function compileLiveTrace(
   };
 
   const slim = (c: RawChunk): ChunkHit => {
-    const d = docOf(c.content ?? "");
+    const d = docOf(c.content ?? "", c.file_path ?? "");
     const cp = aux.chunkXyz[c.chunk_id] ?? null;
     return {
       chunk_id: c.chunk_id,
@@ -234,7 +239,7 @@ export function compileLiveTrace(
 
   const bullets = fc.slice(0, 3).map((c) => {
     const body = (c.content ?? "").replace(DOC_HDR_ALL, "").trim().slice(0, 260).replace(/\n/g, " ");
-    const d = docOf(c.content ?? "");
+    const d = docOf(c.content ?? "", c.file_path ?? "");
     const cp = aux.chunkXyz[c.chunk_id] ?? null;
     return {
       quote: body,

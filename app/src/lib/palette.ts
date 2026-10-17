@@ -69,7 +69,7 @@ const TYPE_FAMILY: Record<string, string> = {
   other: "other",
   unknown: "other",
   wrong_episode: "other",
-  naturalsobject: "other",
+  naturalobject: "data",
 };
 
 export function familyOf(type: string): string {

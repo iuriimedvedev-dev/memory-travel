@@ -43,11 +43,21 @@ def embed(texts):
     return [row["embedding"] for row in d["data"]]
 
 
-def doc_of(content):
+def doc_of(content, file_path=""):
+    """Doc name from the [Document: ...] header; fall back to the file path.
+
+    Many stored chunks lack the header (older ingest formats) — the file
+    reference is still real data, so use it instead of the literal
+    "unknown" (which used to flood the stage panels).
+    """
     m = DOC_HDR.search(content or "")
-    if not m:
-        return {"doc": "unknown", "section": "", "date": ""}
-    return {"doc": m.group(1).strip(), "section": m.group(2).strip(), "date": m.group(3).strip()}
+    if m:
+        return {"doc": m.group(1).strip(), "section": m.group(2).strip(), "date": m.group(3).strip()}
+    if file_path:
+        base = file_path.rsplit("/", 1)[-1]
+        base = re.sub(r"^(docs-|docs_spec-|plans-|archive-old_reports-)", "", base)
+        return {"doc": base, "section": "", "date": ""}
+    return {"doc": "unknown", "section": "", "date": ""}
 
 
 def parse_context(ctx):
@@ -133,7 +143,7 @@ def main():
         srank = {c["chunk_id"]: i + 1 for i, c in enumerate(by_sparse)}
 
         def slim(c, extra=None):
-            d = doc_of(c.get("content", ""))
+            d = doc_of(c.get("content", ""), c.get("file_path", ""))
             o = {
                 "chunk_id": c["chunk_id"],
                 "dense": round(c.get("dense_score") or 0, 4),
@@ -222,11 +232,11 @@ def main():
         src_blocks = []
         for s in sources[:10]:
             body = s.get("content", "")
-            m = DOC_HDR.search(body)
+            d = doc_of(body, s.get("file_path", "") or s.get("reference_id", ""))
             src_blocks.append(
                 {
                     "ref": s.get("reference_id"),
-                    "doc": m.group(1).strip() if m else "unknown",
+                    "doc": d["doc"],
                     "preview": body[:600],
                 }
             )
@@ -242,7 +252,7 @@ def main():
         for c in fc[:3]:
             body = re.sub(r"\[Document:.*? needs review\]\n?", "", c.get("content", "")) if False else c.get("content", "")
             body = DOC_HDR.sub("", body).strip()[:260].replace("\n", " ")
-            d = doc_of(c.get("content", ""))
+            d = doc_of(c.get("content", ""), c.get("file_path", ""))
             bullets.append(
                 {
                     "quote": body,
