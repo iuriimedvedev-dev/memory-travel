@@ -5,8 +5,9 @@ through embeddings → vector hits → graph walk → BM25 → fusion → rerank
 context assembly → grounded answer. Cosmic look, zero mockups — every pixel is
 driven by real memory telemetry or the real index.
 
-> Setup / deployment (demo mode, live bridge, your own index, systemd):
-> **docs/SETUP.md** (EN+RU). Bridge target: `MEMORY_BRIDGE_URL=http://host:8099/mcp npm run dev`.
+> Setup / deployment: **docs/SETUP.md** (EN+RU). Agent-first connection,
+> identity-verification and failure-modes reference: **docs/CONNECTION.md**.
+> Bridge target: `MEMORY_BRIDGE_URL=http://host:8099/mcp npm run dev`.
 
 ## Run it
 
@@ -16,19 +17,21 @@ npm install
 npm run dev      # → http://localhost:5173
 ```
 
-`npm run dev` also proxies `/api/memory` → the memory bridge (see
-`vite.config.ts`), which is what powers **ask live**. Without the bridge the
-five fixture traces still play; without WebGPU the app falls back to Canvas2D
-automatically. `npm run build` is clean (`tsc -b && vite build`).
+Data integrity: the app renders the memory it is CONNECTED to (trace service
+:8098 → `/stats` `/graph` `/coords`), badged `live data: <index_id>`. With no
+connection it renders nothing and offers the baked demo snapshot behind an
+explicit button (badged `demo: offline snapshot…`). Without WebGPU the app
+falls back to Canvas2D automatically. `npm run build` is clean
+(`tsc -b && vite build`).
 
 ## Views
 
-- **Cosmos** — the full production index: 47,355 entities / 54,502 relations,
-  positioned by UMAP over the stored 768-dim vectors, coloured by entity
-  family. Search-as-you-type spotlights matches and dims the rest, the legend
-  toggles families on/off, hovering shows a tooltip, clicking opens an info
-  card (fly-to, degree, description). HUD shows node/edge counts, zoom and the
-  active renderer. "Take the tour" jumps into Travel.
+- **Cosmos** — the connected index as a starfield (live: top-8000 entities by
+  degree of the connected graph, 3D UMAP over the stored vectors, coloured by
+  entity family; demo: the baked snapshot). Search-as-you-type spotlights
+  matches and dims the rest, the legend toggles families on/off, hovering shows
+  a tooltip, clicking opens an info card (fly-to, degree, description). HUD
+  shows node/edge counts, zoom, the active renderer and the connection chip.
 - **Travel** — cinematic replay of a saved recall trace (5 fixtures + any live
   answer, picker at top): query card, vector hits pulse in, BFS glow spreads
   hop by hop, BM25 hits rain in, fusion stamps rank by rank, rerank moves flare

@@ -25,14 +25,12 @@ export interface PresCtx {
   edges: number;
 }
 
-/** Real measured stats (benchmark run on this index; provided by telemetry). */
-export const MEASURED = {
-  docs: 1854,
-  fusionRecallAt10: 0.979,
-  fusionLatencyMs: 12.7,
-  rerankLatencyS: 1.6,
-  edgesTotal: 60117,
-};
+/**
+ * Presentation copy is deployment-agnostic on purpose: no hardcoded index
+ * name, no hardcoded corpus marketing numbers. Every number shown comes from
+ * the loaded trace (`ctx.trace`) or the loaded graph (`ctx.nodes`/`ctx.edges`)
+ * — the same data the rest of the app renders.
+ */
 
 /**
  * Model/pipeline identity shown on the presentation cards. These are the same
@@ -51,8 +49,8 @@ export const CHAPTERS: PresentationChapter[] = [
     viz: "cosmos",
     title: { ru: "Что это", en: "What this is" },
     narration: ({ nodes, edges }) => ({
-      ru: `Перед вами долговременная память агента: ${MEASURED.docs.toLocaleString("ru-RU")} заметки превращены в ${nodes.toLocaleString("ru-RU")} сущностей и ${edges.toLocaleString("ru-RU")} связей. Это GraphRAG-гибрид: векторный поиск по смыслу + knowledge graph + BM25 по словам. Каждая звезда — реальная сущность продакшн-индекса, положение — 3D UMAP по 768-мерным векторам.`,
-      en: `This is an agent's long-term memory: ${MEASURED.docs.toLocaleString("en-US")} notes distilled into ${nodes.toLocaleString("en-US")} entities and ${edges.toLocaleString("en-US")} relations. A GraphRAG hybrid: semantic vector search + a knowledge graph + BM25 over words. Every star is a real entity of the production index; positions are a 3D UMAP of 768-dim vectors.`,
+      ru: `Перед вами долговременная память агента: корпус заметок превращён в ${nodes.toLocaleString("ru-RU")} сущностей и ${edges.toLocaleString("ru-RU")} связей — столько сейчас в индексе, к которому подключён мост. Это GraphRAG-гибрид: векторный поиск по смыслу + knowledge graph + BM25 по словам. Каждая звезда — реальная сущность подключённого индекса, положение — 3D UMAP по хранимым эмбеддингам.`,
+      en: `This is an agent's long-term memory: a corpus of notes distilled into ${nodes.toLocaleString("en-US")} entities and ${edges.toLocaleString("en-US")} relations — whatever the connected index holds right now. A GraphRAG hybrid: semantic vector search + a knowledge graph + BM25 over words. Every star is a real entity of the connected index; positions are a 3D UMAP of the stored embeddings.`,
     }),
     fact: ({ nodes, edges }) => ({
       ru: `Факт: ${nodes.toLocaleString("ru-RU")} сущностей · ${edges.toLocaleString("ru-RU")} связей — не мокап, а живой индекс.`,
@@ -68,8 +66,8 @@ export const CHAPTERS: PresentationChapter[] = [
       en: `A note is split by the md_struct chunker along its sections (headings → sections → chunks with line ranges). A teacher — a local 27B model — extracts entities and relations from every chunk; everything merges into one graph. The card shows a real note with its real extraction records from the teacher's cache.`,
     }),
     fact: () => ({
-      ru: `Факт: 2 820 чанков из 1 854 заметок; каждая запись учителя сохранена в kv-кэше — воспроизводимо.`,
-      en: `Fact: 2,820 chunks from 1,854 notes; every teacher record is kept in the kv cache — reproducible.`,
+      ru: `Факт: каждая заметка нарезается на окна индекса; каждая запись учителя сохранена в kv-кэше — воспроизводимо.`,
+      en: `Fact: every note is cut into index windows; every teacher record is kept in the kv cache — reproducible.`,
     }),
   },
   {
@@ -82,8 +80,8 @@ export const CHAPTERS: PresentationChapter[] = [
       en: `The question becomes a vector via the 768-dim embedder (EmbeddingGemma through llama.cpp; prompt “task: search result | query: …”) and lands in the same UMAP meaning space — the pink marker. Its nearest neighbours light up immediately: those are the answer candidates.`,
     }),
     fact: ({ trace }) => ({
-      ru: `Факт: dense-поиск по ${trace?.meta.candidate_pool ?? 2813} чанкам занял ${trace?.meta.latency_ms.dense ?? "?"} мс.`,
-      en: `Fact: the dense scan over ${trace?.meta.candidate_pool ?? 2813} chunks took ${trace?.meta.latency_ms.dense ?? "?"} ms.`,
+      ru: `Факт: dense-поиск по ${trace?.meta.candidate_pool ?? "?"} чанкам занял ${trace?.meta.latency_ms.dense ?? "?"} мс.`,
+      en: `Fact: the dense scan over ${trace?.meta.candidate_pool ?? "?"} chunks took ${trace?.meta.latency_ms.dense ?? "?"} ms.`,
     }),
   },
   {
@@ -109,9 +107,9 @@ export const CHAPTERS: PresentationChapter[] = [
       ru: `Рейтинги каналов нормализуются и сливаются взвешенно (α = 0.5 — измеренный оптимум на 46 бенчмарк-запросах). Оранжевое — слитый рейтинг: чанки, которые и «про то», и со словами темы, поднимаются наверх. Полоски в карточке — вклад каждого канала.`,
       en: `Channel rankings are normalised and blended (α = 0.5 — the measured optimum on 46 benchmark queries). Orange is the fused ranking: chunks that are both “about it” and use its words rise. The bars in the card show each channel's contribution.`,
     }),
-    fact: () => ({
-      ru: `Факт: fusion recall@10 = ${MEASURED.fusionRecallAt10} при ${MEASURED.fusionLatencyMs} мс — почти бесплатно за качество.`,
-      en: `Fact: fusion recall@10 = ${MEASURED.fusionRecallAt10} at ${MEASURED.fusionLatencyMs} ms — quality nearly for free.`,
+    fact: ({ trace }) => ({
+      ru: `Факт: в слитом рейтинге ${trace?.fusion.length ?? "?"} чанков при α = ${trace?.meta.alpha ?? "?"} — веса каналов измерены, не придуманы.`,
+      en: `Fact: ${trace?.fusion.length ?? "?"} chunks in the fused ranking at α = ${trace?.meta.alpha ?? "?"} — the blend weight is measured, not invented.`,
     }),
   },
   {
@@ -124,8 +122,8 @@ export const CHAPTERS: PresentationChapter[] = [
       en: `A cross-encoder (Qwen3-Reranker-0.6B on the iGPU) re-reads the whole pool and reorders: white flares mark what moved. A guardrail protects a strong fusion score: when the reranker isn't needed, it stands down (in this trace: see the reason in the inspector).`,
     }),
     fact: ({ trace }) => ({
-      ru: `Факт: реранк пула ${trace?.rerank.pool ?? "?"} кандидатов — ~${MEASURED.rerankLatencyS} с на iGPU; заблокированных инверсий: ${trace?.rerank.blocked_inversions ?? "?"}.`,
-      en: `Fact: reranking the ${trace?.rerank.pool ?? "?"}-candidate pool — ~${MEASURED.rerankLatencyS} s on the iGPU; blocked inversions: ${trace?.rerank.blocked_inversions ?? "?"}.`,
+      ru: `Факт: реранк пула ${trace?.rerank.pool ?? "?"} кандидатов — ${trace?.meta.latency_ms.rerank ?? "?"} мс на этом деплое; заблокированных инверсий: ${trace?.rerank.blocked_inversions ?? "?"}.`,
+      en: `Fact: reranking the ${trace?.rerank.pool ?? "?"}-candidate pool — ${trace?.meta.latency_ms.rerank ?? "?"} ms on this deployment; blocked inversions: ${trace?.rerank.blocked_inversions ?? "?"}.`,
     }),
   },
   {
@@ -160,13 +158,13 @@ export const CHAPTERS: PresentationChapter[] = [
     id: "numbers",
     viz: "cosmos",
     title: { ru: "Цифры", en: "The numbers" },
-    narration: () => ({
-      ru: `Итог на реальных измерениях: fusion recall@10 = 0.979 при 12.7 мс; реранк ~1.6 с на iGPU (и умеет пропускаться); 1 854 документа, 60 117 связей в графе. Всё, что вы видели — телеметрия одного реального запроса к этой памяти.`,
-      en: `Bottom line, measured: fusion recall@10 = 0.979 at 12.7 ms; rerank ~1.6 s on the iGPU (and able to stand down); 1,854 documents, 60,117 relations in the graph. Everything you saw is the telemetry of one real query against this memory.`,
+    narration: ({ nodes, edges }) => ({
+      ru: `Итог: ${nodes.toLocaleString("ru-RU")} сущностей и ${edges.toLocaleString("ru-RU")} связей в подключённом индексе — шапка и карточка «о приложении» читают их с моста живьём, вместе с именем индекса и свежестью данных. Всё, что вы видели — телеметрия одного реального запроса к этой памяти.`,
+      en: `Bottom line: ${nodes.toLocaleString("en-US")} entities and ${edges.toLocaleString("en-US")} relations in the connected index — the header and the about card read them live from the bridge, together with the index id and data freshness. Everything you saw is the telemetry of one real query against this memory.`,
     }),
-    fact: () => ({
-      ru: `Факт: 1 847 заметок → 47 355 сущностей → 60 117 связей; fusion recall@10 0.979 @ 12.7 мс.`,
-      en: `Fact: 1,847 notes → 47,355 entities → 60,117 relations; fusion recall@10 0.979 @ 12.7 ms.`,
+    fact: ({ nodes, edges }) => ({
+      ru: `Факт: ${nodes.toLocaleString("ru-RU")} сущностей · ${edges.toLocaleString("ru-RU")} связей — не мокап, а индекс, к которому подключён мост.`,
+      en: `Fact: ${nodes.toLocaleString("en-US")} entities · ${edges.toLocaleString("en-US")} relations — not a mock, the index the bridge serves.`,
     }),
   },
 ];

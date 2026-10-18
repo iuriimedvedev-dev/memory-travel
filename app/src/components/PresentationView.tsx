@@ -7,7 +7,8 @@ import CosmosCanvas from "./CosmosCanvas";
 import { INK, toWorld3, type XYZ } from "../lib/cosmos";
 import type { AnyCosmos } from "../lib/cosmos2d";
 import { asJourney3D } from "../lib/cosmos3d";
-import { loadChunkCoords, loadEntityCoords, loadGraph, loadIngestFixture, loadManifest, loadNodeIndex, loadTrace } from "../lib/data";
+import { loadIngestFixture, loadTrace } from "../lib/data";
+import type { LoadedCosmos, SourcePhase } from "../lib/cosmosSource";
 import { stageCamera } from "../lib/journeyCam";
 import { makeTimeline, type Timeline } from "../lib/reveal";
 import { CHAPTERS, type PresCtx } from "../lib/presentation";
@@ -23,7 +24,44 @@ import { Inspector, type Inspection } from "./Inspector";
 /** Chapters whose data is owed a docked card row (3–8 = the transformation). */
 const CARD_CHAPTERS = new Set(["embed", "channels", "fusion", "rerank", "context", "answer"]);
 
-export default function PresentationView({ onExit }: { onExit: () => void }) {
+interface PresProps {
+  onExit: () => void;
+  /** The app-level cosmos data (live or demo) — the SAME source the main
+   *  views render; the presentation never loads its own graph. */
+  data: LoadedCosmos | null;
+  /** App-level source phase; unreachable shows the honest gate, demo gates
+   *  the fixture-only chapters (ingest note, trace_01). */
+  source: SourcePhase;
+  /** Latest live recall (chapters 3-8 replay it in live mode when present). */
+  liveTrace: TravelTrace | null;
+  onOpenDemo: () => void;
+  onRetryLive: () => void;
+}
+
+/** Fixture-only chapters (ingest, demo trace replay) in live/unreachable
+ *  mode: an honest gate instead of silently showing another index's data. */
+function PresGate({ source, onOpenDemo, onRetryLive, what }: {
+  source: SourcePhase;
+  onOpenDemo: () => void;
+  onRetryLive: () => void;
+  what: "ingest" | "trace";
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="presgate" role="status">
+      <b>{what === "ingest" ? t.presGateIngestTitle : t.presGateTraceTitle}</b>
+      <p className="dim">{what === "ingest" ? t.presGateIngestBody : t.presGateTraceBody}</p>
+      <div className="overlay-actions">
+        {source.phase !== "demo" && <button className="primary" onClick={onOpenDemo}>{t.openDemo}</button>}
+        {(source.phase === "unreachable" || source.phase === "demo") && (
+          <button onClick={onRetryLive}>{source.phase === "demo" ? t.backToLive : t.retryConnection}</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function PresentationView({ onExit, data, source, liveTrace, onOpenDemo, onRetryLive }: PresProps) {
   const { t, lang, setLangL10n } = useI18n();
   const [chapter, setChapter] = useState(0);
   const [playing, setPlaying] = useState(true);
@@ -47,42 +85,57 @@ export default function PresentationView({ onExit }: { onExit: () => void }) {
 
   const ch = CHAPTERS[chapter];
   const ctx: PresCtx = useMemo(
-    () => ({ trace, nodes: graph?.nodes.length ?? 47355, edges: graph?.edges.length ?? 54502 }),
+    () => ({ trace, nodes: graph?.nodes.length ?? 0, edges: graph?.edges.length ?? 0 }),
     [trace, graph],
   );
 
-  // ---- data: full graph + coords + trace (same loaders as the main views)
+  // ---- data: the app-level LoadedCosmos (live OR explicitly-opened demo).
+  // The presentation loads NO data of its own: whatever the app is connected
+  // to (or the explicit demo snapshot) is what renders here too.
+  const dataKey = `${data?.source ?? "none"}:${data?.identity?.index_id ?? "-"}`;
+  useEffect(() => {
+    if (!data) return;
+    setGraph(data.graph);
+    const m = new Map<string, XYZ>();
+    data.coords.ids.forEach((id, i) => {
+      const v = data.coords.xyz?.[i];
+      if (v) m.set(id, v);
+      else {
+        const xy = data.coords.xy[i];
+        if (xy) m.set(id, [xy[0], xy[1], 0]);
+      }
+    });
+    setPosByIdx(
+      data.graph.nodes.map((n) => {
+        const v = m.get(n.id);
+        return v ? toWorld3(v) : null;
+      }),
+    );
+  }, [dataKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---- chapter trace: demo -> the captured trace_01 fixture; live -> the
+  // latest live recall (a live recall against the CONNECTED memory). Nothing
+  // is shown when neither exists — the chapter card says so instead.
+  const demoMode = source.phase === "demo";
   useEffect(() => {
     let dead = false;
-    Promise.all([loadGraph(), loadNodeIndex(), loadEntityCoords(), loadChunkCoords(), loadManifest(), loadIngestFixture()])
-      .then(([g, idx, coords, , man, fx]) => {
-        if (dead) return;
-        setGraph(g);
-        setFixture(fx as IngestFixture);
-        const m = new Map<string, XYZ>();
-        coords.ids.forEach((id, i) => {
-          const v = coords.xyz?.[i];
-          if (v) m.set(id, v);
-          else {
-            const xy = coords.xy[i];
-            if (xy) m.set(id, [xy[0], xy[1], 0]);
-          }
-        });
-        setPosByIdx(
-          g.nodes.map((n) => {
-            const v = m.get(n.id);
-            return v ? toWorld3(v) : null;
-          }),
-        );
-        void idx;
-        void man;
-      })
-      .catch((e) => !dead && setProgress(`data: ${String(e)}`));
-    loadTrace("traces/trace_01.json").then((tr) => !dead && setTrace(tr)).catch(() => undefined);
+    if (demoMode) {
+      loadTrace("traces/trace_01.json").then((tr) => !dead && setTrace(tr)).catch(() => undefined);
+      loadIngestFixture().then((fx) => !dead && setFixture(fx as IngestFixture)).catch(() => undefined);
+    } else {
+      setTrace(liveTrace);
+      setFixture(null); // the ingest chapter replays ONE captured note — demo data
+    }
     return () => {
       dead = true;
     };
-  }, []);
+  }, [demoMode, liveTrace]);
+
+  // honest progress when there is no data yet (probing / not connected)
+  useEffect(() => {
+    if (data) return;
+    setProgress(source.phase === "unreachable" ? t.notConnectedTitle : t.srcProbing);
+  }, [source.phase, data, t]);
 
   // ---- load canvases when they first become visible
   const chViz = ch.viz;
@@ -326,12 +379,18 @@ export default function PresentationView({ onExit }: { onExit: () => void }) {
         </div>
       )}
 
-      {/* chapter 2: compact ingest schematic with optional drill-downs */}
-      {ch.id === "ingest" && fixture && <IngestPanel fixture={fixture} lang={lang} t={t} onDetailOpen={setDetailOpen} />}
+      {/* chapter 2: compact ingest schematic with optional drill-downs.
+          The fixture replays ONE captured note from the demo snapshot, so it
+          only exists in demo mode; otherwise the honest gate shows. */}
+      {ch.id === "ingest" && (fixture
+        ? <IngestPanel fixture={fixture} lang={lang} t={t} onDetailOpen={setDetailOpen} />
+        : <PresGate source={source} onOpenDemo={onOpenDemo} onRetryLive={onRetryLive} what="ingest" />)}
 
       {/* chapters 3-8: a compact schematic strip + one optional detail card */}
       {CARD_CHAPTERS.has(ch.id) && (
-        <PresStageCards chapterId={ch.id} trace={trace} t={t} lang={lang} onDetailOpen={setDetailOpen} />
+        trace
+          ? <PresStageCards chapterId={ch.id} trace={trace} t={t} lang={lang} onDetailOpen={setDetailOpen} />
+          : <PresGate source={source} onOpenDemo={onOpenDemo} onRetryLive={onRetryLive} what="trace" />
       )}
 
       <div className="pres-bottom">

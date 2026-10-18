@@ -5,6 +5,7 @@ import { INK } from "../lib/cosmos";
 import { FAMILY_COLORS, FAMILY_LABEL, LEGEND_ORDER, colorForType, familyOf } from "../lib/palette";
 import { fmt } from "../i18n/strings";
 import { useI18n } from "../i18n/useI18n";
+import type { ConnState } from "../lib/live";
 import { AnimatedCard } from "./AnimatedCard";
 import { LayersIcon, LinkIcon, SearchIcon, SparkIcon, XIcon } from "./icons";
 
@@ -17,6 +18,8 @@ interface Props {
   focusNode: (idx: number) => void;
   /** Which renderer actually came up (for the HUD chip). */
   mode: string | null;
+  /** Live connection identity for the HUD chip (never hardcoded). */
+  conn: ConnState;
 }
 
 interface HoverInfo {
@@ -39,7 +42,7 @@ function readEdgesPref(): boolean {
   }
 }
 
-export default function CosmosView({ cosmos, graph, names, loading, onTour, focusNode, mode }: Props) {
+export default function CosmosView({ cosmos, graph, names, loading, onTour, focusNode, mode, conn }: Props) {
   const { t } = useI18n();
   const [q, setQ] = useState("");
   const [hi, setHi] = useState(0);
@@ -177,6 +180,27 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
 
   const node = sel !== null && graph ? graph.nodes[sel] : null;
 
+  // ---- connection chip: what the bridge actually serves, straight from
+  // memory_status / trace_start (never a hardcoded deployment identity)
+  const connInfo = conn.kind === "connected" ? conn.info : null;
+  const connLabel =
+    conn.kind === "connected"
+      ? connInfo?.indexId ?? t.connConnected
+      : conn.kind === "connecting"
+        ? t.connConnecting
+        : t.connOffline;
+  const connTitle =
+    conn.kind === "connected"
+      ? [
+          `${t.hudConnTitle}: ${connInfo?.indexId ?? "?"}`,
+          connInfo?.nodeCount != null ? `${nfLocale(connInfo.nodeCount)} ${t.hudNodes}` : null,
+          connInfo?.edgeCount != null ? `${nfLocale(connInfo.edgeCount)} ${t.hudEdges}` : null,
+          connInfo?.lastIngest ? `${t.aboutConnIngest}: ${connInfo.lastIngest}` : null,
+        ].filter(Boolean).join(" · ")
+      : conn.kind === "offline"
+        ? `${t.connOffline}: ${conn.error}`
+        : t.hudConnTitle;
+
   const toggleFamily = (f: string) => {
     setHidden((prev) => {
       const next = new Set(prev);
@@ -201,6 +225,11 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
         )}
         <i>·</i>
         <span className="hudmode">{mode === "webgl2" ? "webgl2 · 3d" : "canvas2d"}</span>
+        <i>·</i>
+        <span className={`hudconn ${conn.kind}`} title={connTitle}>
+          <i className={`conndot ${conn.kind}`} aria-hidden="true" />
+          {connLabel}
+        </span>
       </div>
 
       {/* hover tooltip follows the cursor over the canvas */}
@@ -217,7 +246,7 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
       <div className="panel left">
         <h1>{t.cosmosTitle}</h1>
         <p className="sub">
-          {fmt(t.cosmosSub, {
+          {fmt(conn.kind === "offline" ? t.cosmosSubOffline : t.cosmosSub, {
             n: graph ? graph.nodes.length.toLocaleString("en-US") : "…",
             m: graph ? graph.edges.length.toLocaleString("en-US") : "…",
           })}
@@ -462,6 +491,10 @@ function countMatches(names: string[] | null, q: string): number {
   let n = 0;
   for (const name of names) if (name.toLowerCase().includes(needle)) n++;
   return n;
+}
+
+function nfLocale(n: number): string {
+  return n.toLocaleString("en-US");
 }
 
 function snippet(text: string, max: number): string {

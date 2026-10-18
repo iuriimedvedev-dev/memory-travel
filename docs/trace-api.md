@@ -94,3 +94,14 @@ Canonical: `hars-longterm-memory/docs/trace-api.md`. Changes from this draft:
    source rows are parsed from the rendered context (`derived_from`); a skipped
    rerank emits `applied=false` with its real reason and `latency_ms: null`.
 
+## Cosmos export endpoints (2026-10-18) — new surface, not in the draft
+
+The same :8098 listener now also serves the UI's COSMOS data (the draft only
+covered recall traces). This is the data-integrity fix: the UI renders
+`/stats` + `/graph` + `/coords` of the CONNECTED index (badged
+`live data: <index_id>`) instead of silently loading the baked `data/*.json`
+fixtures, which now live behind an explicit demo button. Routes, sampling,
+cache behaviour and the field contract: **docs/CONNECTION.md §5**; the
+implementation-side reference: `hars-longterm-memory/docs/trace-api.md`
+("Cosmos export endpoints"). No deviation from the trace contract itself.
+

@@ -7,11 +7,13 @@ const BRIDGE_URL = process.env.MEMORY_BRIDGE_URL ?? 'http://10.66.66.99:8099/mcp
 const bridgeOrigin = new URL(BRIDGE_URL)
 const BRIDGE_PATH = bridgeOrigin.pathname === '/' ? '/mcp' : bridgeOrigin.pathname
 
-// Live recall-trace service (SSE stage telemetry). It runs on the SAME host as
-// the MCP bridge on a different port (8098), and its routes are served at the
-// root (/trace, /healthz). Assumption: when MEMORY_BRIDGE_URL is overridden we
-// keep its host but swap the port to 8098; otherwise the documented default.
-const TRACE_ORIGIN = `${bridgeOrigin.protocol}//${bridgeOrigin.hostname}:8098`
+// Live recall-trace service (SSE stage telemetry + read-only cosmos export:
+// /stats /graph /coords /trace /healthz). It runs on the SAME host as the MCP
+// bridge on a different port (8098). MEMORY_TRACE_URL overrides the derived
+// origin outright (e.g. when the trace service sits on another host/port);
+// otherwise the bridge host with port 8098 is used.
+const TRACE_ORIGIN = process.env.MEMORY_TRACE_URL
+  ?? `${bridgeOrigin.protocol}//${bridgeOrigin.hostname}:8098`
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -39,6 +41,14 @@ export default defineConfig({
         target: TRACE_ORIGIN,
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/api\/trace/, ''),
+      },
+      // Read-only cosmos export (/stats /graph /coords) for the CONNECTED
+      // index — the data-integrity source of the starfield. Separate proxy
+      // path from /api/trace so a deployment can gate them independently.
+      '/api/graph-stats': {
+        target: TRACE_ORIGIN,
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/api\/graph-stats/, ''),
       },
     },
   },

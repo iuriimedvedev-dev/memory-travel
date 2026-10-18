@@ -2,14 +2,22 @@
 
 **EN** below, then **RU** (same content).
 
+> Agent-first connection/deployment/identity guide (modes matrix, env+proxy
+> recipes, machine-checkable verification, failure modes): **docs/CONNECTION.md**.
+> Русский mirror inside. This file stays human-friendly; CONNECTION.md is the
+> complete decision-table reference.
+
 ---
 
 ## EN
 
-### 1. Quick start — demo mode, zero dependencies
+### 1. Quick start — no memory service needed
 
-Works fully offline: the repo ships a real data snapshot (the 47k-entity graph, 3D UMAP coords, and five real
-`memory_recall` telemetry traces).
+Out of the box the app starts **not connected**: it renders nothing rather than
+guessing whose memory to show. A card offers **[Open demo data]** — the baked
+offline snapshot (our 47k-entity HARS graph, 3D UMAP coords, five real
+`memory_recall` telemetry traces). While shown, it is badged
+`demo: offline snapshot of the HARS index, 2026-10-17`.
 
 ```bash
 git clone <this repo> memory-travel && cd memory-travel/app
@@ -17,28 +25,33 @@ npm install
 npm run dev          # http://127.0.0.1:5174
 ```
 
-Open http://127.0.0.1:5174 — the **cosmos** starfield, the **travel** journey playback, and the **presentation**
-mode ("Презентация: как работает память") all work against the baked-in fixtures. Nothing else to configure.
+To render a REAL memory instead, connect (next section).
 
-### 2. Live mode — connect to a memory
+### 2. Live mode — connect to a memory (the default you want)
 
-The live question bar ("ask live") needs a memory bridge exposing the read-only `memory_recall` MCP tool
-(any LightRAG-compatible bridge). Point the dev server at it:
+The app is LIVE when the **trace service** (the memory MCP process's read-only
+HTTP surface on :8098) answers `/stats`. Then the starfield renders
+`GET /graph` + `GET /coords` of THAT index, badged `live data: <index_id>`
+(the index id is the basename of the service's `HARS_MEMORY_INDEX_DIR` — the UI
+only echoes it, never hardcodes it).
 
 ```bash
+# point at ANY memory: bridge (8099) + trace service (8098) on its host
 MEMORY_BRIDGE_URL=http://their-host:8099/mcp npm run dev
+# only if the trace service is NOT on their-host:8098:
+MEMORY_TRACE_URL=http://their-host:7123 npm run dev
 ```
 
-- The Vite dev proxy forwards `/api/memory → $MEMORY_BRIDGE_URL` (server-side, no CORS needed).
-- `MEMORY_BRIDGE_URL` must be reachable **from the host running Vite**, not from the browser.
-- Default: `http://10.66.66.99:8099/mcp`.
-- Read-only guarantee: the client speaks MCP `tools/call` with **exactly one tool — `memory_recall`**. No write,
-  delete, or index tools are exposed or proxied.
+- Dev proxies: `/api/memory` → bridge (MCP `memory_recall`, `memory_status`),
+  `/api/graph-stats/*` + `/api/trace/*` → trace service. Read-only everywhere.
+- Targets must be reachable **from the host running Vite**, not from the browser.
+- Full decision table, static-deploy nginx/Caddy snippets, machine-checkable
+  identity verification and the failure-modes table: **docs/CONNECTION.md**.
 
-### 3. Connecting a DIFFERENT index (your own knowledge base)
+### 3. Regenerating the DEMO snapshot (optional; only for the baked files)
 
-The starfield data is produced by offline export scripts (they read a LightRAG-style index dir: kv stores +
-graphml + vdb; works with any index built by this pipeline):
+The demo dataset is produced by offline export scripts (they read a
+LightRAG-style index dir: kv stores + graphml + vdb):
 
 ```bash
 # from the repo root; activates .venv or: python3 -m venv .venv && .venv/bin/pip install umap-learn numpy
@@ -54,6 +67,9 @@ Notes:
 - Re-running `compile_trace.py` needs the local embedder (llama.cpp :8791) to project the fixture questions.
 - Outputs land in `app/public/data/` and are served statically — no rebuild needed (dev hot-reloads; for static
   serving rebuild or just refresh).
+- The LIVE path needs none of this: the memory service computes and serves its
+  own export (`scripts/export_cosmos.py` in the **memory service repo** caches
+  the UMAP projection for `/coords`).
 
 ### 4. Persistent serve
 
@@ -114,10 +130,13 @@ fallback URL is baked at build time (`MEMORY_BRIDGE_URL=... npm run build`) or t
 
 ## RU (то же самое)
 
-### 1. Быстрый старт — демо-режим, без зависимостей
+### 1. Быстрый старт — сервис памяти не нужен
 
-Работает полностью офлайн: в репозитории лежит реальный снимок данных (граф 47k сущностей, 3D-координаты UMAP
-и пять трейсов реальной телеметрии `memory_recall`).
+«Из коробки» приложение стартует **без подключения**: оно не рисует ничего,
+вместо того чтобы угадывать, чью память показывать. Карточка предлагает
+**[Открыть демо-данные]** — вшитый офлайн-снимок (наш граф HARS на 47k сущностей,
+3D-координаты UMAP, пять трейсов реальной телеметрии `memory_recall`). Пока он
+показан, висит бейдж `демо: офлайн-снимок индекса HARS, 2026-10-17`.
 
 ```bash
 git clone <этот репозиторий> memory-travel && cd memory-travel/app
@@ -125,28 +144,33 @@ npm install
 npm run dev          # http://127.0.0.1:5174
 ```
 
-Откройте http://127.0.0.1:5174 — «космос», «путешествие» и «Презентация: как работает память» работают на
-встроенных фикстурах. Ничего настраивать не нужно.
+Чтобы увидеть РЕАЛЬНУЮ память — подключитесь (следующий раздел).
 
-### 2. Живой режим — подключение к памяти
+### 2. Живой режим — подключение к памяти (основной сценарий)
 
-Строке живого вопроса («ask live») нужен мост памяти с read-only MCP-инструментом `memory_recall`
-(любой LightRAG-совместимый мост). Направьте dev-сервер на него:
+Приложение ЖИВОЕ, когда **trace-сервис** (read-only HTTP-поверхность процесса
+памяти MCP на :8098) отвечает на `/stats`. Тогда туманность рендерит
+`GET /graph` + `GET /coords` ТОГО индекса с бейджем `живые данные: <index_id>`
+(id индекса = basename `HARS_MEMORY_INDEX_DIR` сервиса; UI его только
+повторяет, но не хардкодит).
 
 ```bash
+# указать на ЛЮБУЮ память: мост (8099) + trace-сервис (8098) на её хосте
 MEMORY_BRIDGE_URL=http://their-host:8099/mcp npm run dev
+# только если trace-сервис НЕ на their-host:8098:
+MEMORY_TRACE_URL=http://their-host:7123 npm run dev
 ```
 
-- Vite-прокси проксирует `/api/memory → $MEMORY_BRIDGE_URL` (на стороне сервера, CORS не нужен).
-- `MEMORY_BRIDGE_URL` должен быть доступен **с хоста, где запущен Vite**, а не из браузера.
-- По умолчанию: `http://10.66.66.99:8099/mcp`.
-- Гарантия read-only: клиент шлёт MCP `tools/call` ровно с одним инструментом — `memory_recall`. Инструменты
-  записи/удаления не проксируются и не вызываются.
+- Прокси dev-сервера: `/api/memory` → мост (MCP `memory_recall`, `memory_status`),
+  `/api/graph-stats/*` + `/api/trace/*` → trace-сервис. Везде read-only.
+- Цели должны быть доступны **с хоста, где запущен Vite**, а не из браузера.
+- Полная матрица режимов, nginx/Caddy-сниппеты для статики, машинно-проверяемая
+  сверка личности и таблица отказных режимов: **docs/CONNECTION.md**.
 
-### 3. Подключение ДРУГОГО индекса (своя база знаний)
+### 3. Пересборка ДЕМО-снимка (опционально; только для вшитых файлов)
 
-Данные туманности готовят офлайн-скрипты (читают LightRAG-подобный каталог индекса: kv-сторы + graphml + vdb;
-работают с любым индексом этого пайплайна):
+Демо-датасет готовят офлайн-скрипты (читают LightRAG-подобный каталог индекса:
+kv-сторы + graphml + vdb):
 
 ```bash
 scripts/export_graph.py     # каталог индекса -> app/public/data/graph.json + node_index.json
@@ -160,6 +184,9 @@ scripts/export_ingest_fixture.py  # глава 2 презентации (md_stru
 - UMAP обязан запускаться с **n_components=3** (туманность трёхмерная); `xy` тоже пишется для совместимости.
 - Пересборка трейсов требует локального эмбеддера (llama.cpp :8791) для проекции вопросов фикстур.
 - Результаты складываются в `app/public/data/` и раздаются статикой — пересборка приложения не нужна.
+- Живому пути это не нужно: сервис памяти сам считает и отдаёт экспорт
+  (`scripts/export_cosmos.py` в репо **сервиса памяти** кэширует UMAP-проекцию
+  для `/coords`).
 
 ### 4. Постоянный запуск
 

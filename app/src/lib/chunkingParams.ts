@@ -77,17 +77,17 @@ export function paramRows(p: ChunkingParams): ParamRow[] {
     {
       id: "chunk_token_size",
       value: String(p.chunkTokenSize),
-      source: "chunk records + HARS_MEMORY_CHUNK_TOKEN_SIZE",
+      source: "index records + server env override",
     },
     {
       id: "chunk_overlap_token_size",
       value: String(p.chunkOverlapTokenSize),
-      source: "HARS_MEMORY_CHUNK_OVERLAP_TOKENS",
+      source: "server env override",
     },
     {
       id: "mode",
       value: p.mode,
-      source: "HARS_MEMORY_CHUNKER=md_struct",
+      source: "server env (chunker = md_struct)",
     },
     {
       id: "min_section_merge",
@@ -103,7 +103,7 @@ export function paramRows(p: ChunkingParams): ParamRow[] {
 }
 
 /** Where the production splitter lives (caption copy points at this). */
-export const MD_STRUCT_PATH = "hars_memory/ingest/md_structure.py";
+export const MD_STRUCT_PATH = "md_structure.py (production splitter)";
 export const TOKEN_CHUNKER_SOURCE = "LightRAG chunking_by_token_size";
 
 // ---------------------------------------------------------------------------

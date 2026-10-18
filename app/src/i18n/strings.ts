@@ -29,8 +29,10 @@ const RU = {
   // cosmos panel
   cosmosTitle: "Космос памяти",
   cosmosSub:
-    "Живой граф знаний HARS — {n} сущностей, {m} связей, разложенных по смыслу (3D UMAP по stored 768-мерным векторам — настоящая туманность, которую можно вращать). Не мокап: это продакшн-индекс.",
-  searchPlaceholder: "найти сущность… (например VEA, DROID, checkpoint)",
+    "Подключённый граф знаний — {n} сущностей, {m} связей, разложенных по смыслу (3D UMAP по stored-эмбеддингам — настоящая туманность, которую можно вращать). Не мокап: это индекс, который сейчас отдаёт мост.",
+  cosmosSubOffline:
+    "Граф знаний — {n} сущностей, {m} связей, разложенных по смыслу (3D UMAP по stored-эмбеддингам). Офлайн: мост недоступен — это снапшот экспорта плюс сохранённые фикстуры-трейсы.",
+  searchPlaceholder: "найти сущность… (имя, проект, концепт…)",
   searchClear: "очистить поиск",
   searchMetaTop: "{n} совпадений — топ-{k} ниже, совпадения подсвечены на карте",
   searchMetaNone: "ничего не найдено",
@@ -45,7 +47,25 @@ const RU = {
   degreeLinks1: "1 прямая связь",
   degreeLinksN: "{n} прямых связей",
   noDesc: "для этой сущности нет описания",
-  loadingStars: "зажигаем 47k звёзд…",
+  loadingStars: "зажигаем звёзды…",
+  // ---- data source badge: WHAT the starfield renders (live vs demo) ----
+  srcProbing: "источник: подключаюсь…",
+  srcLiveBadge: "живые данные: {id}",
+  srcDemoBadge: "демо: офлайн-снимок индекса HARS, 2026-10-17",
+  srcOfflineBadge: "источник: нет подключения",
+  srcBadgeTitle: "какой индекс рендерит космос",
+  srcLiveTitle:
+    "космос рендерит ПОДКЛЮЧЁННЫЙ индекс: {id} · {docs} док. · {n} узлов · {m} рёбер · ingest {ts}",
+  srcDemoTitle: "ЯВНЫЙ демо-датасет: офлайн-снимок нашего индекса HARS от 2026-10-17. Это НЕ память, подключённая к этому развертыванию.",
+  srcSampled: "показан топ-{n} из {total} узлов (по связям)",
+  notConnectedTitle: "Нет подключения — живой граф недоступен",
+  notConnectedBody:
+    "Космос показывает граф ТОЙ памяти, к которой подключён визуализатор, и никогда — чужую память. Сейчас экспорт графа (сервис трейсов :8098: /stats, /graph, /coords) не отвечает, поэтому звёздное поле пусто. Поднимите сервис (или прокси /api/graph-stats) и нажмите «Повторить», либо явно откройте демо-снимок.",
+  openDemo: "Открыть демо-данные",
+  retryConnection: "Повторить подключение",
+  backToLive: "вернуться к живым данным",
+  demoLoadedNote: "Показан ДЕМО-снимок (офлайн-снимок индекса HARS, 2026-10-17) — не подключённая память.",
+  liveLoadFailed: "живой граф не загрузился: {e}",
   // query bar
   qbPlaceholder: "Спроси память… (живой recall, до 120с)",
   qbAsk: "спросить",
@@ -113,6 +133,13 @@ const RU = {
   presPrev: "назад (←)",
   presFullscreen: "полный экран (F)",
   presLoading: "готовлю данные…",
+  // presentation: honest gates for fixture-only chapters outside demo mode
+  presGateIngestTitle: "Глава 2 — реплей сохранённой заметки из демо-снимка",
+  presGateIngestBody:
+    "Эта глава разбирает ОДНУ конкретную заметку с её реальными записями учителя. В живом режиме она не показывается: заметка из снимка — не ваша память. Откройте демо-снимок или вернитесь к живым данным.",
+  presGateTraceTitle: "Для этой главы нужен трейс recall",
+  presGateTraceBody:
+    "Главы 3–8 воспроизводят один реальный recall по этапам. Задайте живой вопрос (строка запроса) — глава переиграет его по подключённой памяти, либо явно откройте демо-снимок с сохранёнными трейсами.",
   // presentation: docked chapter cards (chapters 3-8, real trace data)
   cardsAria: "данные главы",
   cardQuestion: "вопрос",
@@ -166,7 +193,7 @@ const RU = {
   ingestClickHint: "клик по окну — закрепить и прокрутить заметку к его строкам",
   ingestMeta: "{n} записей учителя · {r} связей · {c} окон в индексе",
   ingestCaption:
-    "Продакшн-сплиттер — hars_memory/ingest/md_structure.py: секции заголовков → абзацы/таблицы/фенсы, мелкие секции подтягиваются вверх, брейдкрамб [A > B] повторяется в каждой части. Панель повторяет этот контракт для иллюстрации: поменяйте параметры — текст будет нарезан заново.",
+    "Продакшн-сплиттер (md_structure): секции заголовков → абзацы/таблицы/фенсы, мелкие секции подтягиваются вверх, брейдкрамб [A > B] повторяется в каждой части. Панель повторяет этот контракт для иллюстрации: поменяйте параметры — текст будет нарезан заново.",
   ingestHonest:
     "Честно про образец: окна в индексе нарезаны token-чанкером LightRAG (ровно 2048 токенов, перекрытия 186–217, 476–520, 760–793, 1035–1068 строк), а md_struct не перекрывает окна и выравнивает их по секциям. Поэтому дорожек две.",
   ingestKindSection: "секция целиком",
@@ -197,18 +224,38 @@ const RU = {
   aboutAria: "О Memory Travel",
   aboutClose: "закрыть (Esc)",
   aboutIntro:
-    "Визуализатор того, как помнит машина. Два взгляда на ОДИН продакшн-индекс — живой граф знаний HARS (47k сущностей, 54k связей, UMAP-проекция stored 768-мерных эмбеддингов):",
+    "Визуализатор того, как помнит машина. Два взгляда на ОДИН индекс — тот, к которому подключён мост (живые счётчики — в шапке, личность и свежесть индекса — в блоке «Подключённая память» ниже):",
   aboutCosmos:
     "Космос — весь граф как звёздное поле, раскрашенное по семействам сущностей. Поиск подсвечивает совпадения, легенда переключает семейства, клик по звезде открывает её карточку.",
   aboutTravel:
     "Путешествие — один recall, воспроизведённый по этапам: вопрос падает, векторные хиты пульсируют, обход графа расходится хоп за хопом, BM25-хиты сыпятся, fusion сливает каналы, реранк переупорядочивает, контекст собирается, и каждый факт ответа связан со своими узлами-источниками.",
   aboutProvenance:
-    "Происхождение данных: data/graph.json + координаты экспортированы из живого индекса (scripts/export_graph.py, scripts/compute_umap.py). Пять фикстур-трейсов — настоящая телеметрия memory_recall, снятая capture_fixtures.py — ничего на экране не смоделировано. «ask live» выполняет реальный recall через мост памяти (context_only — визуализатор показывает дословные цитаты, он не пишет ответы).",
+    "Происхождение данных: в живом режиме космос рендерит ответ сервиса экспорта (:8098 /graph + /coords — read-only срезы живого индекса), личность индекса приходит из /stats и показана в бейдже источника. Демо-снимок (data/graph.json + координаты, scripts/export_graph.py + compute_umap.py) и пять фикстур-трейсов (capture_fixtures.py — настоящая телеметрия memory_recall) открываются ТОЛЬКО явной кнопкой демо. «ask live» выполняет реальный recall через мост памяти (context_only — визуализатор показывает дословные цитаты, он не пишет ответы).",
   aboutRendering:
     "Рендер: WebGL2-звёздное поле (Three.js) основное, автоматический Canvas2D-резерв на том же конвейере данных. Клавиши: ←/→ этапы, пробел play/pause, Esc закрывает карточки.",
   aboutBridge:
-    "Живой мост: {url} — задайте MEMORY_BRIDGE_URL, чтобы указать другой (см. docs/SETUP.md). Проксирует ОДИН read-only инструмент: memory_recall; ничего не записывается.",
+    "Живой мост: {url} — задайте MEMORY_BRIDGE_URL, чтобы указать другую память (см. docs/SETUP.md). Проксируются только read-only инструменты (memory_recall, memory_status); ничего не записывается.",
   aboutRepo: "Репозиторий: ~/Project/software/memory-travel — схема трейса в docs/trace-api.md.",
+  // ---- connection identity (about card + HUD chip) ----
+  connConnected: "на связи",
+  connConnecting: "подключаюсь…",
+  connOffline: "нет связи",
+  hudConnTitle: "подключённая память",
+  aboutConnTitle: "Подключённая память",
+  aboutConnNone:
+    "Нет связи с мостом. Космос в этом состоянии не показывает НИКАКИХ данных (чужая память не рендерится никогда); демо-снимок — только явной кнопкой.",
+  aboutSourceLive: "Источник данных космоса: ЖИВОЙ индекс {id} ({n} узлов, {m} рёбер — ответ /stats подключённого сервиса).",
+  aboutSourceDemo: "Источник данных космоса: ДЕМО-снимок от {date} (явно открытая офлайн-копия, не подключённая память).",
+  aboutSourceNone: "Источник данных космоса: не подключён — граф не рендерится.",
+  aboutConnBridge: "мост",
+  aboutConnIndex: "индекс",
+  aboutConnDir: "каталог индекса",
+  aboutConnEntities: "сущностей",
+  aboutConnRelations: "связей",
+  aboutConnIngest: "последний ingest",
+  aboutConnStale: "возраст данных",
+  aboutStaleDays: "{n} дн.",
+  aboutConnModels: "модели",
   // ---- errors ----
   errIndexTitle: "Не удалось загрузить данные индекса",
   errIndexBody:
@@ -229,7 +276,7 @@ const RU = {
   askNoteNoHits: "живой ответ в Путешествии ({s}с); узлов для подсветки нет",
   askViaProxy: "dev-прокси",
   askViaDirect: "напрямую",
-  askCancelled: "живой recall отменён — фикстуры по-прежнему играются ниже.",
+  askCancelled: "живой recall отменён.",
   // ---- query bar ----
   qbPhase1: "подключаюсь к мосту памяти…",
   qbPhase2: "эмбеддинг вопроса · извлечение ключевых слов…",
@@ -297,8 +344,10 @@ const EN: Dict = {
   aboutLink: "about · v1",
   cosmosTitle: "Memory Cosmos",
   cosmosSub:
-    "The live HARS knowledge graph — {n} entities, {m} relations, laid out by meaning (3D UMAP over stored 768-dim vectors — a true starfield you can orbit). Not a mock: this is the production index.",
-  searchPlaceholder: "find an entity… (e.g. VEA, DROID, checkpoint)",
+    "The connected knowledge graph — {n} entities, {m} relations, laid out by meaning (3D UMAP over the stored embeddings — a true starfield you can orbit). Not a mock: this is the index the bridge is serving right now.",
+  cosmosSubOffline:
+    "Knowledge graph — {n} entities, {m} relations, laid out by meaning (3D UMAP over the stored embeddings). Offline: the bridge is unreachable — this is the exported snapshot plus saved fixture traces.",
+  searchPlaceholder: "find an entity… (a name, a project, a concept…)",
   searchClear: "clear search",
   searchMetaTop: "{n} matches — top {k} below, matches lit on the map",
   searchMetaNone: "no entities match",
@@ -313,7 +362,25 @@ const EN: Dict = {
   degreeLinks1: "1 direct relation",
   degreeLinksN: "{n} direct relations",
   noDesc: "no description stored for this entity",
-  loadingStars: "lighting up 47k stars…",
+  loadingStars: "lighting up the stars…",
+  // ---- data source badge: WHAT the starfield renders (live vs demo) ----
+  srcProbing: "source: connecting…",
+  srcLiveBadge: "live data: {id}",
+  srcDemoBadge: "demo: offline snapshot of the HARS index, 2026-10-17",
+  srcOfflineBadge: "source: not connected",
+  srcBadgeTitle: "which index the cosmos renders",
+  srcLiveTitle:
+    "the cosmos renders the CONNECTED index: {id} · {docs} docs · {n} nodes · {m} edges · ingest {ts}",
+  srcDemoTitle: "EXPLICIT demo dataset: an offline snapshot of our HARS index taken 2026-10-17. This is NOT the memory this deployment is connected to.",
+  srcSampled: "top {n} of {total} nodes shown (by degree)",
+  notConnectedTitle: "Not connected — live graph unavailable",
+  notConnectedBody:
+    "The cosmos renders the graph of the memory this visualiser is connected to — never somebody else's. Right now the graph export (trace service :8098: /stats, /graph, /coords) is unreachable, so the starfield stays empty. Start the service (or the /api/graph-stats proxy) and retry, or explicitly open the demo snapshot.",
+  openDemo: "Open demo data",
+  retryConnection: "Retry connection",
+  backToLive: "back to live data",
+  demoLoadedNote: "Showing the DEMO snapshot (offline snapshot of the HARS index, 2026-10-17) — not the connected memory.",
+  liveLoadFailed: "live graph failed to load: {e}",
   qbPlaceholder: "Ask the memory… (live recall, up to 120s)",
   qbAsk: "ask",
   qbCancel: "cancel",
@@ -377,6 +444,13 @@ const EN: Dict = {
   presPrev: "back (←)",
   presFullscreen: "fullscreen (F)",
   presLoading: "preparing data…",
+  // presentation: honest gates for fixture-only chapters outside demo mode
+  presGateIngestTitle: "Chapter 2 replays one captured note from the demo snapshot",
+  presGateIngestBody:
+    "This chapter dissects ONE specific note with its real teacher records. In live mode it is not shown: a note from the snapshot is not your memory. Open the demo snapshot, or go back to live data.",
+  presGateTraceTitle: "This chapter needs a recall trace",
+  presGateTraceBody:
+    "Chapters 3-8 replay one real recall stage by stage. Ask a live question and the chapter replays it against the connected memory, or explicitly open the demo snapshot with its saved traces.",
   cardsAria: "chapter data",
   cardQuestion: "question",
   cardEmbedding: "embedding",
@@ -428,7 +502,7 @@ const EN: Dict = {
   ingestClickHint: "click a window to pin it and scroll the note to its lines",
   ingestMeta: "{n} teacher records · {r} relations · {c} index windows",
   ingestCaption:
-    "The production splitter is hars_memory/ingest/md_structure.py: heading sections → paragraphs/tables/fences, tiny sections merge up, the [A > B] breadcrumb repeats in every part. This panel mirrors that contract for illustration: change the parameters and the text is cut again.",
+    "The production splitter (md_structure): heading sections → paragraphs/tables/fences, tiny sections merge up, the [A > B] breadcrumb repeats in every part. This panel mirrors that contract for illustration: change the parameters and the text is cut again.",
   ingestHonest:
     "Honest about the sample: the index windows were cut by LightRAG's token chunker (exactly 2048 tokens, overlaps at lines 186–217, 476–520, 760–793, 1035–1068), while md_struct never overlaps and aligns to sections. Hence two lanes.",
   ingestKindSection: "whole section",
@@ -459,18 +533,38 @@ const EN: Dict = {
   aboutAria: "About Memory Travel",
   aboutClose: "close (Esc)",
   aboutIntro:
-    "A visualiser for how machine memory remembers. Two views over ONE production index — the live HARS knowledge graph (47k entities, 54k relations, UMAP-projected from stored 768-dim embeddings):",
+    "A visualiser for how machine memory remembers. Two views over ONE index — the one the bridge is connected to (live counts in the header; the index's identity and freshness in the Connected memory block below):",
   aboutCosmos:
     "Cosmos — the whole graph as a starfield, coloured by entity family. Search spotlights matches, the legend toggles families, clicking a star opens its card.",
   aboutTravel:
     "Travel — one recall, replayed stage by stage: question lands, vector hits pulse in, the graph walk spreads hop by hop, BM25 hits rain in, fusion merges both channels, rerank reorders, context assembles, and every answer fact links back to its source nodes.",
   aboutProvenance:
-    "Data provenance: data/graph.json + coords are exported from the live index (scripts/export_graph.py, scripts/compute_umap.py). The five fixture traces are real memory_recall telemetry captured by capture_fixtures.py — nothing on screen is mocked. \"ask live\" runs a real recall through the memory bridge (context_only — the visualiser shows extractive quotes, it does not write answers).",
+    "Data provenance: in live mode the cosmos renders the export service's answer (:8098 /graph + /coords — read-only slices of the connected index); the index identity comes from /stats and is shown in the source badge. The demo snapshot (data/graph.json + coords, scripts/export_graph.py + compute_umap.py) and the five fixture traces (capture_fixtures.py — real memory_recall telemetry) open ONLY behind the explicit demo button. \"ask live\" runs a real recall through the memory bridge (context_only — the visualiser shows extractive quotes, it does not write answers).",
   aboutRendering:
     "Rendering: WebGL2 starfield (Three.js) primary, automatic Canvas2D fallback on the same data pipeline. Keyboard: ←/→ stages, space play/pause, Esc closes cards.",
   aboutBridge:
-    "Live bridge: {url} — set MEMORY_BRIDGE_URL to point elsewhere (see docs/SETUP.md). The proxy exposes ONE read-only tool: memory_recall; nothing is written.",
+    "Live bridge: {url} — set MEMORY_BRIDGE_URL to point at a different memory (see docs/SETUP.md). Only read-only tools are proxied (memory_recall, memory_status); nothing is written.",
   aboutRepo: "Repo: ~/Project/software/memory-travel — docs/trace-api.md has the trace schema.",
+  // ---- connection identity (about card + HUD chip) ----
+  connConnected: "connected",
+  connConnecting: "connecting…",
+  connOffline: "offline",
+  hudConnTitle: "connected memory",
+  aboutConnTitle: "Connected memory",
+  aboutConnNone:
+    "No bridge connection. In this state the cosmos renders NO data at all (another memory's data is never shown); the demo snapshot exists only behind its explicit button.",
+  aboutSourceLive: "Cosmos data source: LIVE index {id} ({n} nodes, {m} edges — the connected service's /stats answer).",
+  aboutSourceDemo: "Cosmos data source: DEMO snapshot from {date} (an explicitly opened offline copy, not the connected memory).",
+  aboutSourceNone: "Cosmos data source: not connected — no graph is rendered.",
+  aboutConnBridge: "bridge",
+  aboutConnIndex: "index",
+  aboutConnDir: "index dir",
+  aboutConnEntities: "entities",
+  aboutConnRelations: "relations",
+  aboutConnIngest: "last ingest",
+  aboutConnStale: "data age",
+  aboutStaleDays: "{n} d",
+  aboutConnModels: "models",
   // ---- errors ----
   errIndexTitle: "Index data failed to load",
   errIndexBody:
@@ -491,7 +585,7 @@ const EN: Dict = {
   askNoteNoHits: "live answer in Travel ({s}s); no graph hits to highlight",
   askViaProxy: "dev proxy",
   askViaDirect: "direct",
-  askCancelled: "live recall cancelled — fixtures still playable below.",
+  askCancelled: "live recall cancelled.",
   // ---- query bar ----
   qbPhase1: "connecting to the memory bridge…",
   qbPhase2: "embedding the question · extracting keywords…",

@@ -12,8 +12,15 @@ import { INK, toWorld3, type RGBA, type XYZ } from "./lib/cosmos";
 import type { AnyCosmos } from "./lib/cosmos2d";
 import { asJourney3D } from "./lib/cosmos3d";
 import { compileLiveTrace } from "./lib/compileLive";
-import { loadChunkCoords, loadEntityCoords, loadGraph, loadManifest, loadNodeIndex } from "./lib/data";
-import { memoryRecallLive, keywordsFor, estimateSteps, emptySteps, markStepsError, parseRecallTelemetry, stepsFromTelemetry, probeTraceSupport, streamRecallTrace, applyTraceEvent, BRIDGE_PROXY_PATH, type RecallStep } from "./lib/live";
+import { loadManifest } from "./lib/data";
+import {
+  loadDemoCosmos,
+  loadLiveCosmos,
+  probeGraphStats,
+  type LoadedCosmos,
+  type SourcePhase,
+} from "./lib/cosmosSource";
+import { memoryRecallLive, keywordsFor, estimateSteps, emptySteps, markStepsError, parseRecallTelemetry, stepsFromTelemetry, probeTraceSupport, streamRecallTrace, applyTraceEvent, mergeTraceStart, memoryStatusLive, emptyBridgeInfo, BRIDGE_PROXY_PATH, type ConnState, type RecallStep } from "./lib/live";
 import type { CosmosGraph, TraceManifestEntry, TravelTrace } from "./lib/types";
 import { fmt } from "./i18n/strings";
 import { useI18n } from "./i18n/useI18n";
@@ -70,6 +77,24 @@ export default function App() {
    *  rows with estimates in the completion race. */
   const tracingRef = useRef(false);
 
+  // Connection identity: what the bridge actually serves (index id/dir, live
+  // counts, last ingest). Read via memory_status on mount; the About card and
+  // the HUD chip render it. Never hardcoded — an unreachable bridge renders
+  // the honest offline/fixtures state instead.
+  const [conn, setConn] = useState<ConnState>({ kind: "connecting" });
+
+  const refreshConn = useCallback(() => {
+    // async only: the previous identity (or the initial "connecting") stays
+    // rendered until the fresh memory_status answer lands
+    memoryStatusLive()
+      .then((info) => setConn({ kind: "connected", info }))
+      .catch((e: unknown) => setConn({ kind: "offline", error: e instanceof Error ? e.message : String(e) }));
+  }, []);
+
+  useEffect(() => {
+    refreshConn();
+  }, [refreshConn]);
+
   // elapsed-seconds ticker for the honest phase hints while a recall runs;
   // also drives the in-flight step estimate (spinner + ticking per row).
   useEffect(() => {
@@ -83,45 +108,97 @@ export default function App() {
     return () => window.clearInterval(id);
   }, [asking]);
 
-  useEffect(() => {
+  // ---- cosmos data source (data-integrity gate) --------------------------
+  // The starfield renders ONLY the memory this deployment is connected to
+  // (/api/stats -> /api/graph + /api/coords via the trace server). When that
+  // export is unreachable the app shows the honest "not connected" state; the
+  // baked fixtures in public/data are an EXPLICIT demo dataset behind a button,
+  // badged while shown. They are never loaded silently again.
+  const [source, setSource] = useState<SourcePhase>({ phase: "probing" });
+  const [cosmosData, setCosmosData] = useState<LoadedCosmos | null>(null);
+  const [sourceError, setSourceError] = useState<string | null>(null);
+  const [demoNoteDismissed, setDemoNoteDismissed] = useState(false);
+
+  /** Fill the render state from one LoadedCosmos (live or demo). */
+  const applyCosmosData = useCallback((data: LoadedCosmos) => {
+    setCosmosData(data);
+    setGraph(data.graph);
+    setNames(data.names);
+    setChunkXyz(data.chunkCoords);
+    // xyz preferred; old coord files (xy only) flatten to z=0
+    const m = new Map<string, XYZ>();
+    data.coords.ids.forEach((id, i) => {
+      const v = data.coords.xyz?.[i];
+      if (v) m.set(id, v);
+      else {
+        const xy = data.coords.xy[i];
+        if (xy) m.set(id, [xy[0], xy[1], 0]);
+      }
+    });
+    let hit = 0;
+    const aligned = data.graph.nodes.map((n) => {
+      const v = m.get(n.id) ?? null;
+      if (v) hit++;
+      // raw UMAP [-1,1] -> world units (shared mapping with markers)
+      return v ? toWorld3(v) : null;
+    });
+    setPosByIdx(aligned);
+    setProgress(
+      fmt(t.coordCoverage, { p: (100 * hit / Math.max(1, data.graph.nodes.length)).toFixed(1) }),
+    );
+  }, [t]);
+
+  const loadLive = useCallback(() => {
     let dead = false;
-    Promise.all([loadGraph(), loadNodeIndex(), loadEntityCoords(), loadChunkCoords(), loadManifest()])
-      .then(([g, idx, coords, cxyz, man]) => {
+    setSource({ phase: "probing" });
+    setSourceError(null);
+    setProgress(t.srcProbing);
+    setManifest(null); // fixture traces are demo-only
+    probeGraphStats()
+      .then((stats) => {
         if (dead) return;
-        setGraph(g);
-        setNames(idx);
-        setManifest(man);
-        setChunkXyz(cxyz);
-        // xyz preferred; old coord files (xy only) flatten to z=0
-        const m = new Map<string, XYZ>();
-        coords.ids.forEach((id, i) => {
-          const v = coords.xyz?.[i];
-          if (v) m.set(id, v);
-          else {
-            const xy = coords.xy[i];
-            if (xy) m.set(id, [xy[0], xy[1], 0]);
-          }
-        });
-        let hit = 0;
-        const aligned = g.nodes.map((n) => {
-          const v = m.get(n.id) ?? null;
-          if (v) hit++;
-          // raw UMAP [-1,1] -> world units (shared mapping with markers)
-          return v ? toWorld3(v) : null;
-        });
-        setPosByIdx(aligned);
-        setProgress((p) => (g ? fmt(t.coordCoverage, { p: (100 * hit / g.nodes.length).toFixed(1) }) : p));
+        setProgress(t.loadingIndex);
+        return loadLiveCosmos(stats);
+      })
+      .then((data) => {
+        if (dead || !data) return;
+        applyCosmosData(data);
+        setSource({ phase: "live" });
       })
       .catch((e: unknown) => {
         if (dead) return;
-        // getJSON() names the file in its message: `fetch <path>: <status>`.
         const msg = e instanceof Error ? e.message : String(e);
-        setDataError(msg);
-        setProgress(fmt(t.dataLoadFailed, { e: msg }));
+        setSourceError(msg);
+        setSource({ phase: "unreachable", error: msg });
+        setProgress(null);
       });
     return () => {
       dead = true;
     };
+  }, [applyCosmosData, t]);
+
+  const openDemo = useCallback(() => {
+    setProgress(t.loadingIndex);
+    setSourceError(null);
+    Promise.all([loadDemoCosmos(), loadManifest()])
+      .then(([data, man]) => {
+        applyCosmosData(data);
+        setManifest(man);
+        setSource({ phase: "demo" });
+      })
+      .catch((e: unknown) => {
+        const msg = e instanceof Error ? e.message : String(e);
+        setDataError(msg);
+        setProgress(fmt(t.dataLoadFailed, { e: msg }));
+      });
+  }, [applyCosmosData, t]);
+
+  useEffect(() => {
+    const cleanup = loadLive();
+    return cleanup;
+    // mount-only: the initial source decision. Reconnects go through
+    // retryConnection / backToLive below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -202,6 +279,9 @@ export default function App() {
               question,
               (ev) => {
                 tracingRef.current = true;
+                // trace_start carries the live index identity — keep the
+                // About card / HUD chip truthful about what we talk to.
+                if (ev.event === "trace_start") setConn((prev) => mergeTraceStart(prev, ev.data));
                 setSteps((prev) => applyTraceEvent(prev, ev));
               },
               { signal: ctrl.signal },
@@ -218,6 +298,11 @@ export default function App() {
           clientLatencyS = one.clientLatencyS;
           endpoint = one.endpoint;
         }
+        // A completed recall proves the bridge is reachable even if
+        // memory_status was down at load: upgrade to (minimal) connected.
+        setConn((prev) =>
+          prev.kind === "connected" ? prev : { kind: "connected", info: { ...emptyBridgeInfo(), endpoint } },
+        );
         const idxOf = new Map(names.map((n, i) => [n, i] as const));
         const entityXy = new Map<string, [number, number]>();
         const entityXyz = new Map<string, XYZ>();
@@ -302,10 +387,47 @@ export default function App() {
     abortRef.current?.abort();
   }, []);
 
+  // ---- data-source badge facts (never hardcoded: identity comes from the
+  // /api/stats answer; the demo label names the baked snapshot).
+  const identity = cosmosData?.identity ?? null;
+  const sampled = cosmosData?.sampled ?? null;
+  const badgeLabel =
+    source.phase === "live" && identity
+      ? fmt(t.srcLiveBadge, { id: identity.index_id })
+      : source.phase === "demo"
+        ? t.srcDemoBadge
+        : source.phase === "probing"
+          ? t.srcProbing
+          : t.srcOfflineBadge;
+  const badgeTitle =
+    source.phase === "live" && identity
+      ? [
+          fmt(t.srcLiveTitle, {
+            id: identity.index_id,
+            docs: identity.docs ?? "?",
+            n: identity.nodes != null ? identity.nodes.toLocaleString("en-US") : "?",
+            m: identity.edges != null ? identity.edges.toLocaleString("en-US") : "?",
+            ts: identity.last_ingest ?? "?",
+          }),
+          sampled
+            ? fmt(t.srcSampled, { n: sampled.nodes.toLocaleString("en-US"), total: sampled.fullNodes.toLocaleString("en-US") })
+            : "",
+        ].filter(Boolean).join("\n")
+      : source.phase === "demo"
+        ? t.srcDemoTitle
+        : t.srcBadgeTitle;
+
   return (
     <div className="app">
       {presenting ? (
-        <PresentationView onExit={() => setPresenting(false)} />
+        <PresentationView
+          onExit={() => setPresenting(false)}
+          data={cosmosData}
+          source={source}
+          liveTrace={liveTrace}
+          onOpenDemo={openDemo}
+          onRetryLive={loadLive}
+        />
       ) : (
         <>
           <div className={tab === "cosmos" ? "canvaswrap" : "canvaswrap hidden"}>
@@ -331,6 +453,19 @@ export default function App() {
               </button>
             </nav>
           </header>
+
+          {/* data-source badge: WHICH memory the starfield renders. In live mode
+              clicking re-probes; in demo mode it offers the way back to live. */}
+          <button
+            className={`srcbadge ${source.phase}`}
+            title={badgeTitle}
+            onClick={() => {
+              if (source.phase !== "probing") loadLive();
+            }}
+          >
+            <i className="srcdot" aria-hidden="true" />
+            <span className="srclabel">{badgeLabel}</span>
+          </button>
 
           <QueryBar
             asking={asking}
@@ -358,13 +493,42 @@ export default function App() {
               onTour={() => setPresenting(true)}
               focusNode={focusNode}
               mode={renderMode}
+              conn={conn}
             />
           )}
           {tab === "travel" && <TravelView cosmos={cosmosTravel} manifest={manifest} liveTrace={liveTrace} />}
+
+          {/* demo-mode note: the snapshot is explicit, but it must stay obvious */}
+          {source.phase === "demo" && !demoNoteDismissed && (
+            <div className="demonote" role="status">
+              <span>{t.demoLoadedNote}</span>
+              <button className="ghostbtn" onClick={loadLive} title={t.backToLive}>
+                {t.backToLive}
+              </button>
+              <button className="ghostbtn" onClick={() => setDemoNoteDismissed(true)} title={t.commonDismiss}>
+                <XIcon size={11} />
+              </button>
+            </div>
+          )}
         </>
       )}
 
-      {about && <AboutModal onClose={() => setAbout(false)} />}
+      {about && <AboutModal onClose={() => setAbout(false)} conn={conn} onRefreshConn={refreshConn} identity={identity} sourcePhase={source.phase} />}
+      {/* the honest not-connected state: NO foreign data renders, the baked
+          snapshot exists only behind the explicit demo button below */}
+      {source.phase === "unreachable" && !dataError && (
+        <ErrorOverlay
+          title={t.notConnectedTitle}
+          body={t.notConnectedBody}
+          detail={sourceError}
+          actions={
+            <>
+              <button className="primary" onClick={openDemo}>{t.openDemo}</button>
+              <button onClick={loadLive}>{t.retryConnection}</button>
+            </>
+          }
+        />
+      )}
       {dataError && (
         <ErrorOverlay
           title={t.errIndexTitle}

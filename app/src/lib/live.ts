@@ -1,5 +1,6 @@
 // Live memory_recall client (browser-safe).
-// Talks to the HARS memory bridge (Streamable HTTP MCP, no auth):
+// Talks to the memory bridge of whatever index it is pointed at (Streamable
+// HTTP MCP, no auth):
 //   POST initialize -> POST notifications/initialized -> POST tools/call
 //   { name: "memory_recall", arguments: { question, context_only: true } }
 // Bodies may be plain JSON or SSE (`data:` lines) — both are accepted.
@@ -179,12 +180,161 @@ export async function memoryRecallLive(
     }
     throw new Error(
       `memory bridge unreachable. Tried ${BRIDGE_PROXY_PATH} (Vite dev proxy) and ${BRIDGE_DIRECT_URL} (direct). ` +
-        failures.join(" | ") +
-        " The 5 fixture traces still play below.",
+        failures.join(" | "),
     );
   } finally {
     clearTimeout(timer);
   }
+}
+
+// ===========================================================================
+// Connection identity — memory_status (same bridge, read-only)
+// ===========================================================================
+//
+// The UI must show THE memory it is connected to, never a hardcoded
+// deployment name. The bridge exposes a read-only `memory_status` tool whose
+// payload carries the facts we surface: working_dir (the index directory —
+// its basename is the index id), node/edge counts, last_ingest and the
+// configured models. The SSE `trace_start` frame carries the same identity
+// (index_id / index_dir / last_ingest / stale_days) — we fold that in too, so
+// a live query refreshes the card even before status was fetched.
+
+export interface BridgeInfo {
+  /** Which endpoint actually answered: the dev proxy path or the direct URL. */
+  endpoint: string | null;
+  /** Basename of the index working_dir, e.g. "index_compact_20260903_imported". */
+  indexId: string | null;
+  /** Full index directory as reported by the bridge. */
+  indexDir: string | null;
+  nodeCount: number | null;
+  edgeCount: number | null;
+  /** ISO timestamp of the last ingest. */
+  lastIngest: string | null;
+  /** Days since last ingest as reported by trace_start (absent in status). */
+  staleDays: number | null;
+  embedder: string | null;
+  extractor: string | null;
+  queryModel: string | null;
+}
+
+export type ConnState =
+  | { kind: "connecting" }
+  | { kind: "connected"; info: BridgeInfo }
+  | { kind: "offline"; error: string };
+
+export function emptyBridgeInfo(): BridgeInfo {
+  return {
+    endpoint: null, indexId: null, indexDir: null, nodeCount: null,
+    edgeCount: null, lastIngest: null, staleDays: null,
+    embedder: null, extractor: null, queryModel: null,
+  };
+}
+
+/** Basename of an index directory (tolerates trailing slashes). */
+export function indexIdFromDir(dir: string): string {
+  const parts = dir.split("/").filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : dir;
+}
+
+/** Map a parsed memory_status payload onto the identity we render. */
+export function bridgeInfoFromStatus(s: Record<string, unknown>, endpoint: string): BridgeInfo {
+  const models = (s["configured_models"] ?? {}) as Record<string, unknown>;
+  const dir = str(s["working_dir"]);
+  return {
+    endpoint,
+    indexId: dir ? indexIdFromDir(dir) : str(s["project_name"]),
+    indexDir: dir,
+    nodeCount: num(s["node_count"]),
+    edgeCount: num(s["edge_count"]),
+    lastIngest: str(s["last_ingest"]),
+    staleDays: null,
+    embedder: str(models["embedder"]),
+    extractor: str(models["extractor"]),
+    queryModel: str(models["query"]),
+  };
+}
+
+/**
+ * Ask the bridge for its identity via the `memory_status` tool (same transport
+ * as memoryRecallLive: proxy first, then direct). Throws one readable Error
+ * when no endpoint answers — the caller renders the offline/fixtures state.
+ */
+export async function memoryStatusLive(opts: { timeoutMs?: number } = {}): Promise<BridgeInfo> {
+  const timeoutMs = opts.timeoutMs ?? 15_000;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(new DOMException(`memory bridge timed out after ${timeoutMs / 1000}s`, "AbortError")), timeoutMs);
+  try {
+    const failures: string[] = [];
+    for (const url of [BRIDGE_PROXY_PATH, BRIDGE_DIRECT_URL]) {
+      try {
+        const init = await postJSON(
+          url,
+          {
+            jsonrpc: "2.0",
+            id: 1,
+            method: "initialize",
+            params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "memory-travel", version: "1.0" } },
+          },
+          { ...JSON_HEADERS },
+          ctrl.signal,
+        );
+        const session = init.sid;
+        if (!session) throw new Error(`bridge at ${url} omitted the mcp-session-id header on initialize`);
+        const h = { ...JSON_HEADERS, "mcp-session-id": session };
+        try {
+          await postJSON(url, { jsonrpc: "2.0", method: "notifications/initialized" }, h, ctrl.signal);
+        } catch (e) {
+          if (e instanceof DOMException && e.name === "AbortError") throw e;
+          if (e instanceof TypeError) throw e;
+        }
+        const call = await postJSON(
+          url,
+          { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "memory_status", arguments: {} } },
+          h,
+          ctrl.signal,
+        );
+        const rpc = unwrapBody(call.text) as {
+          result?: { content?: { text?: string }[]; isError?: boolean };
+          error?: { message?: string };
+        };
+        if (rpc.error) throw new Error(`memory_status error: ${rpc.error.message ?? JSON.stringify(rpc.error)}`);
+        const text = rpc.result?.content?.[0]?.text;
+        if (!text) throw new Error("memory_status returned no content text");
+        return bridgeInfoFromStatus(JSON.parse(text) as Record<string, unknown>, url);
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") throw e;
+        failures.push(`${url}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    throw new Error(
+      `memory bridge unreachable. Tried ${BRIDGE_PROXY_PATH} (Vite dev proxy) and ${BRIDGE_DIRECT_URL} (direct). ` +
+        failures.join(" | "),
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Fold a `trace_start` SSE frame into the connection state: it carries the
+ * live index identity (index_id / index_dir / last_ingest / stale_days). A
+ * working trace also proves the bridge is reachable, so an offline state
+ * upgrades to connected (with whatever identity the frame carried).
+ */
+export function mergeTraceStart(prev: ConnState, d: Record<string, unknown>): ConnState {
+  const incoming: BridgeInfo = {
+    ...emptyBridgeInfo(),
+    indexId: str(d["index_id"]),
+    indexDir: str(d["index_dir"]),
+    lastIngest: str(d["last_ingest"]),
+    staleDays: num(d["stale_days"]),
+  };
+  if (prev.kind !== "connected") return { kind: "connected", info: incoming };
+  const info = { ...prev.info };
+  for (const [k, v] of Object.entries(incoming)) {
+    if (v != null) (info as unknown as Record<string, unknown>)[k] = v;
+  }
+  return { kind: "connected", info };
 }
 
 // ===========================================================================
