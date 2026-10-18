@@ -5,7 +5,7 @@
 //   { name: "memory_recall", arguments: { question, context_only: true } }
 // Bodies may be plain JSON or SSE (`data:` lines) — both are accepted.
 //
-// Cross-origin: the page (127.0.0.1:5174) and the bridge (10.66.66.99:8099)
+// Cross-origin: the page and the bridge
 // differ, so dev goes through the Vite proxy (/api/memory -> bridge, see
 // vite.config.ts). If the proxy is absent (static preview) we fall back to
 // the direct URL, which needs the bridge to allow CORS. If every endpoint
@@ -15,8 +15,9 @@
 // injects __MEMORY_BRIDGE_URL__). Same default as the dev proxy.
 declare const __MEMORY_BRIDGE_URL__: string;
 export const BRIDGE_DIRECT_URL =
-  typeof __MEMORY_BRIDGE_URL__ === "string" ? __MEMORY_BRIDGE_URL__ : "http://10.66.66.99:8099/mcp";
-export const BRIDGE_PROXY_PATH = "/api/memory";
+  typeof __MEMORY_BRIDGE_URL__ === "string" ? __MEMORY_BRIDGE_URL__ : "";
+const API_BASE = (import.meta.env.BASE_URL ?? "").replace(/\/+$/, "");
+export const BRIDGE_PROXY_PATH = `${API_BASE}/api/memory`;
 
 export const LIVE_TIMEOUT_MS = 120_000;
 export const MAX_QUESTION_CHARS = 500;
@@ -170,7 +171,7 @@ export async function memoryRecallLive(
   }
   try {
     const failures: string[] = [];
-    for (const url of [BRIDGE_PROXY_PATH, BRIDGE_DIRECT_URL]) {
+    for (const url of [BRIDGE_PROXY_PATH, BRIDGE_DIRECT_URL].filter(Boolean)) {
       try {
         return await recallVia(q, url, ctrl.signal);
       } catch (e) {
@@ -265,7 +266,7 @@ export async function memoryStatusLive(opts: { timeoutMs?: number } = {}): Promi
   const timer = setTimeout(() => ctrl.abort(new DOMException(`memory bridge timed out after ${timeoutMs / 1000}s`, "AbortError")), timeoutMs);
   try {
     const failures: string[] = [];
-    for (const url of [BRIDGE_PROXY_PATH, BRIDGE_DIRECT_URL]) {
+    for (const url of [BRIDGE_PROXY_PATH, BRIDGE_DIRECT_URL].filter(Boolean)) {
       try {
         const init = await postJSON(
           url,
@@ -571,7 +572,7 @@ export function stepsFromTelemetry(t: RecallTelemetry): RecallStep[] {
 // ===========================================================================
 //
 // The memory service exposes a real-time trace endpoint
-// (GET <trace-host>/trace, default http://10.66.66.99:8098/trace). It emits one
+// (GET <trace-host>/trace). It emits one
 // SSE frame per pipeline stage IN REAL EXECUTION ORDER, then `result` (the full
 // recall JSON) and `done` (total_ms); `error` on failure. Each frame carries
 // trace_id/seq/t_ms. We probe `GET /healthz` once (cached); when it does not
@@ -585,14 +586,14 @@ export interface TraceEvent {
 }
 
 /** Same-origin dev proxy (see vite.config.ts: /api/trace -> <trace-host>). */
-export const TRACE_PROXY_PATH = "/api/trace";
+export const TRACE_PROXY_PATH = `${API_BASE}/api/trace`;
 /** Direct fallback when no proxy exists (vite preview / static hosting). */
 declare const __MEMORY_TRACE_URL__: string;
 export const TRACE_DIRECT_URL =
-  typeof __MEMORY_TRACE_URL__ === "string" ? __MEMORY_TRACE_URL__ : "http://10.66.66.99:8098";
+  typeof __MEMORY_TRACE_URL__ === "string" ? __MEMORY_TRACE_URL__ : "";
 
 function traceBases(): string[] {
-  return [TRACE_PROXY_PATH, TRACE_DIRECT_URL];
+  return [TRACE_PROXY_PATH, TRACE_DIRECT_URL].filter(Boolean);
 }
 
 let traceSupport: boolean | null = null;

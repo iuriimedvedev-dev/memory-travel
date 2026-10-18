@@ -49,14 +49,15 @@ export type SourcePhase =
 
 // Same bases as the trace client (vite.config.ts): dev proxy first, then the
 // build-time direct URL. The trace server sends CORS *, so direct works too.
-export const GRAPH_PROXY_PATH = "/api/graph-stats";
+const API_BASE = (import.meta.env.BASE_URL ?? "").replace(/\/+$/, "");
+export const GRAPH_PROXY_PATH = `${API_BASE}/api/graph-stats`;
 
 declare const __MEMORY_TRACE_URL__: string;
 const TRACE_DIRECT_URL =
-  typeof __MEMORY_TRACE_URL__ === "string" ? __MEMORY_TRACE_URL__ : "http://10.66.66.99:8098";
+  typeof __MEMORY_TRACE_URL__ === "string" ? __MEMORY_TRACE_URL__ : "";
 
 function graphBases(): string[] {
-  return [GRAPH_PROXY_PATH, TRACE_DIRECT_URL];
+  return [GRAPH_PROXY_PATH, TRACE_DIRECT_URL].filter(Boolean);
 }
 
 /** fetch JSON with the HTML-masquerade check (Vite SPA fallback answers 200). */
@@ -143,13 +144,15 @@ export async function loadLiveCosmos(identity: GraphStats): Promise<LoadedCosmos
 
 /** The explicit demo dataset: the baked offline snapshot in public/data. */
 export async function loadDemoCosmos(): Promise<LoadedCosmos> {
+  const base = import.meta.env.BASE_URL ?? "/";
+  const prefix = base.endsWith("/") ? base : `${base}/`;
   const [g, idx, coords, cxyz] = await Promise.all([
-    getJSON<CosmosGraph>("data/graph.json"),
-    getJSON<string[]>("data/node_index.json"),
+    getJSON<CosmosGraph>(`${prefix}data/graph.json`),
+    getJSON<string[]>(`${prefix}data/node_index.json`),
     getJSON<{ ids: string[]; xy: [number, number][]; xyz?: [number, number, number][] }>(
-      "data/coords_entities.json",
+      `${prefix}data/coords_entities.json`,
     ),
-    getJSON<Record<string, [number, number, number]>>("data/coords_chunks.json"),
+    getJSON<Record<string, [number, number, number]>>(`${prefix}data/coords_chunks.json`),
   ]);
   return {
     source: "demo",
