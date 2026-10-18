@@ -309,6 +309,7 @@ export class Cosmos3D implements CosmosLike, Journey3D {
   private baseAlpha: Float32Array = new Float32Array(0);
   private spot: Set<number> | null = null;
   private paints = new Map<number, { color: RGBA; size?: number }>();
+  private halos: { idx: number; color: RGBA; mesh: THREE.Mesh; size: number }[] = [];
 
   // markers + journey lines
   private markers = new Map<number, MarkerObj>();
@@ -401,6 +402,7 @@ export class Cosmos3D implements CosmosLike, Journey3D {
       this.updateEdgeUniforms(dt);
       const t = (now - this.pulseT0) / 1000;
       this.animateRing(t);
+      this.animateHalos(t);
       // a camera tween calls controls.update() itself; two writers per frame
       // is how the arrival pose used to get nudged off the node
       if (!this.camBusy) this.controls?.update();
@@ -618,6 +620,7 @@ export class Cosmos3D implements CosmosLike, Journey3D {
     this.paints.clear();
     this.spot = null;
     this.clearMarkers();
+    this.clearHalos();
     this.clearContextLines();
     this.clearTrail();
   }
@@ -978,6 +981,86 @@ export class Cosmos3D implements CosmosLike, Journey3D {
     (r.material as THREE.MeshBasicMaterial).opacity = 0.7 + 0.2 * Math.sin(t * 2.6);
   }
 
+  setHalos(items: { idx: number; color?: RGBA; size?: number }[] | null): void {
+    this.clearHalos();
+    if (!items || !items.length || !this.renderer || !this.pos.length) return;
+    for (const item of items) {
+      if (item.idx < 0 || item.idx >= this.n) continue;
+      const g = new THREE.RingGeometry(0.75, 1.25, 48);
+      const col = item.color ?? INK.cyan;
+      const m = new THREE.MeshBasicMaterial({
+        color: new THREE.Color(col[0], col[1], col[2]),
+        transparent: true,
+        opacity: 0.85,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        depthTest: false,
+      });
+      const mesh = new THREE.Mesh(g, m);
+      mesh.frustumCulled = false;
+      mesh.renderOrder = 4;
+      mesh.position.set(this.pos[item.idx * 3], this.pos[item.idx * 3 + 1], this.pos[item.idx * 3 + 2]);
+      this.scene.add(mesh);
+      this.halos.push({ idx: item.idx, color: col, mesh, size: item.size ?? 1 });
+    }
+  }
+
+  clearHalos(): void {
+    for (const h of this.halos) {
+      this.scene.remove(h.mesh);
+      h.mesh.geometry.dispose();
+      (h.mesh.material as THREE.Material).dispose();
+    }
+    this.halos = [];
+  }
+
+  private animateHalos(t: number): void {
+    if (!this.halos.length || !this.camera || !this.ptsMat) return;
+    const uScale = this.pointScale();
+    for (const h of this.halos) {
+      h.mesh.quaternion.copy(this.camera.quaternion);
+      const dist = Math.max(0.1, this.camera.position.distanceTo(h.mesh.position));
+      const basePx = Math.max(16, 20 * h.size);
+      const targetPx = basePx * this.dpr * (1 + 0.16 * Math.sin(t * 3.6 + h.idx * 0.5));
+      h.mesh.scale.setScalar((targetPx * dist) / uScale);
+      h.mesh.rotateZ(t * 0.4);
+      (h.mesh.material as THREE.MeshBasicMaterial).opacity = 0.65 + 0.3 * Math.sin(t * 3.6 + h.idx * 0.5);
+    }
+  }
+
+  pulseCluster(indices: number[], color: RGBA, fly = true): void {
+    if (!indices.length || !this.n) return;
+    const valid = indices.filter((i) => i >= 0 && i < this.n);
+    if (!valid.length) return;
+    this.spotlight(new Set(valid));
+    const paints = new Map<number, { color: RGBA; size?: number }>();
+    valid.forEach((i) => paints.set(i, { color, size: 2.8 }));
+    this.paint(paints);
+    this.setHalos(valid.map((idx) => ({ idx, color, size: 1.3 })));
+    if (fly && this.camera) {
+      let sx = 0, sy = 0, sz = 0;
+      for (const i of valid) {
+        sx += this.pos[i * 3];
+        sy += this.pos[i * 3 + 1];
+        sz += this.pos[i * 3 + 2];
+      }
+      const cx = sx / valid.length;
+      const cy = sy / valid.length;
+      const cz = sz / valid.length;
+      let maxDist = 0;
+      for (const i of valid) {
+        const dx = this.pos[i * 3] - cx;
+        const dy = this.pos[i * 3 + 1] - cy;
+        const dz = this.pos[i * 3 + 2] - cz;
+        const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (d > maxDist) maxDist = d;
+      }
+      const fitDist = Math.max(18, Math.min(130, maxDist * 2.4));
+      this.flyToNode([cx, cy, cz], fitDist, 1000);
+    }
+  }
+
   cameraNow(): { pos: XYZ; target: XYZ } {
     const c = this.camera!;
     const t = this.controls?.target ?? new THREE.Vector3();
@@ -1179,6 +1262,7 @@ export class Cosmos3D implements CosmosLike, Journey3D {
       this.canvas.removeEventListener("pointerdown", this.onDown);
     }
     this.clearMarkers();
+    this.clearHalos();
     this.clearContextLines();
     this.clearTrail();
     if (this.selRing) {

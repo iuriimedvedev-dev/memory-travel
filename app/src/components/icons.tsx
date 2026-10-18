@@ -178,3 +178,59 @@ export function HandIcon(p: IconProps) {
     </Base>
   );
 }
+
+export function CheckIcon(p: IconProps) {
+  return (
+    <Base {...p}>
+      <polyline points="4,12 9,17 20,6" />
+    </Base>
+  );
+}
+
+export function MinimizeIcon(p: IconProps) {
+  return (
+    <Base {...p}>
+      <line x1="4" y1="12" x2="20" y2="12" />
+    </Base>
+  );
+}
+
+export function MaximizeIcon(p: IconProps) {
+  return (
+    <Base {...p}>
+      <polyline points="15 3 21 3 21 9" />
+      <polyline points="9 21 3 21 3 15" />
+      <line x1="21" y1="3" x2="14" y2="10" />
+      <line x1="3" y1="21" x2="10" y2="14" />
+    </Base>
+  );
+}
+
+export function ChevronDownIcon(p: IconProps) {
+  return (
+    <Base {...p}>
+      <polyline points="6 9 12 15 18 9" />
+    </Base>
+  );
+}
+
+export function ChevronUpIcon(p: IconProps) {
+  return (
+    <Base {...p}>
+      <polyline points="18 15 12 9 6 15" />
+    </Base>
+  );
+}
+
+export function NodesIcon(p: IconProps) {
+  return (
+    <Base {...p}>
+      <circle cx="6" cy="6" r="2.5" />
+      <circle cx="18" cy="6" r="2.5" />
+      <circle cx="12" cy="18" r="2.5" />
+      <line x1="8.2" y1="7.2" x2="15.8" y2="7.2" />
+      <line x1="7.3" y1="8.3" x2="10.7" y2="15.7" />
+      <line x1="16.7" y1="8.3" x2="13.3" y2="15.7" />
+    </Base>
+  );
+}

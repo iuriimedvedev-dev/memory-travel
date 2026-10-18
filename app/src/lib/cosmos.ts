@@ -35,13 +35,18 @@ export function toWorld3(xyz: XYZ | null | undefined): XYZ {
 export const INK: Record<string, RGBA> = {
   base: [0.23, 0.3, 0.48, 1],
   dim: [0.13, 0.16, 0.28, 1],
-  cyan: [0.2, 0.95, 1.0, 1],
+  cyan: [0.0, 0.95, 1.0, 1],
+  vector: [0.0, 0.95, 1.0, 1],
   gold: [1.0, 0.78, 0.25, 1],
+  amber: [1.0, 0.72, 0.14, 1],
+  bm25: [1.0, 0.72, 0.14, 1],
+  overlap: [0.22, 1.0, 0.58, 1],
   magenta: [1.0, 0.35, 0.85, 1],
+  violet: [0.75, 0.4, 1.0, 1],
   green: [0.35, 1.0, 0.55, 1],
   orange: [1.0, 0.55, 0.2, 1],
   white: [1.0, 1.0, 1.0, 1],
-  query: [1.0, 0.3, 0.5, 1],
+  query: [1.0, 0.28, 0.58, 1],
 };
 
 export interface SelectedNode {
@@ -104,6 +109,11 @@ export interface CosmosLike {
   setEdgeHover(idx: number | null): void;
   /** Current effective base edge opacity (0..1) for the HUD intensity hint. */
   edgeIntensity(): number;
+  /** Glowing billboard halos around candidate nodes. */
+  setHalos(items: { idx: number; color?: RGBA; size?: number }[] | null): void;
+  clearHalos(): void;
+  /** Highlight and pulse a cluster of nodes with camera flight. */
+  pulseCluster(nodeIndices: number[], color: RGBA, fly?: boolean): void;
   /** Eased camera flight. x/y world coords; zoom is renderer-relative. */
   flyTo(x: number, y: number, zoom: number, ms?: number): void;
   fit(padding?: number): void;

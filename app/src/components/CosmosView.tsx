@@ -53,6 +53,7 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
   const [zoom, setZoom] = useState<number | null>(null);
   const [edgesOn, setEdgesOn] = useState<boolean>(readEdgesPref);
   const [edgePct, setEdgePct] = useState<number | null>(null);
+  const [panelCollapsed, setPanelCollapsed] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // ---- family census for the legend (counts + colours stay stable)
@@ -243,14 +244,37 @@ export default function CosmosView({ cosmos, graph, names, loading, onTour, focu
         </div>
       )}
 
-      <div className="panel left">
-        <h1>{t.cosmosTitle}</h1>
-        <p className="sub">
-          {fmt(conn.kind === "offline" ? t.cosmosSubOffline : t.cosmosSub, {
-            n: graph ? graph.nodes.length.toLocaleString("en-US") : "…",
-            m: graph ? graph.edges.length.toLocaleString("en-US") : "…",
-          })}
-        </p>
+      {panelCollapsed && (
+        <button
+          className="panel-toggle-pill"
+          onClick={() => setPanelCollapsed(false)}
+          title={t.cosmosTitle}
+        >
+          <SparkIcon size={12} />
+          <span>{t.cosmosTitle}</span>
+        </button>
+      )}
+
+      <div className={`panel left${panelCollapsed ? " collapsed" : ""}`}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <h1>{t.cosmosTitle}</h1>
+            <p className="sub">
+              {fmt(conn.kind === "offline" ? t.cosmosSubOffline : t.cosmosSub, {
+                n: graph ? graph.nodes.length.toLocaleString("en-US") : "…",
+                m: graph ? graph.edges.length.toLocaleString("en-US") : "…",
+              })}
+            </p>
+          </div>
+          <button
+            className="ghostbtn"
+            onClick={() => setPanelCollapsed(true)}
+            title={t.commonDismiss}
+            style={{ marginTop: 2, padding: "3px 6px" }}
+          >
+            <XIcon size={11} />
+          </button>
+        </div>
         {loading && <p className="loading">{loading}</p>}
 
         <div className="searchwrap">

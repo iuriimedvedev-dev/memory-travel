@@ -380,6 +380,32 @@ export class Cosmos2D implements CosmosLike {
     this.flyRaf = 0;
   }
 
+  setHalos(_items: { idx: number; color?: RGBA; size?: number }[] | null): void {
+    // 2D fallback handles halos via spotlight and paint
+  }
+
+  clearHalos(): void {}
+
+  pulseCluster(indices: number[], color: RGBA, fly = true): void {
+    if (!indices.length || !this.n) return;
+    this.spotlight(new Set(indices));
+    const paints = new Map<number, { color: RGBA; size?: number }>();
+    indices.forEach((i) => paints.set(i, { color, size: 3 }));
+    this.paint(paints);
+    if (fly) {
+      let sx = 0, sy = 0;
+      let count = 0;
+      for (const i of indices) {
+        if (i >= 0 && i < this.n) {
+          sx += this.wx[i];
+          sy += this.wy[i];
+          count++;
+        }
+      }
+      if (count > 0) this.flyTo(sx / count, sy / count, this.fitScale * 2.5, 1000);
+    }
+  }
+
   fit(padding = 0.12): void {
     if (!this.canvas || this.n === 0) return;
     let x0 = Infinity;

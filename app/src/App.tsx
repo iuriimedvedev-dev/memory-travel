@@ -5,10 +5,11 @@ import AboutModal from "./components/AboutModal";
 import ErrorOverlay from "./components/ErrorOverlay";
 import PresentationView from "./components/PresentationView";
 import QueryBar, { type HistoryEntry } from "./components/QueryBar";
+import PipelineWidget from "./components/PipelineWidget";
 import TravelView from "./components/TravelView";
 import UiScaleSlider from "./components/UiScaleSlider";
 import { SparkIcon, XIcon } from "./components/icons";
-import { INK, toWorld3, type RGBA, type XYZ } from "./lib/cosmos";
+import { INK, toWorld3, type XYZ } from "./lib/cosmos";
 import type { AnyCosmos } from "./lib/cosmos2d";
 import { asJourney3D } from "./lib/cosmos3d";
 import { compileLiveTrace } from "./lib/compileLive";
@@ -63,12 +64,14 @@ export default function App() {
 
   // Live Q&A state (one box above both views).
   const [liveTrace, setLiveTrace] = useState<TravelTrace | null>(null);
+  const [activeQuestion, setActiveQuestion] = useState<string | null>(null);
+  const [currentStage, setCurrentStage] = useState<number>(0);
   const [asking, setAsking] = useState(false);
   const [askError, setAskError] = useState<string | null>(null);
   const [askNote, setAskNote] = useState<string | null>(null);
   const [elapsedS, setElapsedS] = useState(0);
   const [history, setHistory] = useState<HistoryEntry[]>(loadHistory);
-  const [steps, setSteps] = useState<RecallStep[]>(emptySteps);
+  const [steps, setSteps] = useState<RecallStep[]>([]);
   const [about, setAbout] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const startedAtRef = useRef(0);
@@ -95,6 +98,112 @@ export default function App() {
     refreshConn();
   }, [refreshConn]);
 
+  const highlightStageInCosmos = useCallback(
+    (stageIdx: number, tr: TravelTrace | null, qText: string) => {
+      if (!cosmosFull || !graph || !names) return;
+      if (stageIdx === 1) {
+        // Stage 2 (Vector hits): cyan glow & halos on candidate chunks
+        let hitIdxs: number[] = [];
+        if (tr && tr.vector_hits.length) {
+          const entNames = new Set(tr.vector_hits.flatMap((h) => h.entities));
+          hitIdxs = names
+            .map((name, i) => (entNames.has(name) ? i : -1))
+            .filter((i) => i >= 0);
+        }
+        if (!hitIdxs.length && qText) {
+          const kws = keywordsFor(qText).map((k) => k.toLowerCase());
+          hitIdxs = names
+            .map((name, i) => (kws.some((k) => name.toLowerCase().includes(k)) ? i : -1))
+            .filter((i) => i >= 0)
+            .slice(0, 20);
+        }
+        if (!hitIdxs.length && graph && graph.nodes.length) {
+          hitIdxs = graph.nodes
+            .slice(0, 40)
+            .sort((a, b) => b.deg - a.deg)
+            .slice(0, 12)
+            .map((_, i) => i);
+        }
+        if (hitIdxs.length) {
+          cosmosFull.pulseCluster(hitIdxs, INK.cyan, true);
+        }
+      } else if (stageIdx === 2) {
+        // Stage 3 (BM25): emerald green
+        let hitIdxs: number[] = [];
+        if (tr && tr.bm25_hits.length) {
+          const entNames = new Set(tr.bm25_hits.flatMap((h) => h.entities));
+          hitIdxs = names
+            .map((name, i) => (entNames.has(name) ? i : -1))
+            .filter((i) => i >= 0);
+        }
+        if (!hitIdxs.length && graph && graph.nodes.length) {
+          hitIdxs = graph.nodes
+            .slice(5, 35)
+            .sort((a, b) => b.deg - a.deg)
+            .slice(0, 8)
+            .map((_, i) => i + 5);
+        }
+        if (hitIdxs.length) {
+          cosmosFull.pulseCluster(hitIdxs, INK.green, true);
+        }
+      } else if (stageIdx === 3) {
+        // Stage 4 (Graph walk): gold seeds + magenta 1-hop neighbours
+        let allGraphIdxs: number[] = [];
+        if (tr && tr.graph.nodes.length) {
+          allGraphIdxs = tr.graph.nodes.map((n) => n.i);
+        }
+        if (!allGraphIdxs.length && qText) {
+          const kws = keywordsFor(qText).map((k) => k.toLowerCase());
+          allGraphIdxs = names
+            .map((name, i) => (kws.some((k) => name.toLowerCase().includes(k)) ? i : -1))
+            .filter((i) => i >= 0)
+            .slice(0, 15);
+        }
+        if (!allGraphIdxs.length && graph && graph.nodes.length) {
+          allGraphIdxs = graph.nodes
+            .slice(12, 45)
+            .sort((a, b) => b.deg - a.deg)
+            .slice(0, 14)
+            .map((_, i) => i + 12);
+        }
+        if (allGraphIdxs.length) {
+          cosmosFull.pulseCluster(allGraphIdxs, INK.gold, true);
+        }
+      } else if (stageIdx === 4) {
+        // Stage 5 (Fusion / LTR): vivid orange
+        let hitIdxs: number[] = [];
+        if (tr && tr.fusion.length) {
+          const entNames = new Set(tr.fusion.flatMap((h) => h.entities));
+          hitIdxs = names
+            .map((name, i) => (entNames.has(name) ? i : -1))
+            .filter((i) => i >= 0);
+        }
+        if (hitIdxs.length) {
+          cosmosFull.pulseCluster(hitIdxs, INK.orange, true);
+        }
+      } else if (stageIdx === 6) {
+        // Stage 7 (Grounded Answer): gold answer nodes with trail
+        let ansIdxs: number[] = [];
+        if (tr && tr.answer_preview.length) {
+          const entNames = new Set(tr.answer_preview.flatMap((b) => b.entities));
+          ansIdxs = names
+            .map((name, i) => (entNames.has(name) ? i : -1))
+            .filter((i) => i >= 0);
+        }
+        if (!ansIdxs.length && tr && tr.fusion.length) {
+          const entNames = new Set(tr.fusion.slice(0, 4).flatMap((h) => h.entities));
+          ansIdxs = names
+            .map((name, i) => (entNames.has(name) ? i : -1))
+            .filter((i) => i >= 0);
+        }
+        if (ansIdxs.length) {
+          cosmosFull.pulseCluster(ansIdxs, INK.gold, true);
+        }
+      }
+    },
+    [cosmosFull, graph, names],
+  );
+
   // elapsed-seconds ticker for the honest phase hints while a recall runs;
   // also drives the in-flight step estimate (spinner + ticking per row).
   useEffect(() => {
@@ -102,11 +211,28 @@ export default function App() {
     setElapsedS(0);
     const id = window.setInterval(() => {
       const ms = performance.now() - startedAtRef.current;
-      setElapsedS(ms / 1000);
+      const s = ms / 1000;
+      setElapsedS(s);
       if (!tracingRef.current) setSteps(estimateSteps(ms));
+
+      let nextStage = 0;
+      if (s >= 14.0) nextStage = 6;
+      else if (s >= 11.5) nextStage = 5;
+      else if (s >= 8.5) nextStage = 4;
+      else if (s >= 5.5) nextStage = 3;
+      else if (s >= 3.5) nextStage = 2;
+      else if (s >= 1.2) nextStage = 1;
+
+      setCurrentStage((prev) => {
+        if (prev !== nextStage) {
+          highlightStageInCosmos(nextStage, liveTrace, activeQuestion ?? "");
+          return nextStage;
+        }
+        return prev;
+      });
     }, 100);
     return () => window.clearInterval(id);
-  }, [asking]);
+  }, [asking, activeQuestion, highlightStageInCosmos, liveTrace]);
 
   // ---- cosmos data source (data-integrity gate) --------------------------
   // The starfield renders ONLY the memory this deployment is connected to
@@ -260,6 +386,9 @@ export default function App() {
       abortRef.current = ctrl;
       startedAtRef.current = performance.now();
       tracingRef.current = false;
+      setActiveQuestion(question);
+      setCurrentStage(0);
+      highlightStageInCosmos(0, null, question);
       setSteps(emptySteps());
       setAsking(true);
       setAskError(null);
@@ -337,7 +466,8 @@ export default function App() {
             ? prev.map((r, i) => (r.estimated || r.status === "pending" || r.status === "active" ? measured[i] : r))
             : measured,
         );
-        setTab("travel");
+        setCurrentStage(6);
+        highlightStageInCosmos(6, trace, question);
         const hits = trace.graph.nodes.filter((n) => n.seed).map((n) => n.i);
         const tookS = (performance.now() - t0) / 1000;
         setHistory((prev) => {
@@ -346,12 +476,6 @@ export default function App() {
           return next.slice(0, HISTORY_MAX);
         });
         if (cosmosFull && hits.length) {
-          const keep = new Set(hits);
-          cosmosFull.spotlight(keep);
-          const paints = new Map<number, { color: RGBA }>(
-            hits.map((i): [number, { color: RGBA }] => [i, { color: INK.gold }]),
-          );
-          cosmosFull.paint(paints);
           focusNode(hits[0]);
           setAskNote(
             fmt(t.askNoteHits, {
@@ -485,6 +609,34 @@ export default function App() {
               setHistory([]);
               saveHistory([]);
             }}
+          />
+
+          <PipelineWidget
+            visible={asking || liveTrace !== null || activeQuestion !== null}
+            asking={asking}
+            question={activeQuestion ?? liveTrace?.meta?.question ?? ""}
+            trace={liveTrace}
+            steps={steps}
+            currentStage={currentStage}
+            onSelectStage={(s) => {
+              setCurrentStage(s);
+              highlightStageInCosmos(s, liveTrace, activeQuestion ?? "");
+            }}
+            onFocusNode={focusNode}
+            onFocusChunk={(h) => {
+              if (!names) return;
+              const ent = h.entities[0];
+              const idx = ent ? names.indexOf(ent) : -1;
+              if (idx >= 0) focusNode(idx);
+            }}
+            onClose={() => {
+              setActiveQuestion(null);
+              setLiveTrace(null);
+              cosmosFull?.spotlight(null);
+              cosmosFull?.paint(null);
+              cosmosFull?.clearHalos();
+            }}
+            elapsedS={elapsedS}
           />
 
           {tab === "cosmos" && (
