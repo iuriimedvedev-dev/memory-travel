@@ -217,6 +217,19 @@ try {
   check("connection chip resolves to the live index", !!chip && !chip.includes("connecting") && !chip.includes("offline"), `chip="${chip}" dot="${dot}"`);
   check("no HARS branding anywhere on the page", !/\bhars\b/i.test(await pageText()));
 
+  // The graph may be gated by the source probe (backend must serve the graph
+  // export on the trace service). When the app says "not connected" the live
+  // query cannot run — that is a backend deployment dependency, not a UI bug:
+  // record it and skip the graph-dependent checks with the reason.
+  const notConnected = await evaluate(
+    cdp,
+    `!!document.querySelector(".errcard") && /not connected/i.test(document.querySelector(".errcard")?.textContent ?? "")`,
+  );
+  if (notConnected) {
+    skips.push("graph export API (:8098 /stats,/graph,/coords) not deployed — live query needs the graph; the app honestly shows 'not connected' + explicit demo button");
+    console.log("skip: live query + travel tab (graph export API not deployed; app shows the honest not-connected state)");
+  }
+
   // data-source badge: in the live state it must say WHICH index is rendered
   const badgeCls = await evaluate(cdp, `document.querySelector(".srcbadge")?.className ?? null`);
   const badgeTxt = await evaluate(cdp, `document.querySelector(".srcbadge .srclabel")?.textContent ?? null`);
@@ -235,19 +248,6 @@ try {
   }
 
   await screenshot(cdp, "verify-cosmos.png");
-
-  // The graph may be gated by the source probe (backend must serve the graph
-  // export on the trace service). When the app says "not connected" the live
-  // query cannot run — that is a backend deployment dependency, not a UI bug:
-  // record it and skip the graph-dependent checks with the reason.
-  const notConnected = await evaluate(
-    cdp,
-    `!!document.querySelector(".errcard") && /not connected/i.test(document.querySelector(".errcard")?.textContent ?? "")`,
-  );
-  if (notConnected) {
-    skips.push("graph export API (:8098 /stats,/graph,/coords) not deployed — live query needs the graph; the app honestly shows 'not connected' + explicit demo button");
-    console.log("skip: live query + travel tab (graph export API not deployed; app shows the honest not-connected state)");
-  }
 
   // ---- travel tab + real live query (only when the graph is live)
   if (!notConnected) {
@@ -349,10 +349,16 @@ try {
     check("offline pass: chip reports offline", settled && isOffline, `chip="${chip}"`);
     const gate = await evaluate(off.cdp, `!!document.querySelector(".errcard") && /not connected|Нет подключения/i.test(document.querySelector(".errcard")?.textContent ?? "")`);
     check("offline pass: honest not-connected card shown", gate);
-    const noStars = await evaluate(off.cdp, `document.querySelectorAll(".hudnum").length === 0`);
+    const noStars = await evaluate(off.cdp, `(() => {
+      const nums = [...document.querySelectorAll(".hudnum")].map((el) => (el.textContent ?? "").trim());
+      // honest unreachable state: HUD placeholders ("…") may exist, but NO
+      // rendered node/edge counts and no stars behind them
+      return nums.every((v) => !/\d/.test(v)) && !document.querySelector(".canvaswrap:not(.hidden) canvas ~ *");
+    })()`);
     check("offline pass: NO graph data rendered (no star counts)", noStars);
     const noBaked = off.requests.some((u) => /\/data\/(graph|coords|node_index)/.test(u)) === false;
     check("offline pass: no baked data fetched before the demo click", noBaked);
+    await screenshot(off.cdp, "verify-offline.png"); // the honest GATE state
     // the fixtures path is now an explicit demo action — take it if offered
     const hasDemo = await evaluate(off.cdp, `!![...document.querySelectorAll("button")].find((b) => /open demo|демо-данные/i.test(b.textContent))`);
     if (hasDemo) {
@@ -366,6 +372,8 @@ try {
       check("offline pass: demo snapshot loads behind the explicit button (demo badge + stars)", demoSettled, String(demoBadge).slice(0, 120));
       const demoFetch = off.requests.some((u) => /\/data\/graph\.json/.test(u));
       check("offline pass: baked files fetched only AFTER the explicit click", demoFetch);
+      await sleep(4000);
+      await screenshot(off.cdp, "verify-demo.png"); // the explicit DEMO state
     }
     await sleep(1500);
     await screenshot(off.cdp, "verify-offline.png");
