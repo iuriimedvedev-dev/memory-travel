@@ -129,13 +129,23 @@ async function main() {
 
   await cdp.send("Page.navigate", { url: "http://localhost:5176/travel/" });
 
-  // Wait for button to be clickable
-  console.log("Waiting for tour button to be enabled...");
+  // If there's an "Open demo data" / "открыть демо" button, click it first
+  await sleep(1500);
+  await evalExpr(cdp, `(() => {
+    const btns = Array.from(document.querySelectorAll("button"));
+    const demo = btns.find(x => x.innerText.toLowerCase().includes("demo") || x.innerText.toLowerCase().includes("демо"));
+    if (demo) demo.click();
+  })()`);
+
+  await sleep(1500);
+
+  // Wait for tour button to be clickable
+  console.log("Waiting for 'how it works' button to be enabled...");
   let enabled = false;
   for (let i = 0; i < 40; i++) {
     const btnInfo = await evalExpr(cdp, `(() => {
       const btns = Array.from(document.querySelectorAll("button"));
-      const b = btns.find(x => x.innerText.includes("Презентация") || x.innerText.includes("Presentation"));
+      const b = btns.find(x => x.innerText.toLowerCase().includes("как это работает") || x.innerText.toLowerCase().includes("how it works"));
       return b ? { found: true, disabled: b.disabled, text: b.innerText } : { found: false };
     })()`);
     if (btnInfo.found && !btnInfo.disabled) {
@@ -150,7 +160,7 @@ async function main() {
   // Click the tour button
   await evalExpr(cdp, `(() => {
     const btns = Array.from(document.querySelectorAll("button"));
-    const b = btns.find(x => x.innerText.includes("Презентация") || x.innerText.includes("Presentation"));
+    const b = btns.find(x => x.innerText.toLowerCase().includes("как это работает") || x.innerText.toLowerCase().includes("how it works"));
     if (b) b.click();
   })()`);
 

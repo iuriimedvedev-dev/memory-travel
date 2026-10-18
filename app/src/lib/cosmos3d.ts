@@ -115,6 +115,18 @@ export interface Journey3D {
   /** Glowing journey trail through the given world points. */
   setTrail(points: XYZ[], color: RGBA): void;
   clearTrail(): void;
+  /** Distinct glowing query beacon / pulsing target sphere in 3D space (Chapter 3). */
+  setQueryBeacon(pos: XYZ | null, color?: RGBA): void;
+  clearQueryBeacon(): void;
+  /** Animated graph walk relations with traveling photon beams (Chapter 5). */
+  setGraphWalkEdges(edges: { from: XYZ; to: XYZ; color?: RGBA }[], options?: { intensity?: number }): void;
+  clearGraphWalkEdges(): void;
+  /** Bounding cluster hull / cage tightly enclosing context entities (Chapter 7). */
+  setClusterHull(points: XYZ[], color?: RGBA): void;
+  clearClusterHull(): void;
+  /** Connected citation beams from answer hub to evidence nodes (Chapter 8). */
+  setCitationBeams(items: { from: XYZ; to: XYZ; color?: RGBA }[]): void;
+  clearCitationBeams(): void;
 }
 
 interface MarkerObj {
@@ -254,6 +266,33 @@ const MARKER_FRAG = /* glsl */ `
   }
 `;
 
+const PULSE_EDGE_VERT = /* glsl */ `
+  attribute vec3 aColor;
+  attribute float aProgress; // 0 at seed / source, 1 at neighbor / target
+  varying vec3 vColor;
+  varying float vProgress;
+  void main() {
+    vColor = aColor;
+    vProgress = aProgress;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const PULSE_EDGE_FRAG = /* glsl */ `
+  uniform float uTime;
+  uniform float uBaseAlpha;
+  varying vec3 vColor;
+  varying float vProgress;
+  void main() {
+    // Continuous animated traveling photon pulses along relations
+    float phase = fract(vProgress * 2.2 - uTime * 2.0);
+    float packet = smoothstep(0.0, 0.25, phase) * smoothstep(0.7, 0.25, phase);
+    float a = clamp(uBaseAlpha + packet * 0.85, 0.0, 1.0);
+    vec3 col = vColor * (0.88 + packet * 0.95);
+    gl_FragColor = vec4(col, a);
+  }
+`;
+
 export class Cosmos3D implements CosmosLike, Journey3D {
   private canvas: HTMLCanvasElement | null = null;
   private renderer: THREE.WebGLRenderer | null = null;
@@ -318,6 +357,26 @@ export class Cosmos3D implements CosmosLike, Journey3D {
   private trail: THREE.Line | null = null;
   private pulseRaf = 0;
   private pulseT0 = 0;
+
+  // Chapter 3: 3D Query Beacon
+  private queryBeacon: {
+    group: THREE.Group;
+    core: THREE.Mesh;
+    wireSphere: THREE.Mesh;
+    ring1: THREE.Mesh;
+    ring2: THREE.Mesh;
+    beam: THREE.LineSegments;
+  } | null = null;
+
+  // Chapter 5: Animated Graph Walk Edges
+  private graphWalkMesh: THREE.LineSegments | null = null;
+  private graphWalkMat: THREE.ShaderMaterial | null = null;
+
+  // Chapter 7: Context Assembly Cluster Hull
+  private clusterHull: THREE.Group | null = null;
+
+  // Chapter 8: Citation Beams
+  private citationBeams: THREE.LineSegments | null = null;
 
   // camera flight
   private camRaf = 0;
@@ -403,6 +462,9 @@ export class Cosmos3D implements CosmosLike, Journey3D {
       const t = (now - this.pulseT0) / 1000;
       this.animateRing(t);
       this.animateHalos(t);
+      this.animateQueryBeacon(t);
+      if (this.graphWalkMat) this.graphWalkMat.uniforms.uTime.value = t;
+      this.animateClusterHull(t);
       // a camera tween calls controls.update() itself; two writers per frame
       // is how the arrival pose used to get nudged off the node
       if (!this.camBusy) this.controls?.update();
@@ -577,9 +639,11 @@ export class Cosmos3D implements CosmosLike, Journey3D {
     this.paints.clear();
     this.spot = null;
     this.screenDirty = true;
-    // debug/verification handle: only a renderer with DATA loaded claims it
-    // (two CosmosCanvas instances exist; the hidden one never loads)
-    (window as unknown as { __cosmos3d?: Cosmos3D }).__cosmos3d = this;
+    // debug/verification handle: expose both active and specific instances
+    const win = window as unknown as { __cosmos3d?: Cosmos3D; __cosmosTrace?: Cosmos3D; __cosmosFull?: Cosmos3D };
+    win.__cosmos3d = this;
+    if (this.n < 500) win.__cosmosTrace = this;
+    else win.__cosmosFull = this;
     this.fit(0.12);
   }
 
@@ -884,6 +948,337 @@ export class Cosmos3D implements CosmosLike, Journey3D {
     this.trail.geometry.dispose();
     (this.trail.material as THREE.Material).dispose();
     this.trail = null;
+  }
+
+  // ---- Chapter 3: 3D Query Beacon ----
+
+  setQueryBeacon(pos: XYZ | null, color: RGBA = INK.query): void {
+    this.clearQueryBeacon();
+    if (!pos || !this.renderer) return;
+    const col = new THREE.Color(color[0], color[1], color[2]);
+    const group = new THREE.Group();
+    group.position.set(pos[0], pos[1], pos[2]);
+
+    // 1. Glowing central core sphere
+    const coreGeo = new THREE.SphereGeometry(1.6, 24, 24);
+    const coreMat = new THREE.MeshBasicMaterial({
+      color: col,
+      transparent: true,
+      opacity: 0.95,
+      blending: THREE.AdditiveBlending,
+    });
+    const core = new THREE.Mesh(coreGeo, coreMat);
+    group.add(core);
+
+    // 2. Wireframe target sphere
+    const wireGeo = new THREE.SphereGeometry(3.2, 16, 16);
+    const wireMat = new THREE.MeshBasicMaterial({
+      color: col,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.8,
+      blending: THREE.AdditiveBlending,
+    });
+    const wireSphere = new THREE.Mesh(wireGeo, wireMat);
+    group.add(wireSphere);
+
+    // 3. Two concentric sonar ripple rings in XY
+    const ringGeo = new THREE.RingGeometry(0.8, 1.4, 48);
+    const rMat1 = new THREE.MeshBasicMaterial({
+      color: col,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const ring1 = new THREE.Mesh(ringGeo, rMat1);
+    group.add(ring1);
+
+    const rMat2 = new THREE.MeshBasicMaterial({
+      color: col,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const ring2 = new THREE.Mesh(ringGeo.clone(), rMat2);
+    group.add(ring2);
+
+    // 4. Vertical beacon laser beam
+    const beamPos = new Float32Array([0, 0, -36, 0, 0, 36]);
+    const beamGeo = new THREE.BufferGeometry();
+    beamGeo.setAttribute("position", new THREE.BufferAttribute(beamPos, 3));
+    const beamMat = new THREE.LineBasicMaterial({
+      color: col,
+      transparent: true,
+      opacity: 0.75,
+      blending: THREE.AdditiveBlending,
+    });
+    const beam = new THREE.LineSegments(beamGeo, beamMat);
+    group.add(beam);
+
+    this.scene.add(group);
+    this.queryBeacon = { group, core, wireSphere, ring1, ring2, beam };
+  }
+
+  clearQueryBeacon(): void {
+    if (!this.queryBeacon) return;
+    const { group, core, wireSphere, ring1, ring2, beam } = this.queryBeacon;
+    this.scene.remove(group);
+    core.geometry.dispose();
+    (core.material as THREE.Material).dispose();
+    wireSphere.geometry.dispose();
+    (wireSphere.material as THREE.Material).dispose();
+    ring1.geometry.dispose();
+    (ring1.material as THREE.Material).dispose();
+    ring2.geometry.dispose();
+    (ring2.material as THREE.Material).dispose();
+    beam.geometry.dispose();
+    (beam.material as THREE.Material).dispose();
+    this.queryBeacon = null;
+  }
+
+  private animateQueryBeacon(t: number): void {
+    if (!this.queryBeacon) return;
+    const { core, wireSphere, ring1, ring2 } = this.queryBeacon;
+    wireSphere.rotation.y = t * 0.9;
+    wireSphere.rotation.x = t * 0.45;
+    const pulse = 1.0 + 0.22 * Math.sin(t * 4.2);
+    core.scale.setScalar(pulse);
+
+    // Expand sonar ripple rings continuously
+    const p1 = (t * 1.3) % 1.0;
+    const s1 = 0.5 + p1 * 8.5;
+    ring1.scale.setScalar(s1);
+    (ring1.material as THREE.MeshBasicMaterial).opacity = Math.max(0, (1.0 - p1) * 0.9);
+
+    const p2 = (t * 1.3 + 0.5) % 1.0;
+    const s2 = 0.5 + p2 * 8.5;
+    ring2.scale.setScalar(s2);
+    (ring2.material as THREE.MeshBasicMaterial).opacity = Math.max(0, (1.0 - p2) * 0.9);
+  }
+
+  // ---- Chapter 5: Animated Graph Walk Edges ----
+
+  setGraphWalkEdges(
+    edges: { from: XYZ; to: XYZ; color?: RGBA }[],
+    options?: { intensity?: number },
+  ): void {
+    this.clearGraphWalkEdges();
+    if (!edges.length || !this.renderer) return;
+
+    const count = edges.length;
+    const pos = new Float32Array(count * 6);
+    const col = new Float32Array(count * 6);
+    const prog = new Float32Array(count * 2);
+
+    for (let i = 0; i < count; i++) {
+      const e = edges[i];
+      const c = e.color ?? INK.gold;
+      pos[i * 6] = e.from[0];
+      pos[i * 6 + 1] = e.from[1];
+      pos[i * 6 + 2] = e.from[2];
+      pos[i * 6 + 3] = e.to[0];
+      pos[i * 6 + 4] = e.to[1];
+      pos[i * 6 + 5] = e.to[2];
+
+      for (let j = 0; j < 6; j += 3) {
+        col[i * 6 + j] = c[0];
+        col[i * 6 + j + 1] = c[1];
+        col[i * 6 + j + 2] = c[2];
+      }
+
+      prog[i * 2] = 0.0;
+      prog[i * 2 + 1] = 1.0;
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute("aColor", new THREE.BufferAttribute(col, 3));
+    geo.setAttribute("aProgress", new THREE.BufferAttribute(prog, 1));
+
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: PULSE_EDGE_VERT,
+      fragmentShader: PULSE_EDGE_FRAG,
+      uniforms: {
+        uTime: { value: 0 },
+        uBaseAlpha: { value: (options?.intensity ?? 1.0) * 0.55 },
+      },
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+
+    const mesh = new THREE.LineSegments(geo, mat);
+    mesh.frustumCulled = false;
+    mesh.renderOrder = 3;
+    this.scene.add(mesh);
+
+    this.graphWalkMesh = mesh;
+    this.graphWalkMat = mat;
+  }
+
+  clearGraphWalkEdges(): void {
+    if (!this.graphWalkMesh) return;
+    this.scene.remove(this.graphWalkMesh);
+    this.graphWalkMesh.geometry.dispose();
+    this.graphWalkMat?.dispose();
+    this.graphWalkMesh = null;
+    this.graphWalkMat = null;
+  }
+
+  // ---- Chapter 7: Context Assembly Cluster Hull ----
+
+  setClusterHull(points: XYZ[], color: RGBA = INK.gold): void {
+    this.clearClusterHull();
+    if (!points.length || !this.renderer) return;
+
+    const group = new THREE.Group();
+    const c = new THREE.Color(color[0], color[1], color[2]);
+
+    let minX = Infinity, minY = Infinity, minZ = Infinity;
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+    for (const p of points) {
+      if (p[0] < minX) minX = p[0];
+      if (p[0] > maxX) maxX = p[0];
+      if (p[1] < minY) minY = p[1];
+      if (p[1] > maxY) maxY = p[1];
+      if (p[2] < minZ) minZ = p[2];
+      if (p[2] > maxZ) maxZ = p[2];
+    }
+
+    const pad = 3.5;
+    const sx = Math.max(5, maxX - minX + pad * 2);
+    const sy = Math.max(5, maxY - minY + pad * 2);
+    const sz = Math.max(4, maxZ - minZ + pad * 2);
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const cz = (minZ + maxZ) / 2;
+
+    const boxGeo = new THREE.BoxGeometry(sx, sy, sz);
+    const edgeGeo = new THREE.EdgesGeometry(boxGeo);
+    const edgeMat = new THREE.LineBasicMaterial({
+      color: c,
+      transparent: true,
+      opacity: 0.75,
+      blending: THREE.AdditiveBlending,
+    });
+    const edgeMesh = new THREE.LineSegments(edgeGeo, edgeMat);
+    edgeMesh.position.set(cx, cy, cz);
+    group.add(edgeMesh);
+
+    const fillMat = new THREE.MeshBasicMaterial({
+      color: c,
+      transparent: true,
+      opacity: 0.07,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    });
+    const fillMesh = new THREE.Mesh(boxGeo, fillMat);
+    fillMesh.position.set(cx, cy, cz);
+    group.add(fillMesh);
+
+    // Internal constellation links connecting each point to the centroid
+    const linksPos = new Float32Array(points.length * 6);
+    points.forEach((p, i) => {
+      linksPos[i * 6] = cx;
+      linksPos[i * 6 + 1] = cy;
+      linksPos[i * 6 + 2] = cz;
+      linksPos[i * 6 + 3] = p[0];
+      linksPos[i * 6 + 4] = p[1];
+      linksPos[i * 6 + 5] = p[2];
+    });
+    const linksGeo = new THREE.BufferGeometry();
+    linksGeo.setAttribute("position", new THREE.BufferAttribute(linksPos, 3));
+    const linksMat = new THREE.LineBasicMaterial({
+      color: c,
+      transparent: true,
+      opacity: 0.45,
+      blending: THREE.AdditiveBlending,
+    });
+    const linksMesh = new THREE.LineSegments(linksGeo, linksMat);
+    group.add(linksMesh);
+
+    this.scene.add(group);
+    this.clusterHull = group;
+  }
+
+  clearClusterHull(): void {
+    if (!this.clusterHull) return;
+    this.scene.remove(this.clusterHull);
+    this.clusterHull.children.forEach((ch: THREE.Object3D) => {
+      if ("geometry" in ch) (ch as THREE.Mesh).geometry.dispose();
+      if ("material" in ch) {
+        const mat = (ch as THREE.Mesh).material;
+        if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
+        else mat.dispose();
+      }
+    });
+    this.clusterHull = null;
+  }
+
+  private animateClusterHull(t: number): void {
+    if (!this.clusterHull) return;
+    const lineMesh = this.clusterHull.children[0] as THREE.LineSegments | undefined;
+    if (lineMesh && lineMesh.material) {
+      (lineMesh.material as THREE.LineBasicMaterial).opacity = 0.55 + 0.25 * Math.sin(t * 2.4);
+    }
+  }
+
+  // ---- Chapter 8: Citation Beams ----
+
+  setCitationBeams(items: { from: XYZ; to: XYZ; color?: RGBA }[]): void {
+    this.clearCitationBeams();
+    if (!items.length || !this.renderer) return;
+
+    const count = items.length;
+    const pos = new Float32Array(count * 6);
+    const col = new Float32Array(count * 6);
+
+    for (let i = 0; i < count; i++) {
+      const it = items[i];
+      const c = it.color ?? INK.gold;
+      pos[i * 6] = it.from[0];
+      pos[i * 6 + 1] = it.from[1];
+      pos[i * 6 + 2] = it.from[2];
+      pos[i * 6 + 3] = it.to[0];
+      pos[i * 6 + 4] = it.to[1];
+      pos[i * 6 + 5] = it.to[2];
+
+      for (let j = 0; j < 6; j += 3) {
+        col[i * 6 + j] = c[0];
+        col[i * 6 + j + 1] = c[1];
+        col[i * 6 + j + 2] = c[2];
+      }
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute("aColor", new THREE.BufferAttribute(col, 3));
+
+    const mat = new THREE.LineBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending,
+    });
+
+    const mesh = new THREE.LineSegments(geo, mat);
+    mesh.frustumCulled = false;
+    mesh.renderOrder = 4;
+    this.scene.add(mesh);
+    this.citationBeams = mesh;
+  }
+
+  clearCitationBeams(): void {
+    if (!this.citationBeams) return;
+    this.scene.remove(this.citationBeams);
+    this.citationBeams.geometry.dispose();
+    (this.citationBeams.material as THREE.Material).dispose();
+    this.citationBeams = null;
   }
 
   setControlsEnabled(on: boolean): void {

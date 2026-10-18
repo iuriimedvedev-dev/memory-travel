@@ -4,14 +4,13 @@
 // the full cosmos; 3-8 replay the journey choreography on the trace subgraph.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CosmosCanvas from "./CosmosCanvas";
-import { INK, toWorld3, type XYZ } from "../lib/cosmos";
+import { INK, toWorld3, type RGBA, type XYZ } from "../lib/cosmos";
 import type { AnyCosmos } from "../lib/cosmos2d";
-import { asJourney3D } from "../lib/cosmos3d";
+import { asJourney3D, type Journey3D } from "../lib/cosmos3d";
 import { loadIngestFixture, loadTrace } from "../lib/data";
 import { compileLiveTrace } from "../lib/compileLive";
 import { fetchLiveTraceJson, CANONICAL_QUESTION, CANONICAL_KEYWORDS } from "../lib/live";
 import type { LoadedCosmos, SourcePhase } from "../lib/cosmosSource";
-import { stageCamera } from "../lib/journeyCam";
 import { makeTimeline, type Timeline } from "../lib/reveal";
 import { CHAPTERS, type PresCtx } from "../lib/presentation";
 import type { CosmosGraph, IngestFixture, TravelTrace } from "../lib/types";
@@ -24,7 +23,72 @@ import { ChevronLeftIcon, ChevronRightIcon, GearIcon, PauseIcon, PlayIcon, XIcon
 import { Inspector, type Inspection } from "./Inspector";
 
 /** Chapters whose data is owed a docked card row (3–8 = the transformation). */
-const CARD_CHAPTERS = new Set(["embed", "channels", "fusion", "rerank", "context", "answer"]);
+const CARD_CHAPTERS = new Set(["embed", "channels", "graph", "fusion", "context", "answer"]);
+
+interface BadgePin {
+  rank?: number;
+  citation?: string;
+  name: string;
+  x: number;
+  y: number;
+  color: string;
+  idx: number;
+}
+
+interface PinDef {
+  rank?: number;
+  citation?: string;
+  name: string;
+  idx: number;
+  color: string;
+}
+
+function flyCameraToPoints(
+  j3d: Journey3D | null,
+  points: (XYZ | null | undefined)[],
+  options?: {
+    minDist?: number;
+    padFactor?: number;
+    elevation?: number;
+    azimuth?: number;
+    duration?: number;
+  },
+) {
+  if (!j3d) return;
+  const valid = points.filter((p): p is XYZ => p != null && !isNaN(p[0]) && !isNaN(p[1]) && !isNaN(p[2]));
+  if (!valid.length) return;
+
+  let sx = 0, sy = 0, sz = 0;
+  for (const p of valid) {
+    sx += p[0];
+    sy += p[1];
+    sz += p[2];
+  }
+  const cx = sx / valid.length;
+  const cy = sy / valid.length;
+  const cz = sz / valid.length;
+
+  let maxR = 0;
+  for (const p of valid) {
+    const d = Math.hypot(p[0] - cx, p[1] - cy, p[2] - cz);
+    if (d > maxR) maxR = d;
+  }
+
+  const pad = options?.padFactor ?? 2.1;
+  const minDist = options?.minDist ?? 22;
+  const dist = Math.max(minDist, maxR * pad);
+  const elev = options?.elevation ?? 0.36;
+  const azim = options?.azimuth ?? 0.24;
+  const zOffset = Math.sqrt(Math.max(0.1, 1 - elev * elev - azim * azim));
+
+  const pos: XYZ = [
+    cx + dist * azim,
+    cy + dist * elev,
+    cz + dist * zOffset,
+  ];
+  const target: XYZ = [cx, cy, cz];
+  j3d.cameraFly(pos, target, options?.duration ?? 1300, "inout");
+}
 
 interface PresProps {
   onExit: () => void;
@@ -233,8 +297,10 @@ export default function PresentationView({ onExit, data, source, liveTrace, onOp
   }, [cosmosFull, graph, posByIdx, chViz]);
 
   const [traceLoaded, setTraceLoaded] = useState(0);
+  const loadedTraceRef = useRef<TravelTrace | null>(null);
   useEffect(() => {
     if (chViz !== "trace" || !cosmosTrace || !trace) return;
+    if (loadedTraceRef.current === trace) return;
     let dead = false;
     const g2g = new Map<number, number>();
     trace.graph.nodes.forEach((n, li) => g2g.set(n.i, li));
@@ -255,6 +321,7 @@ export default function PresentationView({ onExit, data, source, liveTrace, onOp
       )
       .then(() => {
         if (dead) return;
+        loadedTraceRef.current = trace;
         setProgress(null);
         // load() ends with fit(): re-run the chapter choreography so the
         // chapter camera keyframe wins over the fit position
@@ -264,48 +331,66 @@ export default function PresentationView({ onExit, data, source, liveTrace, onOp
     return () => {
       dead = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cosmosTrace, chViz]);
+  }, [cosmosTrace, chViz, trace]);
 
   const traceCanvasActive = chViz === "trace";
 
-  // ---- chapter choreography (compact replay of the journey primitives)
-  const posOf = useMemo(() => {
-    const m = new Map<string, XYZ>();
-    trace?.graph.nodes.forEach((n) => {
-      const p = n.xyz ?? (n.xy ? [n.xy[0], n.xy[1], 0] : null);
-      if (p) m.set(n.name, p);
-    });
-    return m;
-  }, [trace]);
+  // ---- floating badges / pins projected into screen-space ----
+  const [pinDefs, setPinDefs] = useState<PinDef[]>([]);
+  const [pins, setPins] = useState<BadgePin[]>([]);
 
-  const centroid = (ps: XYZ[]): XYZ | null =>
-    ps.length ? ps.reduce((a, p) => [a[0] + p[0], a[1] + p[1], a[2] + p[2]] as XYZ, [0, 0, 0]).map((v) => v / ps.length) as XYZ : null;
+  useEffect(() => {
+    if (!pinDefs.length || !cosmosTrace || !traceCanvasActive) {
+      setPins([]);
+      return;
+    }
+    let raf = 0;
+    const tick = () => {
+      const updated: BadgePin[] = [];
+      for (const def of pinDefs) {
+        const p = cosmosTrace.projectNode(def.idx);
+        if (p && p.visible) {
+          updated.push({
+            ...def,
+            x: p.x,
+            y: p.y,
+          });
+        }
+      }
+      setPins(updated);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [pinDefs, cosmosTrace, traceCanvasActive]);
 
   const playChapter = useCallback(() => {
     const cosmos = traceCanvasActive ? cosmosTrace : cosmosFull;
     const j3d = traceCanvasActive ? jTrace : jFull;
     timeline.current?.cancel();
+    setPinDefs([]);
     if (!cosmos) return;
     cosmos.paint(null);
+    cosmos.spotlight(null);
+    cosmos.clearHalos();
+
     if (j3d) {
       j3d.clearContextLines();
       j3d.clearTrail();
+      j3d.clearQueryBeacon();
+      j3d.clearGraphWalkEdges();
+      j3d.clearClusterHull();
+      j3d.clearCitationBeams();
       j3d.setEdgeRingProgress(1e9);
-      j3d.setEdgeOpacity(0.028);
+      j3d.setEdgeOpacity(0.25);
       j3d.setControlsEnabled(false);
     }
+
     const tl = makeTimeline(1, false);
     timeline.current = tl;
-    const markers: number[] = [];
-    const mark = (p: XYZ, size: number, color: typeof INK.cyan) => {
-      const w = toWorld3(p);
-      const id = j3d ? j3d.addMarker3("", w, size, color) : cosmos.addMarker("", w[0], w[1], size, color);
-      markers.push(id);
-    };
 
     if (!traceCanvasActive) {
-      // full-cosmos chapters: gentle orbit + a couple of gold sparks
+      // full-cosmos chapters (1: What this is, 2: Ingest, 9: Numbers)
       if (j3d) {
         j3d.cameraSet([0, 60, 145], [0, 0, 0]);
         tl.tween(400, 12000, (tt) => j3d.orbitAround([0, 0, 0], 148, tt * 0.9, 0.36));
@@ -313,83 +398,328 @@ export default function PresentationView({ onExit, data, source, liveTrace, onOp
     } else if (trace) {
       const stage = ch.stage ?? 0;
       const qpos = trace.query.xyz ?? null;
-      const W = (p: XYZ | null): XYZ | null => (p ? toWorld3(p) : null);
-      const key = stageCamera(stage, {
-        query: W(qpos),
-        vecCluster: W(centroid(trace.vector_hits.slice(0, 12).map((h) => h.xyz).filter((p): p is XYZ => !!p))),
-        seeds: W(centroid(trace.graph.nodes.filter((n) => n.seed).map((n) => n.xyz).filter((p): p is XYZ => !!p))),
-        bm25: W(centroid(trace.bm25_hits.slice(0, 12).map((h) => h.xyz).filter((p): p is XYZ => !!p))),
-        scene: W(qpos),
-      });
-      if (j3d) j3d.cameraFly(key.pos, key.target, 1400, "inout");
-      const paint = (names: string[], color: typeof INK.cyan) => {
-        const paints = new Map<number, { color: typeof INK.cyan }>();
-        trace.graph.nodes.forEach((n, li) => {
-          if (names.includes(n.name)) paints.set(li, { color });
-        });
-        cosmos.paint(paints as never);
+      const wQ = qpos ? toWorld3(qpos) : null;
+
+      const nodeW = (n: typeof trace.graph.nodes[0]): XYZ | null => {
+        const p = n.xyz ?? (n.xy ? [n.xy[0], n.xy[1], 0] : null);
+        return p ? toWorld3(p) : null;
       };
-      if (stage === 0 && qpos) {
-        tl.at(300, () => mark(qpos, 16, INK.query));
-      } else if (stage === 1) {
-        if (qpos) tl.at(0, () => mark(qpos, 12, INK.query));
-        trace.vector_hits.slice(0, 10).forEach((h, i) => {
-          tl.at(600 + i * 180, () => {
-            if (h.xyz) mark(h.xyz, 4 + 9 * (h.dense / Math.max(...trace.vector_hits.map((x) => x.dense))), INK.cyan);
-            paint(h.entities, INK.cyan);
-          });
+
+      const nameToIdx = new Map<string, number>();
+      const lowNameToIdx = new Map<string, number>();
+      trace.graph.nodes.forEach((n, i) => {
+        nameToIdx.set(n.name, i);
+        lowNameToIdx.set(n.name.toLowerCase(), i);
+      });
+      const getIdx = (name: string): number | undefined =>
+        nameToIdx.get(name) ?? lowNameToIdx.get(name.toLowerCase());
+
+      // ---------------------------------------------------------------
+      // Chapter 3: Embedding (stage 0)
+      // ---------------------------------------------------------------
+      if (stage === 0 && wQ) {
+        j3d?.setQueryBeacon(wQ, INK.query);
+
+        // Highlight nearest candidate neighbors around the query
+        const candHits = trace.vector_hits.slice(0, 5);
+        const candIndices = candHits
+          .flatMap((h) => h.entities.map((e) => getIdx(e)))
+          .filter((i): i is number => i !== undefined);
+
+        const candPoints: XYZ[] = [];
+        const paints = new Map<number, { color: RGBA; size?: number }>();
+        const halos: { idx: number; color?: RGBA; size?: number }[] = [];
+
+        candIndices.forEach((idx) => {
+          paints.set(idx, { color: INK.cyan, size: 3.4 });
+          halos.push({ idx, color: INK.cyan, size: 1.6 });
+          const p = nodeW(trace.graph.nodes[idx]);
+          if (p) candPoints.push(p);
         });
-      } else if (stage === 4) {
-        trace.fusion.forEach((h, i) => {
-          tl.at(i * 220, () => {
-            if (h.xyz) mark(h.xyz, 12 - i * 0.5, INK.orange);
-            paint(h.entities, INK.orange);
-          });
+
+        tl.at(100, () => {
+          cosmos.paint(paints);
+          cosmos.setHalos(halos);
+          if (j3d && candPoints.length) {
+            j3d.setContextLines(wQ, candPoints, [0.0, 0.95, 1.0, 0.55]);
+          }
+          flyCameraToPoints(j3d, [wQ], { minDist: 22, padFactor: 2.0, duration: 1400 });
         });
-      } else if (stage === 5) {
-        const after = new Map(trace.rerank.after.map((id, i) => [id, i + 1]));
-        const moved = trace.fusion.filter((h) => h.dense_rank !== after.get(h.chunk_id));
-        tl.at(300, () => paint([...new Set(trace.fusion.flatMap((h) => h.entities))], INK.orange));
-        tl.at(1200, () => paint([...new Set(moved.flatMap((h) => h.entities))], INK.white));
-        tl.at(2400, () => paint([...new Set(moved.flatMap((h) => h.entities))], INK.orange));
-      } else if (stage === 6) {
-        if (qpos) {
-          const ents = trace.context_blocks.entities.map((e) => posOf.get(e.entity)).filter((p): p is XYZ => !!p);
-          tl.at(400, () => {
-            if (j3d) j3d.setContextLines(toWorld3(qpos), ents.map((p) => toWorld3(p)), [1.0, 0.78, 0.25, 1]);
-          });
-          ents.forEach((p, i) => tl.at(500 + i * 200, () => mark(p, 9, INK.gold)));
-        }
-      } else if (stage === 7) {
-        const trail: XYZ[] = [];
-        if (qpos) trail.push(qpos);
-        trace.fusion.slice(0, 8).forEach((h) => h.xyz && trail.push(h.xyz));
-        trace.answer_preview.forEach((b) => {
-          const ps = b.entities.map((e) => posOf.get(e)).filter((p): p is XYZ => !!p);
-          const c = centroid(ps);
-          if (c) {
-            trail.push(c);
-            tl.at(800 + trail.length * 150, () => mark(c, 14, INK.query));
+      }
+
+      // ---------------------------------------------------------------
+      // Chapter 4: Channels - Vector vs BM25 (stage 1)
+      // ---------------------------------------------------------------
+      else if (stage === 1) {
+        const vecNames = new Set(trace.vector_hits.slice(0, 10).flatMap((h) => h.entities.map((e) => e.toLowerCase())));
+        const bm25Names = new Set(trace.bm25_hits.slice(0, 10).flatMap((h) => h.entities.map((e) => e.toLowerCase())));
+        // Also map doc names so hits without explicit entity strings still highlight their relevant node
+        trace.vector_hits.slice(0, 8).forEach((h) => {
+          const docBase = h.doc.replace(/\.md$/, "").toLowerCase();
+          vecNames.add(docBase);
+          docBase.split(/[-_.]/).forEach((part) => { if (part.length > 3) vecNames.add(part); });
+        });
+        trace.bm25_hits.slice(0, 8).forEach((h) => {
+          const docBase = h.doc.replace(/\.md$/, "").toLowerCase();
+          bm25Names.add(docBase);
+          docBase.split(/[-_.]/).forEach((part) => { if (part.length > 3) bm25Names.add(part); });
+        });
+
+        const paints = new Map<number, { color: RGBA; size?: number }>();
+        const halos: { idx: number; color?: RGBA; size?: number }[] = [];
+        const activeIndices = new Set<number>();
+        const activePts: XYZ[] = [];
+
+        trace.graph.nodes.forEach((n, idx) => {
+          const low = n.name.toLowerCase();
+          const isVec = vecNames.has(low);
+          const isBm25 = bm25Names.has(low);
+          if (!isVec && !isBm25) return;
+          activeIndices.add(idx);
+          const p = nodeW(n);
+          if (p) activePts.push(p);
+
+          if (isVec && isBm25) {
+            paints.set(idx, { color: INK.overlap, size: 4.4 });
+            halos.push({ idx, color: INK.overlap, size: 2.2 });
+          } else if (isVec) {
+            paints.set(idx, { color: INK.cyan, size: 3.6 });
+            halos.push({ idx, color: INK.cyan, size: 1.8 });
+          } else {
+            paints.set(idx, { color: INK.bm25, size: 3.6 });
+            halos.push({ idx, color: INK.bm25, size: 1.8 });
           }
         });
-        tl.at(500, () => paint([...new Set(trace.answer_preview.flatMap((b) => b.entities))], INK.gold));
-        tl.at(600, () => {
-          if (j3d) j3d.setTrail(trail.map((p) => toWorld3(p)), [1.0, 0.3, 0.5, 1]);
+
+        tl.at(50, () => {
+          cosmos.spotlight(activeIndices);
+          cosmos.paint(paints);
+          cosmos.setHalos(halos);
+          j3d?.setEdgeOpacity(0.18);
+          flyCameraToPoints(j3d, activePts, { minDist: 24, padFactor: 1.8, duration: 1400 });
         });
-        if (j3d) tl.at(0, () => j3d.cameraFly([0, 70, 150], [0, 0, 0], 2600, "inout"));
+      }
+
+      // ---------------------------------------------------------------
+      // Chapter 5: Graph Walk (stage 2)
+      // ---------------------------------------------------------------
+      else if (stage === 2) {
+        const g2g = new Map<number, number>();
+        trace.graph.nodes.forEach((n, li) => g2g.set(n.i, li));
+
+        const seedIndices = new Set<number>();
+        const neighborIndices = new Set<number>();
+        const walkEdges: { from: XYZ; to: XYZ; color?: RGBA }[] = [];
+        const activePts: XYZ[] = [];
+
+        trace.graph.nodes.forEach((n, idx) => {
+          if (n.seed) seedIndices.add(idx);
+        });
+
+        trace.graph.edges.forEach(([si, ti]) => {
+          const sIdx = g2g.get(si);
+          const tIdx = g2g.get(ti);
+          if (sIdx === undefined || tIdx === undefined) return;
+          const sNode = trace.graph.nodes[sIdx];
+          const tNode = trace.graph.nodes[tIdx];
+          if (sNode.seed || tNode.seed) {
+            const p1 = nodeW(sNode);
+            const p2 = nodeW(tNode);
+            if (p1 && p2) {
+              const from = sNode.seed ? p1 : p2;
+              const to = sNode.seed ? p2 : p1;
+              walkEdges.push({ from, to, color: INK.gold });
+              if (!sNode.seed) neighborIndices.add(sIdx);
+              if (!tNode.seed) neighborIndices.add(tIdx);
+            }
+          }
+        });
+
+        const paints = new Map<number, { color: RGBA; size?: number }>();
+        const halos: { idx: number; color?: RGBA; size?: number }[] = [];
+        const allWalk = new Set([...seedIndices, ...neighborIndices]);
+
+        seedIndices.forEach((idx) => {
+          paints.set(idx, { color: INK.gold, size: 4.4 });
+          halos.push({ idx, color: INK.gold, size: 2.4 });
+          const p = nodeW(trace.graph.nodes[idx]);
+          if (p) activePts.push(p);
+        });
+
+        neighborIndices.forEach((idx) => {
+          paints.set(idx, { color: INK.violet, size: 3.2 });
+          halos.push({ idx, color: INK.violet, size: 1.7 });
+          const p = nodeW(trace.graph.nodes[idx]);
+          if (p) activePts.push(p);
+        });
+
+        tl.at(50, () => {
+          cosmos.spotlight(allWalk);
+          cosmos.paint(paints);
+          cosmos.setHalos(halos);
+          j3d?.setGraphWalkEdges(walkEdges, { intensity: 1.0 });
+          j3d?.setEdgeOpacity(0.35);
+          flyCameraToPoints(j3d, activePts, { minDist: 25, padFactor: 1.8, duration: 1400 });
+        });
+      }
+
+      // ---------------------------------------------------------------
+      // Chapter 6: Fusion & Ranking (stage 4)
+      // ---------------------------------------------------------------
+      else if (stage === 4) {
+        const topHits = trace.fusion.slice(0, 6);
+        const paints = new Map<number, { color: RGBA; size?: number }>();
+        const halos: { idx: number; color?: RGBA; size?: number }[] = [];
+        const activeIndices = new Set<number>();
+        const activePts: XYZ[] = [];
+        const pinsList: PinDef[] = [];
+
+        topHits.forEach((h, rankIdx) => {
+          const rank = rankIdx + 1;
+          const entities = [...h.entities];
+          if (!entities.length) {
+            const docBase = h.doc.replace(/\.md$/, "");
+            entities.push(docBase);
+            docBase.split(/[-_.]/).forEach((part) => { if (part.length > 3) entities.push(part); });
+          }
+
+          entities.forEach((name) => {
+            const idx = getIdx(name);
+            if (idx === undefined || activeIndices.has(idx)) return;
+            activeIndices.add(idx);
+            const p = nodeW(trace.graph.nodes[idx]);
+            if (p) activePts.push(p);
+
+            const col = rank === 1 ? INK.gold : rank === 2 ? INK.amber : INK.orange;
+            const size = Math.max(2.8, 5.0 - rankIdx * 0.4);
+            const haloSize = Math.max(1.6, 3.2 - rankIdx * 0.3);
+
+            paints.set(idx, { color: col, size });
+            halos.push({ idx, color: col, size: haloSize });
+
+            pinsList.push({
+              rank,
+              name,
+              idx,
+              color: rank === 1 ? "#ffc83b" : rank === 2 ? "#ffa726" : "#ff7043",
+            });
+          });
+        });
+
+        tl.at(50, () => {
+          cosmos.spotlight(activeIndices);
+          cosmos.paint(paints);
+          cosmos.setHalos(halos);
+          setPinDefs(pinsList);
+          j3d?.setEdgeOpacity(0.15);
+          flyCameraToPoints(j3d, activePts, { minDist: 22, padFactor: 1.8, duration: 1400 });
+        });
+      }
+
+      // ---------------------------------------------------------------
+      // Chapter 7: Context Assembly (stage 6)
+      // ---------------------------------------------------------------
+      else if (stage === 6) {
+        const ents = trace.context_blocks.entities;
+        const paints = new Map<number, { color: RGBA; size?: number }>();
+        const halos: { idx: number; color?: RGBA; size?: number }[] = [];
+        const activeIndices = new Set<number>();
+        const ctxPoints: XYZ[] = [];
+
+        ents.forEach((e) => {
+          const idx = getIdx(e.entity);
+          if (idx === undefined) return;
+          activeIndices.add(idx);
+          const p = nodeW(trace.graph.nodes[idx]);
+          if (p) ctxPoints.push(p);
+
+          paints.set(idx, { color: INK.gold, size: 3.8 });
+          halos.push({ idx, color: INK.gold, size: 2.0 });
+        });
+
+        tl.at(50, () => {
+          cosmos.spotlight(activeIndices);
+          cosmos.paint(paints);
+          cosmos.setHalos(halos);
+          if (j3d) {
+            const hullPoints = ctxPoints.length >= 1 ? ctxPoints : (wQ ? [wQ] : []);
+            if (hullPoints.length >= 1) j3d.setClusterHull(hullPoints, INK.gold);
+            if (wQ && ctxPoints.length) j3d.setContextLines(wQ, ctxPoints, [1.0, 0.8, 0.25, 0.7]);
+          }
+          flyCameraToPoints(j3d, wQ ? [wQ, ...ctxPoints] : ctxPoints, { minDist: 26, padFactor: 1.9, duration: 1400 });
+        });
+      }
+
+      // ---------------------------------------------------------------
+      // Chapter 8: Grounded Answer (stage 7)
+      // ---------------------------------------------------------------
+      else if (stage === 7) {
+        const trail: XYZ[] = [];
+        if (wQ) trail.push(wQ);
+
+        trace.fusion.slice(0, 5).forEach((h) => {
+          if (h.xyz) trail.push(toWorld3(h.xyz));
+        });
+
+        const paints = new Map<number, { color: RGBA; size?: number }>();
+        const halos: { idx: number; color?: RGBA; size?: number }[] = [];
+        const activeIndices = new Set<number>();
+        const citedPoints: XYZ[] = [];
+        const citationPins: PinDef[] = [];
+        const beamItems: { from: XYZ; to: XYZ; color?: RGBA }[] = [];
+
+        trace.answer_preview.forEach((b, bIdx) => {
+          const cNum = String(bIdx + 1);
+          const entities = [...b.entities];
+          if (!entities.length && b.doc) {
+            const docBase = b.doc.replace(/\.md$/, "");
+            entities.push(docBase);
+            docBase.split(/[-_.]/).forEach((part) => { if (part.length > 3) entities.push(part); });
+          }
+
+          entities.forEach((name) => {
+            const idx = getIdx(name);
+            if (idx === undefined) return;
+            activeIndices.add(idx);
+            const p = nodeW(trace.graph.nodes[idx]);
+            if (p) {
+              citedPoints.push(p);
+              trail.push(p);
+              if (wQ) beamItems.push({ from: wQ, to: p, color: INK.gold });
+            }
+
+            paints.set(idx, { color: INK.gold, size: 4.2 });
+            halos.push({ idx, color: INK.gold, size: 2.2 });
+
+            citationPins.push({
+              citation: cNum,
+              name,
+              idx,
+              color: "#ffd54f",
+            });
+          });
+        });
+
+        tl.at(50, () => {
+          cosmos.spotlight(activeIndices);
+          cosmos.paint(paints);
+          cosmos.setHalos(halos);
+          setPinDefs(citationPins);
+          if (j3d) {
+            j3d.setTrail(trail, [1.0, 0.35, 0.65, 1.0]);
+            if (beamItems.length) j3d.setCitationBeams(beamItems);
+          }
+          flyCameraToPoints(j3d, citedPoints.length ? citedPoints : trail, { minDist: 26, padFactor: 2.0, duration: 1400 });
+        });
       }
     }
+
     tl.start();
     return () => {
       tl.cancel();
-      markers.forEach((id) => {
-        try {
-          cosmos.removeMarker(id);
-        } catch { /* noop */ }
-      });
+      setPinDefs([]);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chapter, trace, cosmosFull, cosmosTrace, chViz, posOf, traceLoaded]);
+  }, [chapter, trace, cosmosFull, cosmosTrace, traceCanvasActive, jTrace, jFull, ch.stage, traceLoaded]);
 
   useEffect(() => {
     if (progress) return; // wait for data
@@ -436,6 +766,34 @@ export default function PresentationView({ onExit, data, source, liveTrace, onOp
       <div className={traceCanvasActive ? "canvaswrap hidden" : "canvaswrap"}>
         <CosmosCanvas label="pres-full" onCosmos={setCosmosFull} onSelect={() => {}} onHover={() => {}} onError={(e) => setProgress(String(e))} />
       </div>
+
+      {/* Floating 3D badge pins (ranked winners, grounded citations) */}
+      {pins.length > 0 && (
+        <div className="pres-floating-pins" aria-hidden="true">
+          {pins.map((pin) => (
+            <div
+              key={`${pin.idx}-${pin.rank ?? pin.citation}`}
+              className="pres-pin"
+              style={{
+                left: `${pin.x}px`,
+                top: `${pin.y}px`,
+                borderColor: pin.color,
+                boxShadow: `0 0 16px rgba(0,0,0,0.85), 0 0 10px ${pin.color}`,
+              }}
+              onClick={() => {
+                const node = trace?.graph.nodes[pin.idx];
+                const p = node?.xyz ?? (node?.xy ? [node.xy[0], node.xy[1], 0] : null);
+                if (p && jTrace) flyCameraToPoints(jTrace, [toWorld3(p)], { minDist: 18, duration: 900 });
+              }}
+            >
+              <span className="pres-pin-num" style={{ background: pin.color }}>
+                {pin.rank ? `#${pin.rank}` : `[${pin.citation}]`}
+              </span>
+              <span className="pres-pin-label">{pin.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="pres-top">
         <span className="pres-brand">MEMORY TRAVEL · {t.presLaunch}</span>

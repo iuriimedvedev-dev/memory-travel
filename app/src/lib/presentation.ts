@@ -88,42 +88,42 @@ export const CHAPTERS: PresentationChapter[] = [
     id: "channels",
     viz: "trace",
     stage: 1,
-    title: { ru: "Параллельные каналы", en: "Parallel channels" },
+    title: { ru: "Каналы: Вектор vs BM25", en: "Channels: Vector vs BM25" },
     narration: () => ({
-      ru: `Четыре поиска работают гибридно: векторный (смысл, голубой), BM25 (точные слова, зелёный), обход графа (связи, золотой/фиолетовый) и ripgrep (поиск по коду/заметкам). У каждого своя природа: вектор находит «про то же», BM25 — «те же слова», граф добавляет контекст связей, ripgrep гарантирует попадание по именам и идентификаторам.`,
-      en: `Four searches run in hybrid: vector (meaning, cyan), BM25 (exact words, green), graph walk (relations, gold/violet), and ripgrep (code/docs text). Each covers a distinct failure mode: vector finds semantic intent, BM25 finds keywords, graph adds relational context, and ripgrep anchors exact identifiers.`,
+      ru: `Два ключевых канала работают параллельно: векторный семантический поиск (голубые маркеры) находит чанки по смыслу, а классический BM25 (янтарно-золотые маркеры) — по точным ключевым словам. Чанки, найденные обоими каналами, подсвечены изумрудным ореолом. Каждый найденный узел увеличен и окружён пульсирующим гало.`,
+      en: `Two key channels run in parallel: semantic vector search (bright cyan markers) locates chunks by meaning, while classic BM25 (golden amber markers) scores exact keyword occurrences. Chunks hit by both channels radiate with emerald halos. Each retrieved node is enlarged with an animated breathing halo.`,
     }),
     fact: ({ trace }) => ({
-      ru: `Факт: sparse-канал — ${trace?.meta.latency_ms.sparse ?? "?"} мс по ${((trace?.meta.bm25_chunks ?? 0)).toLocaleString("ru-RU")} чанкам BM25-индекса.`,
-      en: `Fact: the sparse channel — ${trace?.meta.latency_ms.sparse ?? "?"} ms across ${(trace?.meta.bm25_chunks ?? 0).toLocaleString("en-US")} BM25 chunks.`,
+      ru: `Факт: ${trace?.vector_hits.length ?? 0} векторных хитов (${trace?.meta.latency_ms.dense ?? "?"} мс) + ${((trace?.meta.bm25_chunks ?? 0)).toLocaleString("ru-RU")} BM25-чанков (${trace?.meta.latency_ms.sparse ?? "?"} мс).`,
+      en: `Fact: ${trace?.vector_hits.length ?? 0} vector hits (${trace?.meta.latency_ms.dense ?? "?"} ms) + ${(trace?.meta.bm25_chunks ?? 0).toLocaleString("en-US")} BM25 chunks (${trace?.meta.latency_ms.sparse ?? "?"} ms).`,
+    }),
+  },
+  {
+    id: "graph",
+    viz: "trace",
+    stage: 2,
+    title: { ru: "Обход графа", en: "Graph walk" },
+    narration: () => ({
+      ru: `LightRAG-режим извлекает сущности из найденного текста (золотые сид-узлы) и совершает обход по реальным рёбрам графа к их соседям (фиолетовые узлы). На графе визуализированы соединяющие рёбра, а анимированные световые импульсы показывают передачу смыслового контекста от сидов к соседям 1-го и 2-го порядка.`,
+      en: `LightRAG extracts entities from retrieved text (golden seed nodes) and traverses real graph edges to their neighbours (violet nodes). Connecting edges are rendered in high fidelity with animated photon pulses streaming relational context from seed nodes to 1-hop and 2-hop neighbours.`,
+    }),
+    fact: ({ trace }) => ({
+      ru: `Факт: ${trace?.graph.nodes.filter((n) => n.seed).length ?? 0} сид-сущностей соединяются через ${trace?.graph.edges.length ?? 0} связей с соседями в подграфе recall.`,
+      en: `Fact: ${trace?.graph.nodes.filter((n) => n.seed).length ?? 0} seed entities connect across ${trace?.graph.edges.length ?? 0} relations to neighbours in the recall subgraph.`,
     }),
   },
   {
     id: "fusion",
     viz: "trace",
     stage: 4,
-    title: { ru: "Фьюжн", en: "Fusion" },
+    title: { ru: "Фьюжн и ранжирование", en: "Fusion & ranking" },
     narration: () => ({
-      ru: `Рейтинги каналов нормализуются и сливаются взвешенно (α = 0.5 — измеренный оптимум на 46 бенчмарк-запросах или прямое слияние Reciprocal Rank Fusion / RRF). Оранжевое — слитый рейтинг: чанки, которые и «про то», и со словами темы, поднимаются наверх. Задержка слияния минимальна.`,
-      en: `Channel rankings are normalised and blended (α = 0.5 — measured optimum on 46 benchmark queries, or direct Reciprocal Rank Fusion / RRF). Orange is the fused ranking: chunks that are both relevant and use the query terms rise. Latency is minimal.`,
+      ru: `Рейтинги каналов сливаются через взвешенный RRF / α-фьюжн (α = 0.5 — оптимум) и ранжируются легковесным LightGBM (~160 мс). Топ-победители выделены светящимися бейджами с номерами мест (1, 2, 3...) и яркими маяками, а защитный предохранитель блокирует деградацию fusion-порядка.`,
+      en: `Channel rankings are blended via weighted RRF / α-fusion (α = 0.5 measured optimum) and ranked with fast LightGBM (~160ms). Top winners are highlighted with glowing numbered badges (1, 2, 3...) and high-intensity beacons, with guardrails protecting high-confidence order.`,
     }),
     fact: ({ trace }) => ({
-      ru: `Факт: в слитом рейтинге ${trace?.fusion.length ?? "?"} чанков при α = ${trace?.meta.alpha ?? "?"} — веса каналов измерены, не придуманы.`,
-      en: `Fact: ${trace?.fusion.length ?? "?"} chunks in the fused ranking at α = ${trace?.meta.alpha ?? "?"} — the blend weight is measured, not invented.`,
-    }),
-  },
-  {
-    id: "rerank",
-    viz: "trace",
-    stage: 5,
-    title: { ru: "Реранк", en: "Rerank" },
-    narration: () => ({
-      ru: `В HARS v0.7.0 кросс-энкодер ВЫКЛЮЧЕН по умолчанию: ранжирование выполняет легковесный LightGBM или прямой RRF, обеспечивая задержку выборки ~160 мс (вместо секунд на тяжелых моделях). Предохранитель защищает уверенный fusion-порядок от деградации.`,
-      en: `In HARS v0.7.0, the neural cross-encoder is OFF by default: ranking is performed via fast LightGBM or direct RRF, maintaining ~160ms retrieval latency (vs seconds for heavy neural rerankers). A guardrail preserves high-confidence fusion rankings.`,
-    }),
-    fact: () => ({
-      ru: `Факт: кросс-энкодер ВЫКЛЮЧЕН по умолчанию (LightGBM/RRF), сквозная задержка выборки ~160 мс.`,
-      en: `Fact: cross-encoder reranker is OFF by default (LightGBM/RRF), end-to-end recall latency is ~160ms.`,
+      ru: `Факт: ${trace?.fusion.length ?? 0} чанков в слитом топе; задержка выборки ~160 мс (кросс-энкодер ВЫКЛЮЧЕН по умолчанию).`,
+      en: `Fact: ${trace?.fusion.length ?? 0} chunks in the fused top; recall latency ~160ms (cross-encoder OFF by default).`,
     }),
   },
   {

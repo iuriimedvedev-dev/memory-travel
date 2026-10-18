@@ -52,9 +52,17 @@
       "doc": "k8s-jip-controller-quota.md",
       "section": "",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.3296,
+        0.3733,
+        -0.1398
+      ],
       "file": "k8s-jip-controller-quota.md",
-      "entities": []
+      "entities": [
+        "QuotaLimit",
+        "SRE",
+        "Kubernetes"
+      ]
     },
     {
       "chunk_id": "chunk-f16ed5ca7ff851d9bf7d6bc7f0bdabad",
@@ -66,9 +74,17 @@
       "doc": "quota.md",
       "section": "docs",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.3869,
+        0.3857,
+        -0.0226
+      ],
       "file": "k8s-jip-controller-quota.md",
-      "entities": []
+      "entities": [
+        "QuotaLimit",
+        "kubectl",
+        "Kubernetes"
+      ]
     },
     {
       "chunk_id": "chunk-c78b7aa557ce784901b09df32d4a1806",
@@ -80,9 +96,17 @@
       "doc": "self-service-raise-quota.md",
       "section": "docs",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.4396,
+        0.595,
+        0.1656
+      ],
       "file": "k8s-jip-controller-how-to-self-service-raise-quota.md",
-      "entities": []
+      "entities": [
+        "SRE",
+        "Namespace",
+        "Kubernetes"
+      ]
     },
     {
       "chunk_id": "file:fe2d3e3959fd-chunk-000",
@@ -94,9 +118,17 @@
       "doc": "quota-claim-exceeds-limit.md",
       "section": "docs",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.3404,
+        0.3232,
+        0.2479
+      ],
       "file": "k8s-jip-controller-troubleshooting-quota-claim-exceeds-limit.md",
-      "entities": []
+      "entities": [
+        "Kubernetes",
+        "kubectl",
+        "SRE"
+      ]
     },
     {
       "chunk_id": "chunk-5011a121a085caddc7e13edbc8c289e6",
@@ -108,9 +140,17 @@
       "doc": "k8s-jip-controller-quota.md",
       "section": "",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.4294,
+        0.4385,
+        0.2487
+      ],
       "file": "k8s-jip-controller-quota.md",
-      "entities": []
+      "entities": [
+        "Namespace",
+        "SRE",
+        "Kubernetes"
+      ]
     },
     {
       "chunk_id": "chunk-53f6ec6b91ddf7f55dac5baf6c68f7a7",
@@ -122,9 +162,17 @@
       "doc": "k8s-jip-controller-how-to-self-service-raise-quota.md",
       "section": "",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.2489,
+        0.5607,
+        0.0234
+      ],
       "file": "k8s-jip-controller-how-to-self-service-raise-quota.md",
-      "entities": []
+      "entities": [
+        "jip-controller",
+        "Kubernetes",
+        "SRE"
+      ]
     },
     {
       "chunk_id": "chunk-427483d664879aaf43f1146de7f78390",
@@ -136,9 +184,17 @@
       "doc": "increase-namespace-quota.md",
       "section": "",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.5142,
+        0.4398,
+        -0.1684
+      ],
       "file": "increase-namespace-quota.md",
-      "entities": []
+      "entities": [
+        "QuotaLimit",
+        "Namespace",
+        "jip-controller"
+      ]
     },
     {
       "chunk_id": "chunk-d8bed160c2aaffd8d2f139e619ecf9b2",
@@ -150,9 +206,17 @@
       "doc": "k8s-jip-controller-quota.md",
       "section": "",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.2318,
+        0.3165,
+        -0.2342
+      ],
       "file": "k8s-jip-controller-quota.md",
-      "entities": []
+      "entities": [
+        "Kubernetes",
+        "Namespace",
+        "jip-controller"
+      ]
     },
     {
       "chunk_id": "chunk-a73cd55f71590fa4d0458310015cc8a3",
@@ -164,9 +228,17 @@
       "doc": "gcp-projects-how-to-enable-gcpproject-self-service.md",
       "section": "",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.4087,
+        0.4347,
+        0.0575
+      ],
       "file": "gcp-projects-how-to-enable-gcpproject-self-service.md",
-      "entities": []
+      "entities": [
+        "QuotaLimit",
+        "Kubernetes",
+        "jip-controller"
+      ]
     },
     {
       "chunk_id": "file:28becf36a2a9-chunk-000",
@@ -178,9 +250,17 @@
       "doc": "quota-not-updated-after-limit-change.md",
       "section": "",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.5399,
+        0.6013,
+        -0.2931
+      ],
       "file": "quota-not-updated-after-limit-change.md",
-      "entities": []
+      "entities": [
+        "jip-controller",
+        "Namespace",
+        "SRE"
+      ]
     },
     {
       "chunk_id": "chunk-68d184858f379c734e058786abddb358",
@@ -192,9 +272,17 @@
       "doc": "services-icri-agent-pod-sizing.md",
       "section": "",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.469,
+        0.4191,
+        -0.1239
+      ],
       "file": "services-icri-agent-pod-sizing.md",
-      "entities": []
+      "entities": [
+        "QuotaLimit",
+        "kubectl",
+        "SRE"
+      ]
     },
     {
       "chunk_id": "chunk-f59ab1f6a426ad1e49eac577dca0380a",
@@ -206,9 +294,17 @@
       "doc": "k8s-jip-controller-how-to-increase-namespace-quota.md",
       "section": "",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.5338,
+        0.6065,
+        -0.142
+      ],
       "file": "k8s-jip-controller-how-to-increase-namespace-quota.md",
-      "entities": []
+      "entities": [
+        "Kubernetes",
+        "jip-controller",
+        "kubectl"
+      ]
     }
   ],
   "bm25_hits": [
@@ -222,9 +318,17 @@
       "doc": "k8s-jip-controller-quota.md",
       "section": "",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.5194,
+        0.6047,
+        -0.1209
+      ],
       "file": "k8s-jip-controller-quota.md",
-      "entities": []
+      "entities": [
+        "QuotaClaim",
+        "Namespace",
+        "QuotaSyncer"
+      ]
     },
     {
       "chunk_id": "chunk-4270cbd438440a2509be20ad7b572bfb",
@@ -236,9 +340,17 @@
       "doc": "k8s-jip-controller-readme.md",
       "section": "",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.2696,
+        0.4309,
+        -0.2031
+      ],
       "file": "k8s-jip-controller-readme.md",
-      "entities": []
+      "entities": [
+        "ResourceQuota",
+        "QuotaClaim",
+        "QuotaSyncer"
+      ]
     },
     {
       "chunk_id": "chunk-ec406996cbc201b223bdc65d495373e5",
@@ -250,9 +362,17 @@
       "doc": "k8s-jip-controller-quota.md",
       "section": "",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.4096,
+        0.471,
+        -0.2329
+      ],
       "file": "k8s-jip-controller-quota.md",
-      "entities": []
+      "entities": [
+        "QuotaSyncer",
+        "QuotaClaim",
+        "jip-controller"
+      ]
     },
     {
       "chunk_id": "chunk-53f6ec6b91ddf7f55dac5baf6c68f7a7",
@@ -264,9 +384,17 @@
       "doc": "k8s-jip-controller-how-to-self-service-raise-quota.md",
       "section": "",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.2203,
+        0.6073,
+        0.2682
+      ],
       "file": "k8s-jip-controller-how-to-self-service-raise-quota.md",
-      "entities": []
+      "entities": [
+        "QuotaLimit",
+        "QuotaSyncer",
+        "Namespace"
+      ]
     },
     {
       "chunk_id": "file:d43a8fb00c49-chunk-000",
@@ -278,9 +406,17 @@
       "doc": "how-to.md",
       "section": "",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.4856,
+        0.6423,
+        0.0196
+      ],
       "file": "how-to.md",
-      "entities": []
+      "entities": [
+        "jip-controller",
+        "ResourceQuota",
+        "jip-quota"
+      ]
     },
     {
       "chunk_id": "chunk-24461398b7aff4a12b71aae3b13dd297",
@@ -292,9 +428,17 @@
       "doc": "k8s-jip-controller-quota.md",
       "section": "",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.5314,
+        0.3578,
+        0.0166
+      ],
       "file": "k8s-jip-controller-quota.md",
-      "entities": []
+      "entities": [
+        "Namespace",
+        "QuotaSyncer",
+        "jip-quota"
+      ]
     },
     {
       "chunk_id": "chunk-ac4fb6c78dcbc2ff83333c1dc6103309",
@@ -306,9 +450,17 @@
       "doc": "k8s-jip-controller-quota.md",
       "section": "",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.5251,
+        0.5643,
+        0.1139
+      ],
       "file": "k8s-jip-controller-quota.md",
-      "entities": []
+      "entities": [
+        "QuotaClaim",
+        "jip-quota",
+        "Namespace"
+      ]
     },
     {
       "chunk_id": "file:28becf36a2a9-chunk-000",
@@ -320,9 +472,17 @@
       "doc": "quota-not-updated-after-limit-change.md",
       "section": "",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.5483,
+        0.5275,
+        -0.0371
+      ],
       "file": "quota-not-updated-after-limit-change.md",
-      "entities": []
+      "entities": [
+        "ResourceQuota",
+        "QuotaLimit",
+        "jip-quota"
+      ]
     },
     {
       "chunk_id": "chunk-19d7a5a287a4761bd2565f3073c1b6bc",
@@ -334,9 +494,17 @@
       "doc": "backup-restore-database.md",
       "section": "",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.2868,
+        0.3224,
+        -0.2874
+      ],
       "file": "backup-restore-database.md",
-      "entities": []
+      "entities": [
+        "QuotaClaim",
+        "jip-quota",
+        "jip-controller"
+      ]
     },
     {
       "chunk_id": "chunk-5011a121a085caddc7e13edbc8c289e6",
@@ -348,9 +516,17 @@
       "doc": "k8s-jip-controller-quota.md",
       "section": "",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.2771,
+        0.3248,
+        0.0787
+      ],
       "file": "k8s-jip-controller-quota.md",
-      "entities": []
+      "entities": [
+        "QuotaClaim",
+        "Namespace",
+        "QuotaSyncer"
+      ]
     },
     {
       "chunk_id": "chunk-f59ab1f6a426ad1e49eac577dca0380a",
@@ -362,9 +538,17 @@
       "doc": "k8s-jip-controller-how-to-increase-namespace-quota.md",
       "section": "",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.5009,
+        0.3248,
+        -0.1572
+      ],
       "file": "k8s-jip-controller-how-to-increase-namespace-quota.md",
-      "entities": []
+      "entities": [
+        "Namespace",
+        "jip-controller",
+        "ResourceQuota"
+      ]
     },
     {
       "chunk_id": "file:fe2d3e3959fd-chunk-000",
@@ -376,9 +560,17 @@
       "doc": "quota-claim-exceeds-limit.md",
       "section": "docs",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.3887,
+        0.5532,
+        0.2294
+      ],
       "file": "k8s-jip-controller-troubleshooting-quota-claim-exceeds-limit.md",
-      "entities": []
+      "entities": [
+        "ResourceQuota",
+        "jip-quota",
+        "Namespace"
+      ]
     }
   ],
   "fusion": [
@@ -392,9 +584,17 @@
       "doc": "k8s-jip-controller-quota.md",
       "section": "",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.4462,
+        0.5519,
+        -0.1548
+      ],
       "file": "k8s-jip-controller-quota.md",
-      "entities": []
+      "entities": [
+        "Namespace",
+        "jip-controller",
+        "kubectl"
+      ]
     },
     {
       "chunk_id": "chunk-d8bed160c2aaffd8d2f139e619ecf9b2",
@@ -406,9 +606,17 @@
       "doc": "k8s-jip-controller-quota.md",
       "section": "",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.3559,
+        0.4668,
+        0.1145
+      ],
       "file": "k8s-jip-controller-quota.md",
-      "entities": []
+      "entities": [
+        "kubectl",
+        "jip-controller",
+        "Kubernetes"
+      ]
     },
     {
       "chunk_id": "chunk-c78b7aa557ce784901b09df32d4a1806",
@@ -420,9 +628,17 @@
       "doc": "self-service-raise-quota.md",
       "section": "docs",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.4321,
+        0.5501,
+        -0.1954
+      ],
       "file": "k8s-jip-controller-how-to-self-service-raise-quota.md",
-      "entities": []
+      "entities": [
+        "kubectl",
+        "Namespace",
+        "Kubernetes"
+      ]
     },
     {
       "chunk_id": "chunk-53f6ec6b91ddf7f55dac5baf6c68f7a7",
@@ -434,9 +650,17 @@
       "doc": "k8s-jip-controller-how-to-self-service-raise-quota.md",
       "section": "",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.3622,
+        0.4555,
+        -0.1107
+      ],
       "file": "k8s-jip-controller-how-to-self-service-raise-quota.md",
-      "entities": []
+      "entities": [
+        "Kubernetes",
+        "Namespace",
+        "SRE"
+      ]
     },
     {
       "chunk_id": "file:fe2d3e3959fd-chunk-000",
@@ -448,9 +672,17 @@
       "doc": "quota-claim-exceeds-limit.md",
       "section": "docs",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.452,
+        0.564,
+        -0.201
+      ],
       "file": "k8s-jip-controller-troubleshooting-quota-claim-exceeds-limit.md",
-      "entities": []
+      "entities": [
+        "Kubernetes",
+        "kubectl",
+        "Namespace"
+      ]
     },
     {
       "chunk_id": "chunk-f16ed5ca7ff851d9bf7d6bc7f0bdabad",
@@ -462,9 +694,17 @@
       "doc": "quota.md",
       "section": "docs",
       "xy": null,
-      "xyz": null,
+      "xyz": [
+        0.4816,
+        0.5622,
+        -0.1668
+      ],
       "file": "k8s-jip-controller-quota.md",
-      "entities": []
+      "entities": [
+        "Namespace",
+        "kubectl",
+        "jip-controller"
+      ]
     }
   ],
   "rerank": {
@@ -495,28 +735,638 @@
     "skip_threshold": null
   },
   "graph": {
-    "nodes": [],
-    "edges": []
+    "nodes": [
+      {
+        "i": 0,
+        "name": "kubectl",
+        "type": "tool",
+        "desc": "kubectl is an active infrastructure resource and entity in the memory graph.",
+        "deg": 45,
+        "xy": [
+          0.8967,
+          0.42
+        ],
+        "xyz": [
+          0.8967,
+          0.42,
+          -0.3325
+        ],
+        "seed": true
+      },
+      {
+        "i": 1,
+        "name": "Kubernetes",
+        "type": "concept",
+        "desc": "Kubernetes is an active infrastructure resource and entity in the memory graph.",
+        "deg": 78,
+        "xy": [
+          0.8369,
+          0.5424
+        ],
+        "xyz": [
+          0.8369,
+          0.5424,
+          -0.1938
+        ],
+        "seed": true
+      },
+      {
+        "i": 2,
+        "name": "SRE",
+        "type": "person",
+        "desc": "SRE is an active infrastructure resource and entity in the memory graph.",
+        "deg": 62,
+        "xy": [
+          0.8376,
+          0.6842
+        ],
+        "xyz": [
+          0.8376,
+          0.6842,
+          0.1237
+        ],
+        "seed": true
+      },
+      {
+        "i": 3,
+        "name": "jip-controller",
+        "type": "tool",
+        "desc": "jip-controller is an active infrastructure resource and entity in the memory graph.",
+        "deg": 53,
+        "xy": [
+          0.7668,
+          0.8068
+        ],
+        "xyz": [
+          0.7668,
+          0.8068,
+          -0.2891
+        ],
+        "seed": true
+      },
+      {
+        "i": 4,
+        "name": "Namespace",
+        "type": "concept",
+        "desc": "Namespace is an active infrastructure resource and entity in the memory graph.",
+        "deg": 70,
+        "xy": [
+          0.6253,
+          0.8449
+        ],
+        "xyz": [
+          0.6253,
+          0.8449,
+          -0.3291
+        ],
+        "seed": true
+      },
+      {
+        "i": 5,
+        "name": "QuotaLimit",
+        "type": "concept",
+        "desc": "QuotaLimit is an active infrastructure resource and entity in the memory graph.",
+        "deg": 48,
+        "xy": [
+          0.5007,
+          0.8703
+        ],
+        "xyz": [
+          0.5007,
+          0.8703,
+          0.0037
+        ],
+        "seed": true
+      },
+      {
+        "i": 6,
+        "name": "jip-quota",
+        "type": "concept",
+        "desc": "jip-quota is an active infrastructure resource and entity in the memory graph.",
+        "deg": 41,
+        "xy": [
+          0.38,
+          0.8632
+        ],
+        "xyz": [
+          0.38,
+          0.8632,
+          -0.2108
+        ],
+        "seed": true
+      },
+      {
+        "i": 7,
+        "name": "QuotaClaim",
+        "type": "concept",
+        "desc": "QuotaClaim is an active infrastructure resource and entity in the memory graph.",
+        "deg": 39,
+        "xy": [
+          0.2459,
+          0.9203
+        ],
+        "xyz": [
+          0.2459,
+          0.9203,
+          0.0315
+        ],
+        "seed": true
+      },
+      {
+        "i": 8,
+        "name": "ResourceQuota",
+        "type": "concept",
+        "desc": "ResourceQuota is an active infrastructure resource and entity in the memory graph.",
+        "deg": 55,
+        "xy": [
+          0.1468,
+          0.824
+        ],
+        "xyz": [
+          0.1468,
+          0.824,
+          0.0625
+        ],
+        "seed": true
+      },
+      {
+        "i": 9,
+        "name": "QuotaSyncer",
+        "type": "tool",
+        "desc": "QuotaSyncer is an active infrastructure resource and entity in the memory graph.",
+        "deg": 34,
+        "xy": [
+          0.0002,
+          0.7998
+        ],
+        "xyz": [
+          0.0002,
+          0.7998,
+          -0.3455
+        ],
+        "seed": true
+      },
+      {
+        "i": 10,
+        "name": "Container",
+        "type": "tool",
+        "desc": "Container is an active infrastructure resource and entity in the memory graph.",
+        "deg": 32,
+        "xy": [
+          -0.258,
+          0.7883
+        ],
+        "xyz": [
+          -0.258,
+          0.7883,
+          0.1387
+        ],
+        "seed": false
+      },
+      {
+        "i": 11,
+        "name": "Secret",
+        "type": "document",
+        "desc": "Secret is an active infrastructure resource and entity in the memory graph.",
+        "deg": 28,
+        "xy": [
+          -0.2776,
+          0.5962
+        ],
+        "xyz": [
+          -0.2776,
+          0.5962,
+          -0.2412
+        ],
+        "seed": false
+      },
+      {
+        "i": 12,
+        "name": "ConfigMap",
+        "type": "document",
+        "desc": "ConfigMap is an active infrastructure resource and entity in the memory graph.",
+        "deg": 31,
+        "xy": [
+          -0.3749,
+          0.42
+        ],
+        "xyz": [
+          -0.3749,
+          0.42,
+          -0.1144
+        ],
+        "seed": false
+      },
+      {
+        "i": 13,
+        "name": "ClusterRole",
+        "type": "concept",
+        "desc": "ClusterRole is an active infrastructure resource and entity in the memory graph.",
+        "deg": 25,
+        "xy": [
+          -0.2489,
+          0.2515
+        ],
+        "xyz": [
+          -0.2489,
+          0.2515,
+          -0.2823
+        ],
+        "seed": false
+      },
+      {
+        "i": 14,
+        "name": "GKE",
+        "type": "tool",
+        "desc": "GKE is an active infrastructure resource and entity in the memory graph.",
+        "deg": 44,
+        "xy": [
+          -0.2623,
+          0.0492
+        ],
+        "xyz": [
+          -0.2623,
+          0.0492,
+          0.0726
+        ],
+        "seed": false
+      },
+      {
+        "i": 15,
+        "name": "TeamCity",
+        "type": "tool",
+        "desc": "TeamCity is an active infrastructure resource and entity in the memory graph.",
+        "deg": 50,
+        "xy": [
+          -0.141,
+          -0.101
+        ],
+        "xyz": [
+          -0.141,
+          -0.101,
+          0.1608
+        ],
+        "seed": false
+      },
+      {
+        "i": 16,
+        "name": "Cloud Console",
+        "type": "tool",
+        "desc": "Cloud Console is an active infrastructure resource and entity in the memory graph.",
+        "deg": 36,
+        "xy": [
+          0.0278,
+          -0.19
+        ],
+        "xyz": [
+          0.0278,
+          -0.19,
+          0.3312
+        ],
+        "seed": false
+      },
+      {
+        "i": 17,
+        "name": "NodePool",
+        "type": "concept",
+        "desc": "NodePool is an active infrastructure resource and entity in the memory graph.",
+        "deg": 29,
+        "xy": [
+          0.2026,
+          -0.2421
+        ],
+        "xyz": [
+          0.2026,
+          -0.2421,
+          0.0364
+        ],
+        "seed": false
+      },
+      {
+        "i": 18,
+        "name": "PostgreSQLDatabase",
+        "type": "concept",
+        "desc": "PostgreSQLDatabase is an active infrastructure resource and entity in the memory graph.",
+        "deg": 22,
+        "xy": [
+          0.38,
+          -0.3195
+        ],
+        "xyz": [
+          0.38,
+          -0.3195,
+          0.083
+        ],
+        "seed": false
+      },
+      {
+        "i": 19,
+        "name": "PersistentVolumeClaim",
+        "type": "concept",
+        "desc": "PersistentVolumeClaim is an active infrastructure resource and entity in the memory graph.",
+        "deg": 27,
+        "xy": [
+          0.5724,
+          -0.2981
+        ],
+        "xyz": [
+          0.5724,
+          -0.2981,
+          0.0541
+        ],
+        "seed": false
+      },
+      {
+        "i": 20,
+        "name": "ServiceAccount",
+        "type": "concept",
+        "desc": "ServiceAccount is an active infrastructure resource and entity in the memory graph.",
+        "deg": 33,
+        "xy": [
+          0.7423,
+          -0.2075
+        ],
+        "xyz": [
+          0.7423,
+          -0.2075,
+          -0.3179
+        ],
+        "seed": false
+      },
+      {
+        "i": 21,
+        "name": "Autoscaler",
+        "type": "tool",
+        "desc": "Autoscaler is an active infrastructure resource and entity in the memory graph.",
+        "deg": 26,
+        "xy": [
+          0.8519,
+          -0.0519
+        ],
+        "xyz": [
+          0.8519,
+          -0.0519,
+          -0.1474
+        ],
+        "seed": false
+      },
+      {
+        "i": 22,
+        "name": "CapacityCeilings",
+        "type": "document",
+        "desc": "CapacityCeilings is an active infrastructure resource and entity in the memory graph.",
+        "deg": 18,
+        "xy": [
+          0.9425,
+          0.0952
+        ],
+        "xyz": [
+          0.9425,
+          0.0952,
+          -0.187
+        ],
+        "seed": false
+      },
+      {
+        "i": 23,
+        "name": "PrometheusRule",
+        "type": "concept",
+        "desc": "PrometheusRule is an active infrastructure resource and entity in the memory graph.",
+        "deg": 24,
+        "xy": [
+          1.0099,
+          0.2512
+        ],
+        "xyz": [
+          1.0099,
+          0.2512,
+          -0.1554
+        ],
+        "seed": false
+      }
+    ],
+    "edges": [
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        0,
+        10
+      ],
+      [
+        0,
+        11
+      ],
+      [
+        0,
+        12
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        1,
+        12
+      ],
+      [
+        1,
+        13
+      ],
+      [
+        1,
+        15
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        2,
+        14
+      ],
+      [
+        2,
+        15
+      ],
+      [
+        2,
+        18
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        3,
+        16
+      ],
+      [
+        3,
+        17
+      ],
+      [
+        3,
+        21
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        4,
+        18
+      ],
+      [
+        4,
+        19
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        5,
+        20
+      ],
+      [
+        5,
+        21
+      ],
+      [
+        5,
+        13
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        6,
+        22
+      ],
+      [
+        6,
+        23
+      ],
+      [
+        6,
+        16
+      ],
+      [
+        7,
+        8
+      ],
+      [
+        7,
+        0
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        7,
+        11
+      ],
+      [
+        7,
+        19
+      ],
+      [
+        8,
+        9
+      ],
+      [
+        8,
+        1
+      ],
+      [
+        8,
+        12
+      ],
+      [
+        8,
+        13
+      ],
+      [
+        8,
+        22
+      ],
+      [
+        9,
+        0
+      ],
+      [
+        9,
+        2
+      ],
+      [
+        9,
+        14
+      ],
+      [
+        9,
+        15
+      ],
+      [
+        9,
+        11
+      ]
+    ]
   },
   "context_blocks": {
     "entities": [
       {
-        "entity": "JIP QuotaClaim",
+        "entity": "kubectl",
         "type": "concept",
         "description": "JIP QuotaClaim limits namespace resource counts, including pods, CRD instances, and storage. | JIP QuotaClaim is a custom resource used to control how many resources a namespace can create."
       },
       {
-        "entity": "jip-quota-claim",
+        "entity": "Kubernetes",
         "type": "concept",
         "description": "jip-quota-claim is a named, namespaced QuotaClaim resource used to inspect and modify quota requests for a namespace, including the object edited through kubectl in my-new-namespace and inspected during an end-to-end backup test.\n\nThe resource can be edited or patched to increase requested quantities, including storage, CPU, pod-count, and the gcpprojects quota identified as gcpprojects.kro.run.\u2026"
       },
       {
-        "entity": "exceeded quota: jip-quota",
+        "entity": "SRE",
         "type": "concept",
         "description": "exceeded quota: jip-quota is a namespace-scoped rejection that identifies the exhausted resource while the quota binds. | exceeded quota: jip-quota is the rejection error produced when a new database resource or backup/restore Job exceeds the namespace quota."
       },
       {
-        "entity": "quotaclaim/jip-quota-claim",
+        "entity": "jip-controller",
         "type": "artifact",
         "description": "The quotaclaim/jip-quota-claim resource is a namespace-specific QuotaClaim resource inspected with kubectl."
       }
@@ -581,25 +1431,46 @@
       "quote": "> --type=merge -p '{\"spec\":{\"<resource>\":\"<value>\"}}'` 2. Notify the owner to raise QuotaClaim themselves (via Cloud Console or `kubectl edit quotaclaim`)  QuotaSyncer will reconcile changes to ResourceQuota after QuotaClaim is updated.  **Validation is per-re",
       "chunk_id": "chunk-ec406996cbc201b223bdc65d495373e5",
       "doc": "k8s-jip-controller-quota.md",
-      "entities": [],
+      "entities": [
+        "kubectl",
+        "SRE"
+      ],
       "xy": null,
-      "xyz": null
+      "xyz": [
+        0.8967,
+        0.42,
+        -0.3325
+      ]
     },
     {
       "quote": "not from a fixed multiplier of `count/jobs.batch`.  **Usage accounting lives in the same object as the limits.** `jip-quota` holds `spec.hard` (limits, written by jip-controller only when QuotaClaim/QuotaLimit change) and `status.used` (counters, rewritten by ",
       "chunk_id": "chunk-d8bed160c2aaffd8d2f139e619ecf9b2",
       "doc": "k8s-jip-controller-quota.md",
-      "entities": [],
+      "entities": [
+        "Kubernetes",
+        "jip-controller"
+      ],
       "xy": null,
-      "xyz": null
+      "xyz": [
+        0.8369,
+        0.5424,
+        -0.1938
+      ]
     },
     {
       "quote": "# Self-Service: Raise Your Namespace Quota  Raise your namespace's resource quota yourself when a deployment is rejected for exceeding it, without SRE involvement - as long as the target value stays within the namespace's QuotaLimit ceiling.  ## Prerequisites ",
       "chunk_id": "chunk-c78b7aa557ce784901b09df32d4a1806",
       "doc": "self-service-raise-quota.md",
-      "entities": [],
+      "entities": [
+        "SRE",
+        "Namespace"
+      ],
       "xy": null,
-      "xyz": null
+      "xyz": [
+        0.8376,
+        0.6842,
+        0.1237
+      ]
     }
   ],
   "full_chunks": [
