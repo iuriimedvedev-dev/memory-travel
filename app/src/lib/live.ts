@@ -31,7 +31,7 @@ const STOP = new Set(
  * `mode_fallback: no keywords supplied — used naive mode` and returns no
  * entities/relations). Fixtures were captured with hand-picked keywords; a
  * typed question has none, so we derive them: UPPER/digit tokens
- * (VEA, M-LDP, DemoVisionModel, STALL…), then longest non-stopwords, capped at 8.
+ * (task-specific low-level and high-level keywords), then longest non-stopwords, capped at 8.
  */
 export function keywordsFor(question: string): string[] {
   const toks = question.match(/[A-Za-z0-9][A-Za-z0-9._/-]*/g) ?? [];
