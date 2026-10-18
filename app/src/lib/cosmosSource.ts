@@ -69,15 +69,20 @@ async function getJSON<T>(path: string, signal?: AbortSignal): Promise<T> {
   return (await r.json()) as T;
 }
 
-async function getJSONFromBases<T>(make: (base: string) => string, timeoutMs = 8000): Promise<T> {
+export const GRAPH_PROBE_TIMEOUT_MS = 20_000;
+export const GRAPH_LOAD_TIMEOUT_MS = 120_000;
+
+async function getJSONFromBases<T>(make: (base: string) => string, timeoutMs = GRAPH_LOAD_TIMEOUT_MS): Promise<T> {
   const failures: string[] = [];
   for (const base of graphBases()) {
+    const cleanBase = base.replace(/\/+$/, "");
+    const url = make(cleanBase);
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    const timer = setTimeout(() => ctrl.abort(new Error(`timeout after ${timeoutMs}ms`)), timeoutMs);
     try {
-      return await getJSON<T>(make(base), ctrl.signal);
+      return await getJSON<T>(url, ctrl.signal);
     } catch (e) {
-      failures.push(`${base}: ${e instanceof Error ? e.message : String(e)}`);
+      failures.push(`${url}: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       clearTimeout(timer);
     }
@@ -110,16 +115,16 @@ export interface CoordsApiResponse {
 }
 
 /** Identity probe: the ONLY thing that decides live vs not-connected. */
-export function probeGraphStats(timeoutMs = 8000): Promise<GraphStats> {
+export function probeGraphStats(timeoutMs = GRAPH_PROBE_TIMEOUT_MS): Promise<GraphStats> {
   return getJSONFromBases<GraphStats>((base) => `${base}/stats`, timeoutMs);
 }
 
 /** The connected graph + coords. `identity` is the /stats payload probed
  *  beforehand (kept for the HUD/About card). Throws with the server's hint. */
-export async function loadLiveCosmos(identity: GraphStats): Promise<LoadedCosmos> {
+export async function loadLiveCosmos(identity: GraphStats, timeoutMs = GRAPH_LOAD_TIMEOUT_MS): Promise<LoadedCosmos> {
   const [g, coords] = await Promise.all([
-    getJSONFromBases<GraphApiResponse>((base) => `${base}/graph`),
-    getJSONFromBases<CoordsApiResponse>((base) => `${base}/coords?dim=3`),
+    getJSONFromBases<GraphApiResponse>((base) => `${base}/graph`, timeoutMs),
+    getJSONFromBases<CoordsApiResponse>((base) => `${base}/coords?dim=3`, timeoutMs),
   ]);
   return {
     source: "live",
