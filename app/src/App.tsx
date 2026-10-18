@@ -442,8 +442,11 @@ export default function App() {
               <SparkIcon size={13} /> MEMORY TRAVEL <span className="dim">{t.brandSub}</span>
             </span>
             <nav>
-              <button className={tab === "cosmos" ? "on" : ""} onClick={() => setTab("cosmos")}>{t.tabCosmos}</button>
-              <button className={tab === "travel" ? "on" : ""} onClick={() => setTab("travel")}>{t.tabTravel}</button>
+              <button className={tab === "cosmos" && !presenting ? "on" : ""} onClick={() => { setPresenting(false); setTab("cosmos"); }}>{t.tabCosmos}</button>
+              <button className={tab === "travel" && !presenting ? "on" : ""} onClick={() => { setPresenting(false); setTab("travel"); }}>{t.tabTravel}</button>
+              <button className={presenting ? "on" : ""} onClick={() => setPresenting(true)} title={t.howItWorksTitle}>{t.tabHowItWorks}</button>
+              <a className="doclink" href="/travel/presentation.html" target="_blank" rel="noopener">{t.tabPresentation}</a>
+              <a className="doclink" href="/evals/" target="_blank" rel="noopener" title={t.evalsTitle}>{t.tabEvals}</a>
               <UiScaleSlider />
               <button className="langtoggle" onClick={() => setLangL10n(lang === "ru" ? "en" : "ru")} title={t.langSwitch}>
                 {lang.toUpperCase()}

@@ -1,1 +1,8 @@
-[{"id": "demo-01", "question": "How does the demo pipeline connect the vector and graph stages?", "file": "traces/trace_01.json", "kb": 4}]
+[
+  {
+    "id": "quota-01",
+    "question": "How does quota claim work?",
+    "file": "traces/trace_01.json",
+    "kb": 33
+  }
+]

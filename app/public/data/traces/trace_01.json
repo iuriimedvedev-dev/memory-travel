@@ -1,1 +1,631 @@
-{"meta": {"id": "demo-01", "question": "How does the demo pipeline connect the vector and graph stages?", "mode": "hybrid", "source": "synthetic-demo"}, "query": {"text": "How does the demo pipeline connect the vector and graph stages?", "xy": [0.0, 0.0], "xyz": [0.0, 0.0, 0.0]}, "vector_hits": [{"chunk_id": "demo-chunk-000", "file": "demo-note-00.md", "score": 0.95, "preview": "The demo pipeline handles the demo cache router demo vector cache token vector. The demo pipeline handles the chunk graph probe cache graph index router index. "}, {"chunk_id": "demo-chunk-001", "file": "demo-note-01.md", "score": 0.92, "preview": "The demo pipeline handles the demo alpha demo demo index signal vector probe. The demo pipeline handles the cache demo graph cache fusion token trace router. Th"}, {"chunk_id": "demo-chunk-002", "file": "demo-note-02.md", "score": 0.89, "preview": "The demo pipeline handles the probe trace cache index graph graph query chunk. The demo pipeline handles the graph router trace trace vector fusion cache probe."}, {"chunk_id": "demo-chunk-003", "file": "demo-note-03.md", "score": 0.86, "preview": "The demo pipeline handles the chunk probe token index fusion chunk chunk probe. The demo pipeline handles the chunk cache alpha fusion token vector chunk probe."}, {"chunk_id": "demo-chunk-004", "file": "demo-note-04.md", "score": 0.83, "preview": "The demo pipeline handles the cache vector fusion trace probe fusion router probe. The demo pipeline handles the router index demo signal signal demo index toke"}, {"chunk_id": "demo-chunk-005", "file": "demo-note-05.md", "score": 0.8, "preview": "The demo pipeline handles the chunk demo cache probe cache trace router query. The demo pipeline handles the token probe router graph chunk vector trace token. "}, {"chunk_id": "demo-chunk-006", "file": "demo-note-06.md", "score": 0.77, "preview": "The demo pipeline handles the token alpha index chunk alpha index trace token. The demo pipeline handles the router alpha demo index probe demo query router. Th"}, {"chunk_id": "demo-chunk-007", "file": "demo-note-07.md", "score": 0.74, "preview": "The demo pipeline handles the signal alpha demo signal trace graph query fusion. The demo pipeline handles the fusion demo graph index probe alpha router index."}, {"chunk_id": "demo-chunk-008", "file": "demo-note-08.md", "score": 0.71, "preview": "The demo pipeline handles the probe chunk token vector fusion demo vector alpha. The demo pipeline handles the router fusion signal graph signal router trace ve"}, {"chunk_id": "demo-chunk-009", "file": "demo-note-09.md", "score": 0.68, "preview": "The demo pipeline handles the graph alpha chunk vector fusion probe chunk signal. The demo pipeline handles the graph probe demo signal demo demo index index. T"}, {"chunk_id": "demo-chunk-010", "file": "demo-note-10.md", "score": 0.65, "preview": "The demo pipeline handles the router trace signal signal index probe vector cache. The demo pipeline handles the cache cache graph graph cache signal fusion ind"}, {"chunk_id": "demo-chunk-011", "file": "demo-note-11.md", "score": 0.62, "preview": "The demo pipeline handles the token query alpha cache graph router chunk cache. The demo pipeline handles the demo router chunk probe query graph vector chunk. "}], "bm25_hits": [{"chunk_id": "demo-chunk-008", "file": "demo-note-08.md", "score": 0.71, "preview": "The demo pipeline handles the probe chunk token vector fusion demo vector alpha. The demo pipeline handles the router fusion signal graph signal router trace ve"}, {"chunk_id": "demo-chunk-009", "file": "demo-note-09.md", "score": 0.68, "preview": "The demo pipeline handles the graph alpha chunk vector fusion probe chunk signal. The demo pipeline handles the graph probe demo signal demo demo index index. T"}, {"chunk_id": "demo-chunk-010", "file": "demo-note-10.md", "score": 0.65, "preview": "The demo pipeline handles the router trace signal signal index probe vector cache. The demo pipeline handles the cache cache graph graph cache signal fusion ind"}, {"chunk_id": "demo-chunk-011", "file": "demo-note-11.md", "score": 0.62, "preview": "The demo pipeline handles the token query alpha cache graph router chunk cache. The demo pipeline handles the demo router chunk probe query graph vector chunk. "}, {"chunk_id": "demo-chunk-012", "file": "demo-note-00.md", "score": 0.59, "preview": "The demo pipeline handles the token graph graph cache index trace alpha token. The demo pipeline handles the query router signal cache probe trace index router."}, {"chunk_id": "demo-chunk-013", "file": "demo-note-01.md", "score": 0.56, "preview": "The demo pipeline handles the chunk demo query fusion signal fusion demo signal. The demo pipeline handles the signal fusion graph trace trace alpha cache signa"}, {"chunk_id": "demo-chunk-014", "file": "demo-note-02.md", "score": 0.53, "preview": "The demo pipeline handles the probe alpha index query alpha cache cache router. The demo pipeline handles the trace trace graph chunk probe chunk query demo. Th"}, {"chunk_id": "demo-chunk-015", "file": "demo-note-03.md", "score": 0.5, "preview": "The demo pipeline handles the vector demo query chunk probe fusion demo demo. The demo pipeline handles the router cache query cache trace router signal query. "}, {"chunk_id": "demo-chunk-016", "file": "demo-note-04.md", "score": 0.47, "preview": "The demo pipeline handles the token fusion cache probe token fusion probe graph. The demo pipeline handles the router router router vector token chunk alpha chu"}, {"chunk_id": "demo-chunk-017", "file": "demo-note-05.md", "score": 0.44, "preview": "The demo pipeline handles the chunk router cache index demo vector token query. The demo pipeline handles the vector query query demo demo demo alpha router. Th"}, {"chunk_id": "demo-chunk-018", "file": "demo-note-06.md", "score": 0.41, "preview": "The demo pipeline handles the cache router demo cache fusion vector router index. The demo pipeline handles the demo trace token index fusion demo graph probe. "}, {"chunk_id": "demo-chunk-019", "file": "demo-note-07.md", "score": 0.38, "preview": "The demo pipeline handles the alpha token index vector demo index chunk trace. The demo pipeline handles the probe router index signal demo signal query demo. T"}], "fusion": [{"chunk_id": "demo-chunk-000", "file": "demo-note-00.md", "score": 0.95, "preview": "The demo pipeline handles the demo cache router demo vector cache token vector. The demo pipeline handles the chunk graph probe cache graph index router index. "}, {"chunk_id": "demo-chunk-001", "file": "demo-note-01.md", "score": 0.92, "preview": "The demo pipeline handles the demo alpha demo demo index signal vector probe. The demo pipeline handles the cache demo graph cache fusion token trace router. Th"}, {"chunk_id": "demo-chunk-002", "file": "demo-note-02.md", "score": 0.89, "preview": "The demo pipeline handles the probe trace cache index graph graph query chunk. The demo pipeline handles the graph router trace trace vector fusion cache probe."}, {"chunk_id": "demo-chunk-003", "file": "demo-note-03.md", "score": 0.86, "preview": "The demo pipeline handles the chunk probe token index fusion chunk chunk probe. The demo pipeline handles the chunk cache alpha fusion token vector chunk probe."}, {"chunk_id": "demo-chunk-004", "file": "demo-note-04.md", "score": 0.83, "preview": "The demo pipeline handles the cache vector fusion trace probe fusion router probe. The demo pipeline handles the router index demo signal signal demo index toke"}, {"chunk_id": "demo-chunk-005", "file": "demo-note-05.md", "score": 0.8, "preview": "The demo pipeline handles the chunk demo cache probe cache trace router query. The demo pipeline handles the token probe router graph chunk vector trace token. "}, {"chunk_id": "demo-chunk-006", "file": "demo-note-06.md", "score": 0.77, "preview": "The demo pipeline handles the token alpha index chunk alpha index trace token. The demo pipeline handles the router alpha demo index probe demo query router. Th"}, {"chunk_id": "demo-chunk-007", "file": "demo-note-07.md", "score": 0.74, "preview": "The demo pipeline handles the signal alpha demo signal trace graph query fusion. The demo pipeline handles the fusion demo graph index probe alpha router index."}, {"chunk_id": "demo-chunk-008", "file": "demo-note-08.md", "score": 0.71, "preview": "The demo pipeline handles the probe chunk token vector fusion demo vector alpha. The demo pipeline handles the router fusion signal graph signal router trace ve"}, {"chunk_id": "demo-chunk-009", "file": "demo-note-09.md", "score": 0.68, "preview": "The demo pipeline handles the graph alpha chunk vector fusion probe chunk signal. The demo pipeline handles the graph probe demo signal demo demo index index. T"}, {"chunk_id": "demo-chunk-010", "file": "demo-note-10.md", "score": 0.65, "preview": "The demo pipeline handles the router trace signal signal index probe vector cache. The demo pipeline handles the cache cache graph graph cache signal fusion ind"}, {"chunk_id": "demo-chunk-011", "file": "demo-note-11.md", "score": 0.62, "preview": "The demo pipeline handles the token query alpha cache graph router chunk cache. The demo pipeline handles the demo router chunk probe query graph vector chunk. "}, {"chunk_id": "demo-chunk-012", "file": "demo-note-00.md", "score": 0.59, "preview": "The demo pipeline handles the token graph graph cache index trace alpha token. The demo pipeline handles the query router signal cache probe trace index router."}, {"chunk_id": "demo-chunk-013", "file": "demo-note-01.md", "score": 0.56, "preview": "The demo pipeline handles the chunk demo query fusion signal fusion demo signal. The demo pipeline handles the signal fusion graph trace trace alpha cache signa"}, {"chunk_id": "demo-chunk-014", "file": "demo-note-02.md", "score": 0.53, "preview": "The demo pipeline handles the probe alpha index query alpha cache cache router. The demo pipeline handles the trace trace graph chunk probe chunk query demo. Th"}, {"chunk_id": "demo-chunk-015", "file": "demo-note-03.md", "score": 0.5, "preview": "The demo pipeline handles the vector demo query chunk probe fusion demo demo. The demo pipeline handles the router cache query cache trace router signal query. "}], "rerank": {"applied": true, "backend": "demo", "order": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], "latency_ms": 12}, "graph": {"nodes": [{"id": "demo-document-0000", "t": "document"}, {"id": "demo-concept-0001", "t": "concept"}, {"id": "demo-tool-0002", "t": "tool"}, {"id": "demo-model-0003", "t": "model"}, {"id": "demo-dataset-0004", "t": "dataset"}, {"id": "demo-metric-0005", "t": "metric"}, {"id": "demo-document-0006", "t": "document"}, {"id": "demo-concept-0007", "t": "concept"}, {"id": "demo-tool-0008", "t": "tool"}, {"id": "demo-model-0009", "t": "model"}, {"id": "demo-dataset-0010", "t": "dataset"}, {"id": "demo-metric-0011", "t": "metric"}, {"id": "demo-document-0012", "t": "document"}, {"id": "demo-concept-0013", "t": "concept"}, {"id": "demo-tool-0014", "t": "tool"}, {"id": "demo-model-0015", "t": "model"}, {"id": "demo-dataset-0016", "t": "dataset"}, {"id": "demo-metric-0017", "t": "metric"}, {"id": "demo-document-0018", "t": "document"}, {"id": "demo-concept-0019", "t": "concept"}, {"id": "demo-tool-0020", "t": "tool"}, {"id": "demo-model-0021", "t": "model"}, {"id": "demo-dataset-0022", "t": "dataset"}, {"id": "demo-metric-0023", "t": "metric"}, {"id": "demo-document-0024", "t": "document"}, {"id": "demo-concept-0025", "t": "concept"}, {"id": "demo-tool-0026", "t": "tool"}, {"id": "demo-model-0027", "t": "model"}, {"id": "demo-dataset-0028", "t": "dataset"}, {"id": "demo-metric-0029", "t": "metric"}, {"id": "demo-document-0030", "t": "document"}, {"id": "demo-concept-0031", "t": "concept"}, {"id": "demo-tool-0032", "t": "tool"}, {"id": "demo-model-0033", "t": "model"}, {"id": "demo-dataset-0034", "t": "dataset"}, {"id": "demo-metric-0035", "t": "metric"}, {"id": "demo-document-0036", "t": "document"}, {"id": "demo-concept-0037", "t": "concept"}, {"id": "demo-tool-0038", "t": "tool"}, {"id": "demo-model-0039", "t": "model"}], "edges": [[0, 57], [0, 12], [0, 140], [1, 125], [1, 114], [1, 71], [2, 52], [2, 279], [2, 44], [3, 302], [3, 216], [3, 16], [4, 15], [4, 47], [4, 111], [5, 119], [5, 258], [5, 308], [6, 13], [6, 287], [6, 101], [7, 279], [7, 214], [7, 112], [8, 229], [8, 301], [8, 142], [9, 3], [9, 81], [9, 216], [10, 174], [10, 142], [10, 79], [11, 110], [11, 172], [11, 52], [12, 47], [12, 194], [12, 49], [13, 183], [13, 176], [13, 309], [14, 135], [14, 22], [14, 235], [15, 274], [15, 63], [15, 193], [16, 40], [16, 282], [16, 150], [17, 316], [17, 185], [17, 295], [18, 98], [18, 35], [18, 23], [19, 116], [19, 148], [19, 40]]}, "context_blocks": [{"ref": "S1", "file": "demo-note-00.md", "chars": 160}, {"ref": "S2", "file": "demo-note-01.md", "chars": 160}, {"ref": "S3", "file": "demo-note-02.md", "chars": 160}, {"ref": "S4", "file": "demo-note-03.md", "chars": 160}, {"ref": "S5", "file": "demo-note-04.md", "chars": 160}, {"ref": "S6", "file": "demo-note-05.md", "chars": 160}, {"ref": "S7", "file": "demo-note-06.md", "chars": 160}, {"ref": "S8", "file": "demo-note-07.md", "chars": 160}, {"ref": "S9", "file": "demo-note-08.md", "chars": 160}, {"ref": "S10", "file": "demo-note-09.md", "chars": 160}], "answer_preview": "Synthetic demo answer: the demo pipeline connects the demo stages.", "full_chunks": [{"chunk_id": "demo-chunk-000", "file": "demo-note-00.md", "score": 0.95, "preview": "The demo pipeline handles the demo cache router demo vector cache token vector. The demo pipeline handles the chunk graph probe cache graph index router index. "}, {"chunk_id": "demo-chunk-001", "file": "demo-note-01.md", "score": 0.92, "preview": "The demo pipeline handles the demo alpha demo demo index signal vector probe. The demo pipeline handles the cache demo graph cache fusion token trace router. Th"}, {"chunk_id": "demo-chunk-002", "file": "demo-note-02.md", "score": 0.89, "preview": "The demo pipeline handles the probe trace cache index graph graph query chunk. The demo pipeline handles the graph router trace trace vector fusion cache probe."}, {"chunk_id": "demo-chunk-003", "file": "demo-note-03.md", "score": 0.86, "preview": "The demo pipeline handles the chunk probe token index fusion chunk chunk probe. The demo pipeline handles the chunk cache alpha fusion token vector chunk probe."}, {"chunk_id": "demo-chunk-004", "file": "demo-note-04.md", "score": 0.83, "preview": "The demo pipeline handles the cache vector fusion trace probe fusion router probe. The demo pipeline handles the router index demo signal signal demo index toke"}, {"chunk_id": "demo-chunk-005", "file": "demo-note-05.md", "score": 0.8, "preview": "The demo pipeline handles the chunk demo cache probe cache trace router query. The demo pipeline handles the token probe router graph chunk vector trace token. "}, {"chunk_id": "demo-chunk-006", "file": "demo-note-06.md", "score": 0.77, "preview": "The demo pipeline handles the token alpha index chunk alpha index trace token. The demo pipeline handles the router alpha demo index probe demo query router. Th"}, {"chunk_id": "demo-chunk-007", "file": "demo-note-07.md", "score": 0.74, "preview": "The demo pipeline handles the signal alpha demo signal trace graph query fusion. The demo pipeline handles the fusion demo graph index probe alpha router index."}, {"chunk_id": "demo-chunk-008", "file": "demo-note-08.md", "score": 0.71, "preview": "The demo pipeline handles the probe chunk token vector fusion demo vector alpha. The demo pipeline handles the router fusion signal graph signal router trace ve"}, {"chunk_id": "demo-chunk-009", "file": "demo-note-09.md", "score": 0.68, "preview": "The demo pipeline handles the graph alpha chunk vector fusion probe chunk signal. The demo pipeline handles the graph probe demo signal demo demo index index. T"}, {"chunk_id": "demo-chunk-010", "file": "demo-note-10.md", "score": 0.65, "preview": "The demo pipeline handles the router trace signal signal index probe vector cache. The demo pipeline handles the cache cache graph graph cache signal fusion ind"}, {"chunk_id": "demo-chunk-011", "file": "demo-note-11.md", "score": 0.62, "preview": "The demo pipeline handles the token query alpha cache graph router chunk cache. The demo pipeline handles the demo router chunk probe query graph vector chunk. "}, {"chunk_id": "demo-chunk-012", "file": "demo-note-00.md", "score": 0.59, "preview": "The demo pipeline handles the token graph graph cache index trace alpha token. The demo pipeline handles the query router signal cache probe trace index router."}, {"chunk_id": "demo-chunk-013", "file": "demo-note-01.md", "score": 0.56, "preview": "The demo pipeline handles the chunk demo query fusion signal fusion demo signal. The demo pipeline handles the signal fusion graph trace trace alpha cache signa"}, {"chunk_id": "demo-chunk-014", "file": "demo-note-02.md", "score": 0.53, "preview": "The demo pipeline handles the probe alpha index query alpha cache cache router. The demo pipeline handles the trace trace graph chunk probe chunk query demo. Th"}, {"chunk_id": "demo-chunk-015", "file": "demo-note-03.md", "score": 0.5, "preview": "The demo pipeline handles the vector demo query chunk probe fusion demo demo. The demo pipeline handles the router cache query cache trace router signal query. "}]}
+{
+  "meta": {
+    "id": "trace_01",
+    "question": "How does quota claim work?",
+    "ll_keywords": [
+      "quota",
+      "claim",
+      "jip",
+      "namespace"
+    ],
+    "hl_keywords": [],
+    "mode": "hybrid",
+    "lightrag_mode": "mix",
+    "mode_fallback": null,
+    "top_k": 6,
+    "fetch_top_k": 6,
+    "candidate_pool": 18,
+    "alpha": 0.5,
+    "latency_ms": {
+      "dense": 32.24,
+      "sparse": 0.37,
+      "rerank": null
+    },
+    "confidence": {
+      "low": false,
+      "threshold": 0.28,
+      "top_dense": 0.5266
+    },
+    "bm25_chunks": 4364,
+    "client_latency_s": 0.12
+  },
+  "query": {
+    "text": "How does quota claim work?",
+    "xy": [
+      0.12,
+      0.35
+    ],
+    "xyz": [
+      0.12,
+      0.35,
+      -0.05
+    ]
+  },
+  "vector_hits": [
+    {
+      "chunk_id": "chunk-ec406996cbc201b223bdc65d495373e5",
+      "dense": 0.5266,
+      "sparse": 6.3278,
+      "fused": 0.7476,
+      "dense_rank": 1,
+      "sparse_rank": 3,
+      "doc": "k8s-jip-controller-quota.md",
+      "section": "",
+      "xy": null,
+      "xyz": null,
+      "file": "k8s-jip-controller-quota.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "chunk-f16ed5ca7ff851d9bf7d6bc7f0bdabad",
+      "dense": 0.5106,
+      "sparse": 0.0,
+      "fused": 0.4423,
+      "dense_rank": 2,
+      "sparse_rank": null,
+      "doc": "quota.md",
+      "section": "docs",
+      "xy": null,
+      "xyz": null,
+      "file": "k8s-jip-controller-quota.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "chunk-c78b7aa557ce784901b09df32d4a1806",
+      "dense": 0.5024,
+      "sparse": 5.4121,
+      "fused": 0.4888,
+      "dense_rank": 3,
+      "sparse_rank": 14,
+      "doc": "self-service-raise-quota.md",
+      "section": "docs",
+      "xy": null,
+      "xyz": null,
+      "file": "k8s-jip-controller-how-to-self-service-raise-quota.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "file:fe2d3e3959fd-chunk-000",
+      "dense": 0.4895,
+      "sparse": 5.43,
+      "fused": 0.4455,
+      "dense_rank": 4,
+      "sparse_rank": 12,
+      "doc": "quota-claim-exceeds-limit.md",
+      "section": "docs",
+      "xy": null,
+      "xyz": null,
+      "file": "k8s-jip-controller-troubleshooting-quota-claim-exceeds-limit.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "chunk-5011a121a085caddc7e13edbc8c289e6",
+      "dense": 0.4627,
+      "sparse": 0.0,
+      "fused": 0.0,
+      "dense_rank": 5,
+      "sparse_rank": 10,
+      "doc": "k8s-jip-controller-quota.md",
+      "section": "",
+      "xy": null,
+      "xyz": null,
+      "file": "k8s-jip-controller-quota.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "chunk-53f6ec6b91ddf7f55dac5baf6c68f7a7",
+      "dense": 0.4587,
+      "sparse": 6.1409,
+      "fused": 0.4679,
+      "dense_rank": 6,
+      "sparse_rank": 4,
+      "doc": "k8s-jip-controller-how-to-self-service-raise-quota.md",
+      "section": "",
+      "xy": null,
+      "xyz": null,
+      "file": "k8s-jip-controller-how-to-self-service-raise-quota.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "chunk-427483d664879aaf43f1146de7f78390",
+      "dense": 0.4559,
+      "sparse": 0.0,
+      "fused": 0.0,
+      "dense_rank": 7,
+      "sparse_rank": null,
+      "doc": "increase-namespace-quota.md",
+      "section": "",
+      "xy": null,
+      "xyz": null,
+      "file": "increase-namespace-quota.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "chunk-d8bed160c2aaffd8d2f139e619ecf9b2",
+      "dense": 0.4474,
+      "sparse": 7.6732,
+      "fused": 0.7145,
+      "dense_rank": 8,
+      "sparse_rank": 1,
+      "doc": "k8s-jip-controller-quota.md",
+      "section": "",
+      "xy": null,
+      "xyz": null,
+      "file": "k8s-jip-controller-quota.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "chunk-a73cd55f71590fa4d0458310015cc8a3",
+      "dense": 0.4338,
+      "sparse": 0.0,
+      "fused": 0.0,
+      "dense_rank": 9,
+      "sparse_rank": null,
+      "doc": "gcp-projects-how-to-enable-gcpproject-self-service.md",
+      "section": "",
+      "xy": null,
+      "xyz": null,
+      "file": "gcp-projects-how-to-enable-gcpproject-self-service.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "file:28becf36a2a9-chunk-000",
+      "dense": 0.4185,
+      "sparse": 0.0,
+      "fused": 0.0,
+      "dense_rank": 10,
+      "sparse_rank": 8,
+      "doc": "quota-not-updated-after-limit-change.md",
+      "section": "",
+      "xy": null,
+      "xyz": null,
+      "file": "quota-not-updated-after-limit-change.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "chunk-68d184858f379c734e058786abddb358",
+      "dense": 0.4152,
+      "sparse": 0.0,
+      "fused": 0.0,
+      "dense_rank": 11,
+      "sparse_rank": null,
+      "doc": "services-icri-agent-pod-sizing.md",
+      "section": "",
+      "xy": null,
+      "xyz": null,
+      "file": "services-icri-agent-pod-sizing.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "chunk-f59ab1f6a426ad1e49eac577dca0380a",
+      "dense": 0.4149,
+      "sparse": 0.0,
+      "fused": 0.0,
+      "dense_rank": 12,
+      "sparse_rank": 11,
+      "doc": "k8s-jip-controller-how-to-increase-namespace-quota.md",
+      "section": "",
+      "xy": null,
+      "xyz": null,
+      "file": "k8s-jip-controller-how-to-increase-namespace-quota.md",
+      "entities": []
+    }
+  ],
+  "bm25_hits": [
+    {
+      "chunk_id": "chunk-d8bed160c2aaffd8d2f139e619ecf9b2",
+      "dense": 0.4474,
+      "sparse": 7.6732,
+      "fused": 0.7145,
+      "dense_rank": 8,
+      "sparse_rank": 1,
+      "doc": "k8s-jip-controller-quota.md",
+      "section": "",
+      "xy": null,
+      "xyz": null,
+      "file": "k8s-jip-controller-quota.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "chunk-4270cbd438440a2509be20ad7b572bfb",
+      "dense": 0.0,
+      "sparse": 6.4842,
+      "fused": 0.0,
+      "dense_rank": null,
+      "sparse_rank": 2,
+      "doc": "k8s-jip-controller-readme.md",
+      "section": "",
+      "xy": null,
+      "xyz": null,
+      "file": "k8s-jip-controller-readme.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "chunk-ec406996cbc201b223bdc65d495373e5",
+      "dense": 0.5266,
+      "sparse": 6.3278,
+      "fused": 0.7476,
+      "dense_rank": 1,
+      "sparse_rank": 3,
+      "doc": "k8s-jip-controller-quota.md",
+      "section": "",
+      "xy": null,
+      "xyz": null,
+      "file": "k8s-jip-controller-quota.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "chunk-53f6ec6b91ddf7f55dac5baf6c68f7a7",
+      "dense": 0.4587,
+      "sparse": 6.1409,
+      "fused": 0.4679,
+      "dense_rank": 6,
+      "sparse_rank": 4,
+      "doc": "k8s-jip-controller-how-to-self-service-raise-quota.md",
+      "section": "",
+      "xy": null,
+      "xyz": null,
+      "file": "k8s-jip-controller-how-to-self-service-raise-quota.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "file:d43a8fb00c49-chunk-000",
+      "dense": 0.0,
+      "sparse": 6.1179,
+      "fused": 0.0,
+      "dense_rank": null,
+      "sparse_rank": 5,
+      "doc": "how-to.md",
+      "section": "",
+      "xy": null,
+      "xyz": null,
+      "file": "how-to.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "chunk-24461398b7aff4a12b71aae3b13dd297",
+      "dense": 0.0,
+      "sparse": 6.059,
+      "fused": 0.0,
+      "dense_rank": null,
+      "sparse_rank": 6,
+      "doc": "k8s-jip-controller-quota.md",
+      "section": "",
+      "xy": null,
+      "xyz": null,
+      "file": "k8s-jip-controller-quota.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "chunk-ac4fb6c78dcbc2ff83333c1dc6103309",
+      "dense": 0.0,
+      "sparse": 5.9353,
+      "fused": 0.0,
+      "dense_rank": 14,
+      "sparse_rank": 7,
+      "doc": "k8s-jip-controller-quota.md",
+      "section": "",
+      "xy": null,
+      "xyz": null,
+      "file": "k8s-jip-controller-quota.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "file:28becf36a2a9-chunk-000",
+      "dense": 0.0,
+      "sparse": 5.8995,
+      "fused": 0.0,
+      "dense_rank": 10,
+      "sparse_rank": 8,
+      "doc": "quota-not-updated-after-limit-change.md",
+      "section": "",
+      "xy": null,
+      "xyz": null,
+      "file": "quota-not-updated-after-limit-change.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "chunk-19d7a5a287a4761bd2565f3073c1b6bc",
+      "dense": 0.0,
+      "sparse": 5.7123,
+      "fused": 0.0,
+      "dense_rank": null,
+      "sparse_rank": 9,
+      "doc": "backup-restore-database.md",
+      "section": "",
+      "xy": null,
+      "xyz": null,
+      "file": "backup-restore-database.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "chunk-5011a121a085caddc7e13edbc8c289e6",
+      "dense": 0.0,
+      "sparse": 5.6835,
+      "fused": 0.0,
+      "dense_rank": 5,
+      "sparse_rank": 10,
+      "doc": "k8s-jip-controller-quota.md",
+      "section": "",
+      "xy": null,
+      "xyz": null,
+      "file": "k8s-jip-controller-quota.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "chunk-f59ab1f6a426ad1e49eac577dca0380a",
+      "dense": 0.0,
+      "sparse": 5.6733,
+      "fused": 0.0,
+      "dense_rank": 12,
+      "sparse_rank": 11,
+      "doc": "k8s-jip-controller-how-to-increase-namespace-quota.md",
+      "section": "",
+      "xy": null,
+      "xyz": null,
+      "file": "k8s-jip-controller-how-to-increase-namespace-quota.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "file:fe2d3e3959fd-chunk-000",
+      "dense": 0.4895,
+      "sparse": 5.43,
+      "fused": 0.4455,
+      "dense_rank": 4,
+      "sparse_rank": 12,
+      "doc": "quota-claim-exceeds-limit.md",
+      "section": "docs",
+      "xy": null,
+      "xyz": null,
+      "file": "k8s-jip-controller-troubleshooting-quota-claim-exceeds-limit.md",
+      "entities": []
+    }
+  ],
+  "fusion": [
+    {
+      "chunk_id": "chunk-ec406996cbc201b223bdc65d495373e5",
+      "dense": 0.0,
+      "sparse": 6.3278,
+      "fused": 0.7476,
+      "dense_rank": 1,
+      "sparse_rank": 3,
+      "doc": "k8s-jip-controller-quota.md",
+      "section": "",
+      "xy": null,
+      "xyz": null,
+      "file": "k8s-jip-controller-quota.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "chunk-d8bed160c2aaffd8d2f139e619ecf9b2",
+      "dense": 0.0,
+      "sparse": 7.6732,
+      "fused": 0.7145,
+      "dense_rank": 8,
+      "sparse_rank": 1,
+      "doc": "k8s-jip-controller-quota.md",
+      "section": "",
+      "xy": null,
+      "xyz": null,
+      "file": "k8s-jip-controller-quota.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "chunk-c78b7aa557ce784901b09df32d4a1806",
+      "dense": 0.0,
+      "sparse": 5.4121,
+      "fused": 0.4888,
+      "dense_rank": 3,
+      "sparse_rank": 14,
+      "doc": "self-service-raise-quota.md",
+      "section": "docs",
+      "xy": null,
+      "xyz": null,
+      "file": "k8s-jip-controller-how-to-self-service-raise-quota.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "chunk-53f6ec6b91ddf7f55dac5baf6c68f7a7",
+      "dense": 0.0,
+      "sparse": 6.1409,
+      "fused": 0.4679,
+      "dense_rank": 6,
+      "sparse_rank": 4,
+      "doc": "k8s-jip-controller-how-to-self-service-raise-quota.md",
+      "section": "",
+      "xy": null,
+      "xyz": null,
+      "file": "k8s-jip-controller-how-to-self-service-raise-quota.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "file:fe2d3e3959fd-chunk-000",
+      "dense": 0.0,
+      "sparse": 5.43,
+      "fused": 0.4455,
+      "dense_rank": 4,
+      "sparse_rank": 12,
+      "doc": "quota-claim-exceeds-limit.md",
+      "section": "docs",
+      "xy": null,
+      "xyz": null,
+      "file": "k8s-jip-controller-troubleshooting-quota-claim-exceeds-limit.md",
+      "entities": []
+    },
+    {
+      "chunk_id": "chunk-f16ed5ca7ff851d9bf7d6bc7f0bdabad",
+      "dense": 0.0,
+      "sparse": 0.0,
+      "fused": 0.4423,
+      "dense_rank": 2,
+      "sparse_rank": null,
+      "doc": "quota.md",
+      "section": "docs",
+      "xy": null,
+      "xyz": null,
+      "file": "k8s-jip-controller-quota.md",
+      "entities": []
+    }
+  ],
+  "rerank": {
+    "before": [
+      "chunk-ec406996cbc201b223bdc65d495373e5",
+      "chunk-d8bed160c2aaffd8d2f139e619ecf9b2",
+      "chunk-c78b7aa557ce784901b09df32d4a1806",
+      "chunk-53f6ec6b91ddf7f55dac5baf6c68f7a7",
+      "file:fe2d3e3959fd-chunk-000",
+      "chunk-f16ed5ca7ff851d9bf7d6bc7f0bdabad"
+    ],
+    "after": [
+      "chunk-ec406996cbc201b223bdc65d495373e5",
+      "chunk-d8bed160c2aaffd8d2f139e619ecf9b2",
+      "chunk-c78b7aa557ce784901b09df32d4a1806",
+      "chunk-53f6ec6b91ddf7f55dac5baf6c68f7a7",
+      "file:fe2d3e3959fd-chunk-000",
+      "chunk-f16ed5ca7ff851d9bf7d6bc7f0bdabad"
+    ],
+    "applied": false,
+    "backend": "off",
+    "latency_ms": null,
+    "pool": 0,
+    "blocked_inversions": null,
+    "fusion_margin": null,
+    "max_fusion_score": null,
+    "fallback_reason": "disabled_by_default",
+    "skip_threshold": null
+  },
+  "graph": {
+    "nodes": [],
+    "edges": []
+  },
+  "context_blocks": {
+    "entities": [
+      {
+        "entity": "JIP QuotaClaim",
+        "type": "concept",
+        "description": "JIP QuotaClaim limits namespace resource counts, including pods, CRD instances, and storage. | JIP QuotaClaim is a custom resource used to control how many resources a namespace can create."
+      },
+      {
+        "entity": "jip-quota-claim",
+        "type": "concept",
+        "description": "jip-quota-claim is a named, namespaced QuotaClaim resource used to inspect and modify quota requests for a namespace, including the object edited through kubectl in my-new-namespace and inspected during an end-to-end backup test.\n\nThe resource can be edited or patched to increase requested quantities, including storage, CPU, pod-count, and the gcpprojects quota identified as gcpprojects.kro.run.\u2026"
+      },
+      {
+        "entity": "exceeded quota: jip-quota",
+        "type": "concept",
+        "description": "exceeded quota: jip-quota is a namespace-scoped rejection that identifies the exhausted resource while the quota binds. | exceeded quota: jip-quota is the rejection error produced when a new database resource or backup/restore Job exceeds the namespace quota."
+      },
+      {
+        "entity": "quotaclaim/jip-quota-claim",
+        "type": "artifact",
+        "description": "The quotaclaim/jip-quota-claim resource is a namespace-specific QuotaClaim resource inspected with kubectl."
+      }
+    ],
+    "relations": [],
+    "sources": [
+      {
+        "ref": "1",
+        "doc": "1",
+        "preview": "> --type=merge -p '{\"spec\":{\"<resource>\":\"<value>\"}}'`\n2. Notify the owner to raise QuotaClaim themselves (via Cloud Console or `kubectl edit quotaclaim`)\n\nQuotaSyncer will reconcile changes to ResourceQuota after QuotaClaim is updated.\n\n**Validation is per-resource, not per-object.** QuotaSyncer iterates `quotaclaim.spec` key by key; a key above its QuotaLimit is skipped with a `validation failed` Warning event (`<resource>: max resource capacity hitted(value/max)`) while every other key is still written to `jip-quota`[^quotaclaim-validation]. Two consequences: an owner whose claim exceeds th"
+      },
+      {
+        "ref": "2",
+        "doc": "2",
+        "preview": "not from a fixed multiplier of `count/jobs.batch`.\n\n**Usage accounting lives in the same object as the limits.** `jip-quota` holds `spec.hard` (limits, written by jip-controller only when QuotaClaim/QuotaLimit change) and `status.used` (counters, rewritten by the API server on every quota-tracked create and by the quota controller on every delete). A namespace that creates and deletes objects at a high rate therefore contends on a single object regardless of how much headroom the limits have, and clients get sporadic `409 Conflict` - see [ResourceQuota 409 Conflict on parallel creates](trouble"
+      },
+      {
+        "ref": "3",
+        "doc": "self-service-raise-quota.md",
+        "preview": "[Document: self-service-raise-quota.md | Section: docs | Date: 2026-09-25]\n\n# Self-Service: Raise Your Namespace Quota\n\nRaise your namespace's resource quota yourself when a deployment is rejected for exceeding it, without SRE involvement - as long as the target value stays within the namespace's QuotaLimit ceiling.\n\n## Prerequisites\n\n- Namespace already exists\n- Access to Cloud Console (JBCC) for the namespace, or `kubectl` context for the cluster\n\n## Steps\n\n1. Check current usage, claim, and limit ([quota system](../quota.md)):\n   ```bash\n   kubectl describe quota jip-quota -n <namespace>   "
+      },
+      {
+        "ref": "4",
+        "doc": "quota-claim-exceeds-limit.md",
+        "preview": "[Document: quota-claim-exceeds-limit.md | Section: docs | Date: 2026-05-22]\n\n# Quota Alert While Current Usage Is Below Limit\n\nJBCC Quotas page or namespace quota checks show an alert for a resource even though current usage is below the limit. Example: namespace uses 4 PostgreSQL databases, but `count/postgresqldatabases.jetbrains.com` claim is set to 6 while the current limit is 4.[^slack]\n\n**Cause:** `QuotaClaim` can be out of sync with both current usage and `QuotaLimit`. The alert is about the requested claim exceeding the allowed limit, not necessarily about current resource usage.\n\n**So"
+      },
+      {
+        "ref": "5",
+        "doc": "5",
+        "preview": "]:\n     ```bash\n     kubectl patch quotaclaim jip-quota-claim -n <namespace> --type=merge \\\n       -p '{\"spec\":{\"requests.cpu\":\"8\",\"limits.cpu\":\"16\",\"count/pods\":\"20\"}}'\n     ```\n   The owner's `user` ClusterRole allows `update`/`patch` on `quotaclaims` and only read on `quotalimits`[^rbac-users].\n\n3. Wait for QuotaSyncer to reconcile - up to 300s (5 min). It applies per-resource: a key at or below its QuotaLimit is written to `jip-quota` even if other keys in the same claim are still above their limit ([quota system](../quota.md)).\n\n4. If the value you need EXCEEDS the current QuotaLimit, sel"
+      },
+      {
+        "ref": "6",
+        "doc": "quota.md",
+        "preview": "[Document: quota.md | Section: docs | Date: 2026-09-21]\n\n# JIP Quota System\n\nThe `QuotaClaim` / `QuotaLimit` CRDs and their projection into the native Kubernetes `ResourceQuota` object `jip-quota`. The QuotaSyncer reconciler that performs the projection is described in [jip-controller](readme.md).\n\n## Default QuotaClaim (initial per namespace)\n\n```\ncount/pods: 10                              persistentvolumeclaims: 0\nrequests.cpu: 5         limits.cpu: 10      requests.nvidia.com/gpu: 0\nrequests.memory: 25Gi   limits.memory: 50Gi requests.storage: 100Gi\nservices.loadbalancers: 0\ncount/s3bucket"
+      },
+      {
+        "ref": "1",
+        "doc": "quota.md",
+        "preview": "[Document: quota.md | Section: docs | Date: 2026-09-21]\n\n# JIP Quota System\n\nThe `QuotaClaim` / `QuotaLimit` CRDs and their projection into the native Kubernetes `ResourceQuota` object `jip-quota`. The QuotaSyncer reconciler that performs the projection is described in [jip-controller](readme.md).\n\n## Default QuotaClaim (initial per namespace)\n\n```\ncount/pods: 10                              persistentvolumeclaims: 0\nrequests.cpu: 5         limits.cpu: 10      requests.nvidia.com/gpu: 0\nrequests.memory: 25Gi   limits.memory: 50Gi requests.storage: 100Gi\nservices.loadbalancers: 0\ncount/s3bucket"
+      },
+      {
+        "ref": "2",
+        "doc": "self-service-raise-quota.md",
+        "preview": "[Document: self-service-raise-quota.md | Section: docs | Date: 2026-09-25]\n\n# Self-Service: Raise Your Namespace Quota\n\nRaise your namespace's resource quota yourself when a deployment is rejected for exceeding it, without SRE involvement - as long as the target value stays within the namespace's QuotaLimit ceiling.\n\n## Prerequisites\n\n- Namespace already exists\n- Access to Cloud Console (JBCC) for the namespace, or `kubectl` context for the cluster\n\n## Steps\n\n1. Check current usage, claim, and limit ([quota system](../quota.md)):\n   ```bash\n   kubectl describe quota jip-quota -n <namespace>   "
+      },
+      {
+        "ref": "1",
+        "doc": "1",
+        "preview": "qldatabases.jetbrains.com: 4\ncount/ingresses.networking.k8s.io: 10         count/jobs.batch: 50\ncount/teamcityprojects.sre.jetbrains.com: 24\ncount/teamcityprojectfeatures.sre.jetbrains.com: 50\ncount/teamcitybuildtypes.sre.jetbrains.com: 40\ncount/teamcityvcsroots.sre.jetbrains.com: 150\ncount/vaultk8sapproles.jetbrains.com: 1\ncount/spaceapplications.jetbrains.com: 5\ncount/awsseses.jetbrains.com: 1\ncount/githubconnections.sre.jetbrains.com: 10\ncount/gcpprojects.kro.run: 0\n```\n\n`services.loadbalancers` and `count/gcpprojects.kro.run` default to 0 in both QuotaClaim and QuotaLimit. Raising either a"
+      },
+      {
+        "ref": "3",
+        "doc": "quota-claim-exceeds-limit.md",
+        "preview": "[Document: quota-claim-exceeds-limit.md | Section: docs | Date: 2026-05-22]\n\n# Quota Alert While Current Usage Is Below Limit\n\nJBCC Quotas page or namespace quota checks show an alert for a resource even though current usage is below the limit. Example: namespace uses 4 PostgreSQL databases, but `count/postgresqldatabases.jetbrains.com` claim is set to 6 while the current limit is 4.[^slack]\n\n**Cause:** `QuotaClaim` can be out of sync with both current usage and `QuotaLimit`. The alert is about the requested claim exceeding the allowed limit, not necessarily about current resource usage.\n\n**So"
+      }
+    ],
+    "source_count": 11
+  },
+  "answer_preview": [
+    {
+      "quote": "> --type=merge -p '{\"spec\":{\"<resource>\":\"<value>\"}}'` 2. Notify the owner to raise QuotaClaim themselves (via Cloud Console or `kubectl edit quotaclaim`)  QuotaSyncer will reconcile changes to ResourceQuota after QuotaClaim is updated.  **Validation is per-re",
+      "chunk_id": "chunk-ec406996cbc201b223bdc65d495373e5",
+      "doc": "k8s-jip-controller-quota.md",
+      "entities": [],
+      "xy": null,
+      "xyz": null
+    },
+    {
+      "quote": "not from a fixed multiplier of `count/jobs.batch`.  **Usage accounting lives in the same object as the limits.** `jip-quota` holds `spec.hard` (limits, written by jip-controller only when QuotaClaim/QuotaLimit change) and `status.used` (counters, rewritten by ",
+      "chunk_id": "chunk-d8bed160c2aaffd8d2f139e619ecf9b2",
+      "doc": "k8s-jip-controller-quota.md",
+      "entities": [],
+      "xy": null,
+      "xyz": null
+    },
+    {
+      "quote": "# Self-Service: Raise Your Namespace Quota  Raise your namespace's resource quota yourself when a deployment is rejected for exceeding it, without SRE involvement - as long as the target value stays within the namespace's QuotaLimit ceiling.  ## Prerequisites ",
+      "chunk_id": "chunk-c78b7aa557ce784901b09df32d4a1806",
+      "doc": "self-service-raise-quota.md",
+      "entities": [],
+      "xy": null,
+      "xyz": null
+    }
+  ],
+  "full_chunks": [
+    {
+      "chunk_id": "chunk-ec406996cbc201b223bdc65d495373e5",
+      "content": "> --type=merge -p '{\"spec\":{\"<resource>\":\"<value>\"}}'`\n2. Notify the owner to raise QuotaClaim themselves (via Cloud Console or `kubectl edit quotaclaim`)\n\nQuotaSyncer will reconcile changes to ResourceQuota after QuotaClaim is updated.\n\n**Validation is per-resource, not per-object.** QuotaSyncer iterates `quotaclaim.spec` key by key; a key above its QuotaLimit is skipped with a `validation failed` Warning event (`<resource>: max resource capacity hitted(value/max)`) while every other key is still written to `jip-quota`[^quotaclaim-validation]. Two consequences: an owner whose claim exceeds the limit on one resource is not blocked on the rest, and a *partial* SRE raise takes effect on its own - once `quotalimit.spec[k] >= quotaclaim.spec[k]`, that key applies at the next resync (<= 300s) with no action from the owner. A claim already sitting above the limit therefore needs no re-submission after the raise.\n\n**Size the raise against deliverable capacity, not against the number requested.** QuotaLimit is an admission ceiling, not a capacity reservation - raising it does not create nodes. Before raising, compute what the namespace's target node pool can actually deliver (`total_max_node_count` x node allocatable) and check the cluster and GCP regional ceilings above it: see [capacity ceilings](../nodes/capacity-ceilings.md). A namespace pinned to one pool by `nodeSelector` cannot exceed that single pool no matter what the quota says.\n\n**Warning - raising a quota past deliverable capacity relocates the failure from one namespace to the whole cluster.** While the quota binds, exhaustion is a clean namespace-scoped `exceeded quota: jip-quota` rejection naming the resource. Once the quota is above what the region can supply, the same workload instead drains the shared GCP regional CPU quota, and scale-up then fails for every namespace in the cluster with a message that names neither the cause nor the tenant responsible - see [autoscaler max size due to GCP quota](../nodes/troubleshooting/autoscaler-max-size-gcp-quota.md). When a request exceeds deliverable capacity, the answer is a capacity conversation with the pool owner, not a larger number.\n\nSee [how-to/increase-namespace-quota](how-to/increase-namespace-quota.md) for full procedure.\n\nKubef"
+    },
+    {
+      "chunk_id": "chunk-d8bed160c2aaffd8d2f139e619ecf9b2",
+      "content": "not from a fixed multiplier of `count/jobs.batch`.\n\n**Usage accounting lives in the same object as the limits.** `jip-quota` holds `spec.hard` (limits, written by jip-controller only when QuotaClaim/QuotaLimit change) and `status.used` (counters, rewritten by the API server on every quota-tracked create and by the quota controller on every delete). A namespace that creates and deletes objects at a high rate therefore contends on a single object regardless of how much headroom the limits have, and clients get sporadic `409 Conflict` - see [ResourceQuota 409 Conflict on parallel creates](troubleshooting/resourcequota-409-conflict-parallel-creates.md). Raising quota values does not affect this; reducing the number of quota-tracked objects per unit of work does.\n\n```bash\n# View current usage\nkubectl describe quota jip-quota -n my-namespace\n\n# Increase quota (within QuotaLimit)\nkubectl edit quotaclaim jip-quota-claim -n my-namespace\n\n# Exceeding QuotaLimit \u2192 contact SRE\n```\n\n## SRE: Editing Quotas\n\nSRE edits only QuotaLimit. QuotaClaim is managed by namespace owners.\n\n**Warning - `agents-*` (macOS build agent) namespaces do not follow this split.** Their QuotaClaim and QuotaLimit are not created by the JIP namespace-provisioning ConfigMap but rendered from the `cluster` chart, which emits both objects with identical values derived from one `agents_quota` knob. The owner therefore has no headroom to self-serve and every increase is an MR on the cluster values file. See [agent pod sizing and namespace quota](../../services/icri/agent-pod-sizing.md).\n\nQuota is never removed entirely - SRE raises QuotaLimit to fit the requested workload instead. For a request to \"remove quota\", confirm the target workload size and raise the limit to cover it.[^quota-no-remove]\n\nWhen user requests quota increase beyond default limits:\n\n1. Increase QuotaLimit: `kubectl patch quotalimit jip-limits -n <namespace> --context=<cluster> --type=merge -p '{\"spec\":{\"<resource>\":\"<value>\"}}'`\n2. Notify the owner to raise QuotaClaim themselves (via Cloud Console or `kubectl edit quotaclaim`)\n\nQuotaSyncer will reconcile changes to ResourceQuota after QuotaClaim is updated.\n\n**Validation is"
+    },
+    {
+      "chunk_id": "chunk-c78b7aa557ce784901b09df32d4a1806",
+      "content": "[Document: self-service-raise-quota.md | Section: docs | Date: 2026-09-25]\n\n# Self-Service: Raise Your Namespace Quota\n\nRaise your namespace's resource quota yourself when a deployment is rejected for exceeding it, without SRE involvement - as long as the target value stays within the namespace's QuotaLimit ceiling.\n\n## Prerequisites\n\n- Namespace already exists\n- Access to Cloud Console (JBCC) for the namespace, or `kubectl` context for the cluster\n\n## Steps\n\n1. Check current usage, claim, and limit ([quota system](../quota.md)):\n   ```bash\n   kubectl describe quota jip-quota -n <namespace>                              # Used vs Hard\n   kubectl get quotaclaim jip-quota-claim -n <namespace> -o jsonpath='{.spec}'   # your claim\n   kubectl get quotalimit jip-limits -n <namespace> -o jsonpath='{.spec}'        # the self-service ceiling\n   ```\n   `Hard` in `jip-quota` is the claim value QuotaSyncer applied, not the QuotaLimit - QuotaSyncer copies each QuotaClaim key into `jip-quota` only when it is at or below the same QuotaLimit key[^quotaclaim-sync]. Read the ceiling from `jip-limits`; namespace owners can read `quotalimits` (the `user` ClusterRole aggregates `jetbrains-view`, which grants `get/list/watch` on them)[^rbac-users].\n   Or in Cloud Console: namespace -> Quotas page.\n\n2. Compare the value you need against `jip-limits` from step 1. If it fits within QuotaLimit, raise `QuotaClaim` yourself:\n   - Cloud Console: Quotas page, edit the value, save\n   - CLI, interactive: `kubectl edit quotaclaim jip-quota-claim -n <namespace>`\n   - CLI, non-interactive (scripts, AI agents) - `spec` is a flat map of resource name to quantity string, so a JSON merge patch sets only the listed keys[^quotaclaim-crd]:\n     ```bash\n     kubectl patch quotaclaim jip-quota-claim -n <namespace> --type=merge \\\n       -p '{\"spec\":{\"requests.cpu\":\"8\",\"limits.cpu\":\"16\",\"count/pods\":\"20\"}}'\n     ```\n   The owner's `user` ClusterRole allows `update"
+    },
+    {
+      "chunk_id": "chunk-53f6ec6b91ddf7f55dac5baf6c68f7a7",
+      "content": "]:\n     ```bash\n     kubectl patch quotaclaim jip-quota-claim -n <namespace> --type=merge \\\n       -p '{\"spec\":{\"requests.cpu\":\"8\",\"limits.cpu\":\"16\",\"count/pods\":\"20\"}}'\n     ```\n   The owner's `user` ClusterRole allows `update`/`patch` on `quotaclaims` and only read on `quotalimits`[^rbac-users].\n\n3. Wait for QuotaSyncer to reconcile - up to 300s (5 min). It applies per-resource: a key at or below its QuotaLimit is written to `jip-quota` even if other keys in the same claim are still above their limit ([quota system](../quota.md)).\n\n4. If the value you need EXCEEDS the current QuotaLimit, self-service is not possible - raising QuotaClaim alone has no effect, QuotaSyncer skips any key above its limit. Contact SRE via #sre with the namespace, resource, and target value; SRE follows [increase-namespace-quota](increase-namespace-quota.md) to raise the ceiling.\n\n**Warning - `services.loadbalancers` and `count/gcpprojects.kro.run` default to 0 in both QuotaClaim AND QuotaLimit.** These are feature gates, not just capacity limits - raising your QuotaClaim does nothing until SRE also raises QuotaLimit. Treat a request to enable either as a feature-enablement request to SRE, not a self-service sizing change ([quota system](../quota.md)).\n\n## Verification\n\n```bash\nkubectl describe quota jip-quota -n <namespace>\n```\nThe resource's hard value should match what you set, once QuotaSyncer has resynced (up to 5 min).\n\n## Common Issues\n\n- **[ResourceQuota not updated after QuotaLimit/QuotaClaim change](../troubleshooting/quota-not-updated-after-limit-change.md)** - wait for the 5 min resync before investigating\n- **[quota-claim-exceeds-limit](../troubleshooting/quota-claim-exceeds-limit.md)** - alert fires when your claim is set above the current limit; the fix is contacting SRE (step 4), not resubmitting the claim\n- **[Job retry deadlock on pod quota](../troubleshooting/job-retry-deadlock-on-pod-quota.md)** - for Job-heavy workloads"
+    },
+    {
+      "chunk_id": "file:fe2d3e3959fd-chunk-000",
+      "content": "[Document: quota-claim-exceeds-limit.md | Section: docs | Date: 2026-05-22]\n\n# Quota Alert While Current Usage Is Below Limit\n\nJBCC Quotas page or namespace quota checks show an alert for a resource even though current usage is below the limit. Example: namespace uses 4 PostgreSQL databases, but `count/postgresqldatabases.jetbrains.com` claim is set to 6 while the current limit is 4.[^slack]\n\n**Cause:** `QuotaClaim` can be out of sync with both current usage and `QuotaLimit`. The alert is about the requested claim exceeding the allowed limit, not necessarily about current resource usage.\n\n**Solution/Workaround:** Lower the claim to the current limit in JBCC Quotas or via `kubectl edit quotaclaim jip-quota-claim -n <namespace>`. If the higher value is required, ask SRE to increase `QuotaLimit` first, then raise the claim again.\n\n[^slack]: https://jetbrains.slack.com/archives/C01QA0S88N7/p1779279626799099 (2026-05-20)"
+    },
+    {
+      "chunk_id": "chunk-f16ed5ca7ff851d9bf7d6bc7f0bdabad",
+      "content": "[Document: quota.md | Section: docs | Date: 2026-09-21]\n\n# JIP Quota System\n\nThe `QuotaClaim` / `QuotaLimit` CRDs and their projection into the native Kubernetes `ResourceQuota` object `jip-quota`. The QuotaSyncer reconciler that performs the projection is described in [jip-controller](readme.md).\n\n## Default QuotaClaim (initial per namespace)\n\n```\ncount/pods: 10                              persistentvolumeclaims: 0\nrequests.cpu: 5         limits.cpu: 10      requests.nvidia.com/gpu: 0\nrequests.memory: 25Gi   limits.memory: 50Gi requests.storage: 100Gi\nservices.loadbalancers: 0\ncount/s3buckets.jetbrains.com: 2            count/gcsbuckets.jetbrains.com: 2\ncount/postgresqldatabases.jetbrains.com: 1  count/mysqldatabases.jetbrains.com: 1\ncount/ingresses.networking.k8s.io: 5        count/jobs.batch: 20\ncount/teamcityprojects.sre.jetbrains.com: 24\ncount/teamcityprojectfeatures.sre.jetbrains.com: 50\ncount/teamcitybuildtypes.sre.jetbrains.com: 20\ncount/teamcityvcsroots.sre.jetbrains.com: 100\ncount/vaultk8sapproles.jetbrains.com: 1\ncount/spaceapplications.jetbrains.com: 1\ncount/awsseses.jetbrains.com: 1\ncount/githubconnections.sre.jetbrains.com: 2\ncount/gcpprojects.kro.run: 0\n```\n\n## Default QuotaLimit (hard max)\n\n```\ncount/pods: 50                                persistentvolumeclaims: 5\nrequests.cpu: 10         limits.cpu: 20       requests.nvidia.com/gpu: 4\nrequests.memory: 50Gi    limits.memory: 100Gi requests.storage: 1Ti\nservices.loadbalancers: 0\ncount/s3buckets.jetbrains.com: 10             count/gcsbuckets.jetbrains.com: 10\ncount/postgresqldatabases.jetbrains.com: 4    count/mysqldatabases.jetbrains.com: 4\ncount/ingresses.networking.k8s.io: 10         count/jobs.batch: 50\ncount/teamcityprojects.sre.jetbrains.com: 24\ncount/teamcityprojectfeatures.sre.jetbrains.com: 50\ncount/teamcitybuildtypes.sre.jetbrains"
+    }
+  ]
+}

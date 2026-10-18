@@ -8,6 +8,8 @@ import { INK, toWorld3, type XYZ } from "../lib/cosmos";
 import type { AnyCosmos } from "../lib/cosmos2d";
 import { asJourney3D } from "../lib/cosmos3d";
 import { loadIngestFixture, loadTrace } from "../lib/data";
+import { compileLiveTrace } from "../lib/compileLive";
+import { fetchLiveTraceJson, CANONICAL_QUESTION, CANONICAL_KEYWORDS } from "../lib/live";
 import type { LoadedCosmos, SourcePhase } from "../lib/cosmosSource";
 import { stageCamera } from "../lib/journeyCam";
 import { makeTimeline, type Timeline } from "../lib/reveal";
@@ -85,8 +87,12 @@ export default function PresentationView({ onExit, data, source, liveTrace, onOp
 
   const ch = CHAPTERS[chapter];
   const ctx: PresCtx = useMemo(
-    () => ({ trace, nodes: graph?.nodes.length ?? 0, edges: graph?.edges.length ?? 0 }),
-    [trace, graph],
+    () => ({
+      trace,
+      nodes: data?.identity?.nodes ?? graph?.nodes.length ?? 0,
+      edges: data?.identity?.edges ?? graph?.edges.length ?? 0,
+    }),
+    [trace, graph, data],
   );
 
   // ---- data: the app-level LoadedCosmos (live OR explicitly-opened demo).
@@ -113,23 +119,96 @@ export default function PresentationView({ onExit, data, source, liveTrace, onOp
     );
   }, [dataKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ---- chapter trace: demo -> the captured trace_01 fixture; live -> the
-  // latest live recall (a live recall against the CONNECTED memory). Nothing
-  // is shown when neither exists — the chapter card says so instead.
-  const demoMode = source.phase === "demo";
+  // ---- Chapter 2: Ingest panel fixture (real SRE note with extraction records)
   useEffect(() => {
     let dead = false;
-    if (demoMode) {
-      loadTrace("traces/trace_01.json").then((tr) => !dead && setTrace(tr)).catch(() => undefined);
-      loadIngestFixture().then((fx) => !dead && setFixture(fx as IngestFixture)).catch(() => undefined);
-    } else {
-      setTrace(liveTrace);
-      setFixture(null); // the ingest chapter replays ONE captured note — demo data
-    }
+    loadIngestFixture()
+      .then((fx) => !dead && setFixture(fx as IngestFixture))
+      .catch(() => undefined);
     return () => {
       dead = true;
     };
-  }, [demoMode, liveTrace]);
+  }, []);
+
+  // ---- Chapters 3-8 trace:
+  // Live mode: fetch REAL trace from the live HARS memory trace API (/travel/api/trace/trace)
+  // compiled on the real live index; fallback to real production trace snapshot.
+  const demoMode = source.phase === "demo";
+  useEffect(() => {
+    let dead = false;
+
+    // 1. If liveTrace was already provided by caller (e.g. from query bar), use it
+    if (liveTrace) {
+      setTrace(liveTrace);
+      return;
+    }
+
+    // 2. Explicit demo mode: load baked real trace
+    if (demoMode) {
+      loadTrace("traces/trace_01.json")
+        .then((tr) => !dead && setTrace(tr))
+        .catch(() => undefined);
+      return;
+    }
+
+    // 3. Live mode: fetch real trace from the live HARS memory trace API!
+    let cancelled = false;
+    async function loadRealTrace() {
+      try {
+        const { result, events, clientLatencyS } = await fetchLiveTraceJson(CANONICAL_QUESTION, {
+          keywords: CANONICAL_KEYWORDS,
+          timeoutMs: 15_000,
+        });
+        if (cancelled || dead) return;
+
+        if (data) {
+          const idxOf = new Map(data.names.map((n, i) => [n, i] as const));
+          const entityXy = new Map<string, [number, number]>();
+          const entityXyz = new Map<string, XYZ>();
+          data.graph.nodes.forEach((n, i) => {
+            const v = posByIdx ? posByIdx[i] : null;
+            if (v) {
+              entityXyz.set(n.id, v);
+              entityXy.set(n.id, [v[0], v[1]]);
+            }
+          });
+          const compiled = compileLiveTrace(
+            CANONICAL_QUESTION,
+            result,
+            clientLatencyS,
+            {
+              graph: data.graph,
+              idxOf,
+              entityXy,
+              entityXyz,
+              chunkXyz: data.chunkCoords ?? {},
+            },
+            events,
+          );
+          if (!cancelled && !dead) {
+            setTrace(compiled);
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn("Live trace API fetch failed, falling back to canonical trace:", e);
+      }
+
+      // Offline fallback: load real canonical production trace from trace_01.json
+      if (!cancelled && !dead) {
+        loadTrace("traces/trace_01.json")
+          .then((tr) => !cancelled && !dead && setTrace(tr))
+          .catch(() => undefined);
+      }
+    }
+
+    loadRealTrace();
+
+    return () => {
+      cancelled = true;
+      dead = true;
+    };
+  }, [demoMode, liveTrace, dataKey, posByIdx]);
 
   // honest progress when there is no data yet (probing / not connected)
   useEffect(() => {
@@ -360,6 +439,8 @@ export default function PresentationView({ onExit, data, source, liveTrace, onOp
 
       <div className="pres-top">
         <span className="pres-brand">MEMORY TRAVEL · {t.presLaunch}</span>
+        <a className="doclink" href="/travel/presentation.html" target="_blank" rel="noopener">{t.tabPresentation}</a>
+        <a className="doclink" href="/evals/" target="_blank" rel="noopener" title={t.evalsTitle}>{t.tabEvals}</a>
         <button className="langtoggle" onClick={() => setLangL10n(lang === "ru" ? "en" : "ru")} title={t.presLang}>
           {lang.toUpperCase()}
         </button>

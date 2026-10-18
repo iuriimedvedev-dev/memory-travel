@@ -592,8 +592,86 @@ declare const __MEMORY_TRACE_URL__: string;
 export const TRACE_DIRECT_URL =
   typeof __MEMORY_TRACE_URL__ === "string" ? __MEMORY_TRACE_URL__ : "";
 
-function traceBases(): string[] {
-  return [TRACE_PROXY_PATH, TRACE_DIRECT_URL].filter(Boolean);
+export function traceBases(): string[] {
+  const bases = [
+    TRACE_PROXY_PATH,
+    API_BASE ? `${API_BASE}/api/trace` : null,
+    "/travel/api/trace",
+    "/api/trace",
+    TRACE_DIRECT_URL,
+    "http://127.0.0.1:8098",
+  ].filter(Boolean) as string[];
+  return [...new Set(bases)];
+}
+
+export const CANONICAL_QUESTION = "How does quota claim work?";
+export const CANONICAL_KEYWORDS = ["quota", "claim", "jip", "namespace"];
+
+/**
+ * Fetch a complete JSON trace for a question via GET /trace?format=json.
+ * Uses traceBases() (same-origin /travel/api/trace proxy, /api/trace, direct URL, localhost).
+ */
+export async function fetchLiveTraceJson(
+  question = CANONICAL_QUESTION,
+  opts: { keywords?: string[]; signal?: AbortSignal; timeoutMs?: number } = {},
+): Promise<{ result: Record<string, unknown>; events: TraceEvent[]; clientLatencyS: number }> {
+  const timeoutMs = opts.timeoutMs ?? 15_000;
+  const kws = opts.keywords ?? (question === CANONICAL_QUESTION ? CANONICAL_KEYWORDS : keywordsFor(question));
+  const q = encodeURIComponent(question.trim());
+  const query =
+    `question=${q}&mode=hybrid&top_k=6&format=json` +
+    `&ll_keywords=${encodeURIComponent(kws.join(","))}` +
+    `&hl_keywords=${encodeURIComponent(kws.slice(0, 3).join(","))}`;
+
+  const t0 = performance.now();
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(new DOMException(`trace timed out after ${timeoutMs / 1000}s`, "AbortError")), timeoutMs);
+  if (opts.signal) {
+    if (opts.signal.aborted) {
+      clearTimeout(timer);
+      throw opts.signal.reason ?? new DOMException("cancelled", "AbortError");
+    }
+    opts.signal.addEventListener("abort", () => ctrl.abort(opts.signal!.reason), { once: true });
+  }
+
+  try {
+    const failures: string[] = [];
+    for (const base of traceBases()) {
+      try {
+        const url = `${base}/trace?${query}`;
+        const r = await fetch(url, { signal: ctrl.signal });
+        if (!r.ok) {
+          failures.push(`${url}: HTTP ${r.status}`);
+          continue;
+        }
+        const data = (await r.json()) as { ok?: boolean; events?: TraceEvent[] };
+        if (!data.ok || !Array.isArray(data.events)) {
+          failures.push(`${url}: missing ok or events array`);
+          continue;
+        }
+        const events = data.events;
+        const resEvent = events.find((e) => e.event === "result");
+        const doneEvent = events.find((e) => e.event === "done");
+        const resData = resEvent?.data;
+        if (!resData) {
+          failures.push(`${url}: result event missing`);
+          continue;
+        }
+        const totalMs = typeof doneEvent?.data?.["total_ms"] === "number" ? Number(doneEvent.data["total_ms"]) : performance.now() - t0;
+        return {
+          result: resData,
+          events,
+          clientLatencyS: totalMs / 1000,
+        };
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") throw e;
+        failures.push(`${base}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    throw new Error(`fetchLiveTraceJson unreachable: ${failures.join(" | ")}`);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 let traceSupport: boolean | null = null;

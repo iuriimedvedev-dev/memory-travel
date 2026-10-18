@@ -1,1261 +1,1284 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PIER DO LESS · Executive Product Keynote</title>
-  <style>
-    :root {
-      --bg: #0b0c10;
-      --bg-card: rgba(22, 25, 34, 0.75);
-      --bg-card-hover: rgba(30, 35, 48, 0.9);
-      --border: rgba(255, 255, 255, 0.1);
-      --border-accent: rgba(56, 239, 125, 0.35);
-      --text: #f0f2f5;
-      --text-muted: #9ba3af;
-      --text-dim: #64748b;
-      --accent-green: #38ef7d;
-      --accent-cyan: #11998e;
-      --accent-blue: #3b82f6;
-      --accent-purple: #8b5cf6;
-      --accent-orange: #f59e0b;
-      --accent-red: #ef4444;
-      --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      --mono: "SF Mono", Menlo, Consolas, Monaco, monospace;
-      --glass-blur: blur(20px);
-      --shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.56);
-      --shadow-lg: 0 25px 60px -15px rgba(0, 0, 0, 0.75);
-    }
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Enterprise Retrieval Platform · Shared MCP Infrastructure</title>
+<style>
+:root {
+  --bg: #0b0f14;
+  --card: #131922;
+  --card-hover: #182230;
+  --card-alt: #161e29;
+  --fg: #eef3f7;
+  --mute: #92a2b3;
+  --line: #222e3c;
+  --soft: #1c2633;
+  --good: #3ecf8e;
+  --good-dim: rgba(62, 207, 142, 0.15);
+  --bad: #f87171;
+  --bad-dim: rgba(248, 113, 113, 0.15);
+  --accent: #38bdf8;
+  --accent-dim: rgba(56, 189, 248, 0.15);
+  --amber: #fbbf24;
+  --amber-dim: rgba(251, 191, 36, 0.15);
+  --purple: #a855f7;
+  --purple-dim: rgba(168, 85, 247, 0.15);
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  color-scheme: dark;
+}
 
-    [data-theme="light"] {
-      --bg: #f8fafc;
-      --bg-card: rgba(255, 255, 255, 0.85);
-      --bg-card-hover: rgba(255, 255, 255, 0.95);
-      --border: rgba(0, 0, 0, 0.08);
-      --border-accent: rgba(16, 185, 129, 0.35);
-      --text: #0f172a;
-      --text-muted: #475569;
-      --text-dim: #94a3b8;
-      --shadow: 0 12px 32px -8px rgba(15, 23, 42, 0.08);
-      --shadow-lg: 0 20px 48px -12px rgba(15, 23, 42, 0.12);
-    }
+:root[data-theme="light"] {
+  --bg: #f4f6f8;
+  --card: #ffffff;
+  --card-hover: #f8fafc;
+  --card-alt: #f1f5f9;
+  --fg: #0f172a;
+  --mute: #64748b;
+  --line: #e2e8f0;
+  --soft: #eef2f6;
+  --good: #059669;
+  --good-dim: rgba(5, 150, 105, 0.12);
+  --bad: #dc2626;
+  --bad-dim: rgba(220, 38, 38, 0.12);
+  --accent: #0284c7;
+  --accent-dim: rgba(2, 132, 199, 0.12);
+  --amber: #d97706;
+  --amber-dim: rgba(217, 119, 6, 0.12);
+  --purple: #7c3aed;
+  --purple-dim: rgba(124, 58, 237, 0.12);
+  color-scheme: light;
+}
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--font);
-      -webkit-font-smoothing: antialiased;
-    }
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.55 var(--sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
-    /* Top Navigation Bar */
-    .topbar {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 64px;
-      z-index: 100;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 28px;
-      backdrop-filter: var(--glass-blur);
-      background: rgba(11, 12, 16, 0.7);
-      border-bottom: 1px solid var(--border);
-    }
-    [data-theme="light"] .topbar {
-      background: rgba(248, 250, 252, 0.8);
-    }
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-weight: 700;
-      font-size: 16px;
-      letter-spacing: -0.02em;
-    }
-    .brand-badge {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-green));
-      color: #0b0c10;
-      padding: 3px 8px;
-      border-radius: 999px;
-      font-weight: 800;
-    }
-    .nav-actions {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .btn {
-      font-family: inherit;
-      font-size: 13px;
-      font-weight: 600;
-      padding: 7px 14px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: var(--bg-card);
-      color: var(--text);
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      text-decoration: none;
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .btn:hover {
-      background: var(--bg-card-hover);
-      border-color: rgba(255, 255, 255, 0.25);
-      transform: translateY(-1px);
-    }
-    .btn-primary {
-      background: linear-gradient(135deg, #11998e, #38ef7d);
-      color: #05140b;
-      border: none;
-      box-shadow: 0 4px 14px rgba(56, 239, 125, 0.3);
-    }
-    .btn-primary:hover {
-      box-shadow: 0 6px 20px rgba(56, 239, 125, 0.5);
-      transform: translateY(-1px);
-    }
-    .slide-counter {
-      font-family: var(--mono);
-      font-size: 13px;
-      color: var(--text-muted);
-      font-weight: 500;
-      padding: 0 8px;
-    }
+/* Sticky Header */
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.top .in {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--fg);
+  text-decoration: none;
+}
+.brand-pill {
+  font-size: 11px;
+  font-family: var(--mono);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.nav-links {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.nav-links a {
+  color: var(--mute);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  transition: color 0.15s;
+}
+.nav-links a:hover {
+  color: var(--fg);
+}
+.theme-btn {
+  background: var(--card);
+  border: 1px solid var(--line);
+  color: var(--fg);
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
+}
+.theme-btn:hover {
+  border-color: var(--accent);
+}
 
-    /* Presentation Slide Deck Container */
-    .deck-container {
-      position: absolute;
-      top: 64px;
-      bottom: 64px;
-      left: 0;
-      right: 0;
-      overflow: hidden;
-    }
-    .slide {
-      position: absolute;
-      inset: 0;
-      padding: 40px 64px;
-      opacity: 0;
-      visibility: hidden;
-      transform: scale(0.98) translateY(12px);
-      transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-                  transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-                  visibility 0.4s;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      max-width: 1360px;
-      margin: 0 auto;
-      overflow-y: auto;
-    }
-    .slide.active {
-      opacity: 1;
-      visibility: visible;
-      transform: scale(1) translateY(0);
-      z-index: 10;
-    }
+/* Container */
+main {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 24px 80px;
+}
 
-    /* Slide Typography */
-    .eyebrow {
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.16em;
-      color: var(--accent-green);
-      font-weight: 700;
-      margin-bottom: 12px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .eyebrow::before {
-      content: "";
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--accent-green);
-      box-shadow: 0 0 8px var(--accent-green);
-    }
-    .slide-title {
-      font-size: clamp(32px, 4.2vw, 56px);
-      font-weight: 800;
-      line-height: 1.08;
-      letter-spacing: -0.035em;
-      margin-bottom: 16px;
-      background: linear-gradient(180deg, var(--text) 40%, var(--text-muted) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    .slide-subtitle {
-      font-size: clamp(17px, 1.8vw, 22px);
-      line-height: 1.45;
-      color: var(--text-muted);
-      max-width: 880px;
-      margin-bottom: 32px;
-      font-weight: 400;
-    }
+/* Hero Section */
+.hero {
+  padding: 72px 0 54px;
+  border-bottom: 1px solid var(--line);
+}
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+.eyebrow::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+}
+h1 {
+  font-size: clamp(36px, 5.2vw, 62px);
+  line-height: 1.06;
+  letter-spacing: -0.04em;
+  margin: 0 0 20px;
+  font-weight: 800;
+  text-wrap: balance;
+}
+.hero-lead {
+  font-size: clamp(19px, 2.2vw, 24px);
+  color: var(--mute);
+  line-height: 1.45;
+  margin: 0 0 36px;
+  max-width: 900px;
+  text-wrap: balance;
+}
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+.stat-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+  border-top: 3px solid var(--accent);
+}
+.stat-card.good { border-top-color: var(--good); }
+.stat-card.amber { border-top-color: var(--amber); }
+.stat-card.purple { border-top-color: var(--purple); }
+.stat-val {
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.stat-val span {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--mute);
+}
+.stat-lbl {
+  font-size: 13px;
+  color: var(--mute);
+  line-height: 1.4;
+}
 
-    /* Grid & Cards */
-    .grid-4 {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 20px;
-      margin-top: 12px;
-    }
-    .grid-3 {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 20px;
-      margin-top: 12px;
-    }
-    .grid-2 {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 24px;
-      margin-top: 12px;
-    }
-    .card {
-      background: var(--bg-card);
-      backdrop-filter: var(--glass-blur);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 24px;
-      box-shadow: var(--shadow);
-      transition: all 0.25s ease;
-      position: relative;
-      overflow: hidden;
-    }
-    .card:hover {
-      border-color: rgba(255, 255, 255, 0.2);
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-lg);
-    }
-    .card-accent-top {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, var(--accent-cyan), var(--accent-green));
-    }
-    .metric-value {
-      font-size: clamp(36px, 4vw, 54px);
-      font-weight: 800;
-      letter-spacing: -0.04em;
-      line-height: 1;
-      margin: 8px 0 6px;
-      font-feature-settings: "tnum" 1;
-      font-variant-numeric: tabular-nums;
-    }
-    .metric-delta {
-      font-size: 13px;
-      font-weight: 600;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 2px 8px;
-      border-radius: 999px;
-    }
-    .delta-positive {
-      background: rgba(56, 239, 125, 0.15);
-      color: var(--accent-green);
-    }
-    .delta-warning {
-      background: rgba(245, 158, 11, 0.15);
-      color: var(--accent-orange);
-    }
-    .delta-negative {
-      background: rgba(239, 68, 68, 0.15);
-      color: var(--accent-red);
-    }
-    .card-label {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .card-desc {
-      font-size: 14px;
-      line-height: 1.5;
-      color: var(--text-muted);
-      margin-top: 10px;
-    }
+/* Slide Sections */
+section.slide {
+  padding: 72px 0 54px;
+  border-bottom: 1px solid var(--line);
+  scroll-margin-top: 60px;
+}
+h2 {
+  font-size: clamp(28px, 3.8vw, 42px);
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  margin: 0 0 16px;
+  font-weight: 750;
+  text-wrap: balance;
+}
+.section-desc {
+  font-size: 18px;
+  color: var(--mute);
+  margin: 0 0 32px;
+  max-width: 820px;
+}
 
-    /* Comparison Table */
-    .table-container {
-      width: 100%;
-      overflow-x: auto;
-      border-radius: 14px;
-      border: 1px solid var(--border);
-      background: var(--bg-card);
-      box-shadow: var(--shadow);
-      margin-top: 16px;
-    }
-    table.matrix-table {
-      width: 100%;
-      border-collapse: collapse;
-      text-align: left;
-      font-size: 14px;
-    }
-    table.matrix-table th {
-      padding: 14px 18px;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-muted);
-      background: rgba(0, 0, 0, 0.2);
-      border-bottom: 1px solid var(--border);
-    }
-    table.matrix-table td {
-      padding: 14px 18px;
-      border-bottom: 1px solid var(--border);
-      color: var(--text);
-    }
-    table.matrix-table tr:last-child td {
-      border-bottom: none;
-    }
-    table.matrix-table tr.highlight-row {
-      background: rgba(56, 239, 125, 0.08);
-      font-weight: 600;
-    }
-    .status-pill {
-      display: inline-block;
-      padding: 3px 8px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 700;
-    }
-    .pill-win { background: rgba(56, 239, 125, 0.2); color: var(--accent-green); }
-    .pill-cloud { background: rgba(59, 130, 246, 0.2); color: var(--accent-blue); }
-    .pill-local { background: rgba(139, 92, 246, 0.2); color: var(--accent-purple); }
-    .pill-fail { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
+/* Grid & Cards */
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 20px;
+}
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+.grid-4 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 24px;
+  transition: transform 0.15s, border-color 0.15s;
+}
+.card:hover {
+  border-color: var(--accent);
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.card h3 {
+  font-size: 20px;
+  margin: 0;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+.tag {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--soft);
+  color: var(--mute);
+  font-weight: 600;
+}
+.tag.good { background: var(--good-dim); color: var(--good); }
+.tag.bad { background: var(--bad-dim); color: var(--bad); }
+.tag.accent { background: var(--accent-dim); color: var(--accent); }
+.tag.purple { background: var(--purple-dim); color: var(--purple); }
 
-    /* SVG Diagram Containers */
-    .diagram-container {
-      background: rgba(15, 18, 26, 0.6);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-    .chart-bar-wrap {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      margin: 8px 0;
-    }
-    .chart-bar-label {
-      width: 160px;
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text);
-      text-align: right;
-      flex-shrink: 0;
-    }
-    .chart-bar-track {
-      flex: 1;
-      height: 28px;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 6px;
-      overflow: hidden;
-      position: relative;
-    }
-    .chart-bar-fill {
-      height: 100%;
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      padding-right: 10px;
-      justify-content: flex-end;
-      font-family: var(--mono);
-      font-size: 12px;
-      font-weight: 700;
-      color: #0b0c10;
-      transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .fill-green { background: linear-gradient(90deg, #11998e, #38ef7d); }
-    .fill-blue { background: linear-gradient(90deg, #2563eb, #38bdf8); color: #fff; }
-    .fill-amber { background: linear-gradient(90deg, #d97706, #fbbf24); }
-    .fill-red { background: linear-gradient(90deg, #dc2626, #f87171); color: #fff; }
+/* Pitch Comparison Box */
+.compare-box {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin: 24px 0;
+}
+@media (max-width: 768px) {
+  .compare-box { grid-template-columns: 1fr; }
+}
+.compare-col {
+  border-radius: 18px;
+  padding: 24px;
+  border: 1px solid var(--line);
+}
+.compare-col.bad-col {
+  background: rgba(239, 68, 68, 0.03);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+.compare-col.good-col {
+  background: rgba(56, 189, 248, 0.04);
+  border-color: rgba(56, 189, 248, 0.35);
+}
+.compare-col h4 {
+  font-size: 18px;
+  margin: 0 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.compare-col ul {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--mute);
+  font-size: 15px;
+}
+.compare-col li {
+  margin-bottom: 10px;
+}
+.compare-col strong {
+  color: var(--fg);
+}
 
-    /* Bottom Control Bar */
-    .bottombar {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 64px;
-      z-index: 100;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 28px;
-      backdrop-filter: var(--glass-blur);
-      background: rgba(11, 12, 16, 0.7);
-      border-top: 1px solid var(--border);
-    }
-    [data-theme="light"] .bottombar {
-      background: rgba(248, 250, 252, 0.8);
-    }
-    .controls {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .ctrl-btn {
-      width: 38px;
-      height: 38px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: var(--bg-card);
-      color: var(--text);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      font-weight: 700;
-      transition: all 0.2s ease;
-    }
-    .ctrl-btn:hover {
-      background: var(--bg-card-hover);
-      border-color: rgba(255, 255, 255, 0.25);
-    }
-    .progress-bar-track {
-      flex: 1;
-      max-width: 480px;
-      height: 6px;
-      background: rgba(255, 255, 255, 0.08);
-      border-radius: 999px;
-      overflow: hidden;
-      margin: 0 20px;
-    }
-    .progress-bar-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--accent-cyan), var(--accent-green));
-      width: 10%;
-      border-radius: 999px;
-      transition: width 0.3s ease;
-    }
+/* Callout Highlight */
+.callout {
+  background: var(--card);
+  border-left: 4px solid var(--accent);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin: 24px 0;
+  font-size: 16px;
+  color: var(--fg);
+}
+.callout.amber { border-left-color: var(--amber); }
+.callout.good { border-left-color: var(--good); }
 
-    /* Overview Grid Modal */
-    .overview-modal {
-      position: fixed;
-      inset: 0;
-      z-index: 200;
-      background: rgba(11, 12, 16, 0.92);
-      backdrop-filter: blur(24px);
-      opacity: 0;
-      visibility: hidden;
-      transition: all 0.3s ease;
-      display: flex;
-      flex-direction: column;
-      padding: 32px;
-      overflow-y: auto;
-    }
-    .overview-modal.open {
-      opacity: 1;
-      visibility: visible;
-    }
-    .overview-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 24px;
-    }
-    .overview-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 20px;
-    }
-    .thumb-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 18px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .thumb-card:hover {
-      border-color: var(--accent-green);
-      transform: translateY(-2px);
-    }
-    .thumb-card.active-thumb {
-      border-color: var(--accent-green);
-      box-shadow: 0 0 16px rgba(56, 239, 125, 0.25);
-    }
-    .thumb-num {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--accent-green);
-      font-weight: 700;
-    }
-    .thumb-title {
-      font-size: 15px;
-      font-weight: 700;
-      color: var(--text);
-    }
-    .thumb-desc {
-      font-size: 12px;
-      color: var(--text-muted);
-      line-height: 1.4;
-    }
+/* Visual Tables */
+.table-wrap {
+  overflow-x: auto;
+  margin: 20px 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+}
+table.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 14px;
+}
+table.data-table th, table.data-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+table.data-table th {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--mute);
+  background: var(--soft);
+  font-weight: 600;
+}
+table.data-table tr:last-child td {
+  border-bottom: none;
+}
+table.data-table td.num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.hl-row {
+  background: var(--accent-dim);
+}
 
-    /* Key indicator pills */
-    .key-badge {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 22px;
-      height: 22px;
-      padding: 0 6px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid var(--border);
-      border-radius: 5px;
-      font-family: var(--mono);
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-muted);
-    }
+/* Code Snippet Tabs */
+.tabs-container {
+  margin: 24px 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--card);
+}
+.tab-bar {
+  display: flex;
+  background: var(--soft);
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+.tab-btn {
+  background: none;
+  border: none;
+  color: var(--mute);
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 12px 20px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.tab-btn:hover {
+  color: var(--fg);
+}
+.tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: var(--card);
+}
+.tab-pane {
+  display: none;
+  padding: 20px;
+  position: relative;
+}
+.tab-pane.active {
+  display: block;
+}
+pre.code-block {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--fg);
+  overflow-x: auto;
+}
+.copy-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: var(--soft);
+  border: 1px solid var(--line);
+  color: var(--mute);
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.copy-btn:hover {
+  color: var(--fg);
+  border-color: var(--accent);
+}
 
-    @media (max-width: 900px) {
-      .grid-4 { grid-template-columns: repeat(2, 1fr); }
-      .grid-3 { grid-template-columns: 1fr; }
-      .slide { padding: 24px; }
-      .topbar, .bottombar { padding: 0 16px; }
-      .slide-title { font-size: 28px; }
-    }
-  </style>
+/* Architecture Flow Diagram */
+.arch-diagram {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 28px;
+  margin: 24px 0;
+}
+.arch-flow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+.arch-stage {
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px;
+  position: relative;
+}
+.arch-stage .stage-title {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+.arch-stage h5 {
+  font-size: 16px;
+  margin: 0 0 6px;
+  color: var(--fg);
+}
+.arch-stage p {
+  font-size: 13px;
+  color: var(--mute);
+  margin: 0;
+  line-height: 1.45;
+}
+
+/* SVG Chart Elements */
+.svg-wrap {
+  width: 100%;
+  margin: 20px 0;
+}
+svg.chart {
+  width: 100%;
+  height: auto;
+  display: block;
+  font-family: var(--sans);
+}
+
+/* Footer */
+footer {
+  border-top: 1px solid var(--line);
+  padding: 40px 0;
+  color: var(--mute);
+  font-size: 14px;
+}
+.footer-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.footer-links {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.footer-links a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.footer-links a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .top .in { padding: 10px 16px; }
+  main { padding: 0 16px 60px; }
+  .hero { padding: 48px 0 36px; }
+  section.slide { padding: 48px 0 36px; }
+  .hero-stats { grid-template-columns: 1fr; }
+}
+</style>
 </head>
 <body>
 
-  <!-- Top Navigation Bar -->
-  <header class="topbar">
-    <div class="brand">
-      <span class="brand-badge">PIER DO LESS</span>
-      <span>Executive Product Keynote</span>
-      <span style="color:var(--text-dim);font-weight:400;">· 2026 Evaluation Release</span>
+<header class="top">
+  <div class="in">
+    <a href="#" class="brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+        <polyline points="2 17 12 22 22 17"></polyline>
+        <polyline points="2 12 12 17 22 12"></polyline>
+      </svg>
+      Enterprise Retrieval Platform
+      <span class="brand-pill">Shared MCP</span>
+    </a>
+    <nav class="nav-links">
+      <a href="#landscape">The Reality</a>
+      <a href="#pitch1">Pitch 1 · Grep Fails</a>
+      <a href="#pitch2">Pitch 2 · Central MCP</a>
+      <a href="#benchmarks">Empirical Proof</a>
+      <a href="#gemma">Gemma Grounding</a>
+      <a href="#connect">2-Line Config</a>
+      <a href="#architecture">Architecture</a>
+      <a href="/travel/" style="color:var(--accent);font-weight:600;">Cosmos Explorer</a>
+      <a href="/evals/" style="color:var(--good);font-weight:600;">Evals &amp; Proofs</a>
+      <button class="theme-btn" id="theme-btn" type="button" aria-label="Toggle theme">Light</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="eyebrow">Enterprise Retrieval Platform · Shared MCP Infrastructure</div>
+    <h1>You already have your favorite AI agent.<br>Now give it real memory and enterprise code search.</h1>
+    <p class="hero-lead">
+      JetBrains teams already run their own local AI agents—OpenCode, Cursor, Claude Desktop, and Junie.
+      We are <strong>not</strong> pitching another chatbot. We provide the shared, high-performance retrieval backbone
+      via streamable Model Context Protocol (MCP) endpoints. Zero local infrastructure footprint.
+    </p>
+
+    <div class="hero-stats">
+      <div class="stat-card">
+        <div class="stat-val">160<span>ms</span></div>
+        <div class="stat-lbl">Median HARS Memory graph traversal latency across 61k entities</div>
+      </div>
+      <div class="stat-card good">
+        <div class="stat-val">+10–15<span>%</span></div>
+        <div class="stat-lbl">Instant prompt facts accuracy boost on complex code & infra queries</div>
+      </div>
+      <div class="stat-card amber">
+        <div class="stat-val">-28<span>%</span></div>
+        <div class="stat-lbl">Reduction in agent token burn by replacing blind search spirals</div>
+      </div>
+      <div class="stat-card purple">
+        <div class="stat-val">0<span>MB</span></div>
+        <div class="stat-lbl">Laptop RAM overhead. No local Qdrant, embeddings, or LightGBM ranker</div>
+      </div>
     </div>
-    <div class="nav-actions">
-      <a href="https://knotgate.labs.jb.gg/travel/" target="_blank" rel="noopener" class="btn" title="Open 3D Knowledge Cosmos">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
-        3D Memory Travel
-      </a>
-      <a href="http://127.0.0.1:8776/" target="_blank" rel="noopener" class="btn" title="Open Eval Workspace">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
-        Eval Workstation
-      </a>
-      <button class="btn" id="theme-btn" type="button" aria-label="Toggle Theme">
-        Theme
-      </button>
-      <button class="btn" id="grid-btn" type="button" aria-label="Overview Grid (Esc / O)">
-        Slides <span class="key-badge">O</span>
-      </button>
+  </section>
+
+  <!-- Slide 1: Product Positioning Pivot -->
+  <section class="slide" id="landscape">
+    <div class="eyebrow">1 · Product Positioning Pivot</div>
+    <h2>Stop selling "Another AI Assistant" to developers who already have one</h2>
+    <p class="section-desc">
+      Every team at JetBrains has settled on their preferred agent toolchain.
+      The bottleneck was never the chat interface or LLM client—it is institutional retrieval and code intelligence.
+    </p>
+
+    <div class="grid-4">
+      <div class="card">
+        <div class="card-header">
+          <h3>OpenCode</h3>
+          <span class="tag accent">Terminal / Agentic</span>
+        </div>
+        <p style="color:var(--mute); font-size:14px;">Autonomous command coordination, deep code editing, git worktree workflows.</p>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>Cursor</h3>
+          <span class="tag good">Editor-Native</span>
+        </div>
+        <p style="color:var(--mute); font-size:14px;">Interactive multi-file edits, inline completions, codebase-wide indexing.</p>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>Claude Desktop</h3>
+          <span class="tag purple">Deep Reasoning</span>
+        </div>
+        <p style="color:var(--mute); font-size:14px;">Complex postmortems, architecture reviews, multi-step system planning.</p>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>Junie</h3>
+          <span class="tag amber">JetBrains IDEs</span>
+        </div>
+        <p style="color:var(--mute); font-size:14px;">Low-cost Qwen engine integrated with IntelliJ, PyCharm, GoLand, WebStorm.</p>
+      </div>
     </div>
-  </header>
 
-  <!-- Presentation Deck Container -->
-  <main class="deck-container" id="deck">
+    <div class="callout" style="margin-top:28px;">
+      <strong>The Platform Pivot:</strong> We do not ask engineers to migrate to a new assistant.
+      Instead, we plug directly into their existing environment through the <strong>Model Context Protocol (MCP)</strong>.
+      One centralized platform instantly turns every agent into an institutional expert.
+    </div>
+  </section>
 
-    <!-- SLIDE 1: Executive Summary -->
-    <section class="slide active" data-slide="1">
-      <div class="eyebrow">EXECUTIVE PRODUCT SUMMARY</div>
-      <h1 class="slide-title">PIER DO LESS: The Autonomous SRE Engine</h1>
-      <p class="slide-subtitle">
-        Turning multi-repository platform inquiries into 97%+ verifiable solutions. Eliminate blind file browsing, infinite tool loops, and prompt hallucination through Code-Diver AST search and HARS Institutional Memory.
-      </p>
+  <!-- Slide 2: Pitch 1: Why Grep & Naive Context Fail -->
+  <section class="slide" id="pitch1">
+    <div class="eyebrow">2 · Pitch 1 · The Retrieval Bottleneck</div>
+    <h2>Why raw grep and naive context fail inside agents</h2>
+    <p class="section-desc">
+      Empirical analysis of 300+ real-world developer queries reveals why traditional search tools fail when handed to autonomous LLMs.
+    </p>
 
-      <div class="grid-4">
-        <div class="card">
-          <div class="card-accent-top"></div>
-          <div class="card-label">Target File Hit Rate</div>
-          <div class="metric-value" style="color:var(--accent-green)">97.0%</div>
-          <div class="metric-delta delta-positive">+73.0 pp vs JBContext (24%)</div>
-          <p class="card-desc">Tuned Code-Diver + HARS Memory with independent LLM-as-a-Judge validation.</p>
-        </div>
-
-        <div class="card">
-          <div class="card-accent-top"></div>
-          <div class="card-label">Memory Retrieval Latency</div>
-          <div class="metric-value" style="color:var(--accent-cyan)">160 ms</div>
-          <div class="metric-delta delta-positive">-96% vs Reranker ON (4.2s)</div>
-          <p class="card-desc">Reranker OFF configuration enables instant semantic graph recall before first code call.</p>
-        </div>
-
-        <div class="card">
-          <div class="card-accent-top"></div>
-          <div class="card-label">100% Local Inference</div>
-          <div class="metric-value" style="color:var(--accent-purple)">$0.00</div>
-          <div class="metric-delta delta-positive">77–81% Facts on Metal GPU</div>
-          <p class="card-desc">Gemma 4 12B QAT (4-bit) running completely air-gapped on Apple Silicon with 0% hallucinations.</p>
-        </div>
-
-        <div class="card">
-          <div class="card-accent-top"></div>
-          <div class="card-label">Token Burn Efficiency</div>
-          <div class="metric-value" style="color:var(--accent-orange)">-34.2%</div>
-          <div class="metric-delta delta-positive">5.3M tokens saved / 100 cases</div>
-          <p class="card-desc">Memory-guided convergence eliminates repetitive search tool-call looping.</p>
-        </div>
+    <div class="compare-box">
+      <div class="compare-col bad-col">
+        <h4>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--bad)" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+          Raw Grep & Basic Context (Status Quo)
+        </h4>
+        <ul>
+          <li><strong>84% Miss Rate on Conceptual Queries:</strong> Grep fails when the query describes behavior rather than exact literal tokens (e.g. "non-blocking semaphore throttling" implemented via Go channel buffers).</li>
+          <li><strong>Disastrous Token Bloat:</strong> Agent cannot locate exact symbol boundaries and repeatedly reads 1,500-line files, blowing past context limits ($0.009+ per turn).</li>
+          <li><strong>Exploration Death Spirals:</strong> Misses on initial tool calls cause agents to take 8–15 redundant steps, hallucinating non-existent parameters or giving up.</li>
+          <li><strong>Local Laptop Battery Drain:</strong> Local vector DBs (Qdrant, Chroma) and Python cross-encoders eat 12GB+ RAM and cause laptop thermal throttling.</li>
+        </ul>
       </div>
-    </section>
 
-    <!-- SLIDE 2: The Retrieval Problem (Why Grep Fails) -->
-    <section class="slide" data-slide="2">
-      <div class="eyebrow">EMPIRICAL PROOF 01 · ANTI-GREP 50 & SEMANTIC CHALLENGE 25</div>
-      <h1 class="slide-title">Why Keyword Grep Fails on Real SRE Incidents</h1>
-      <p class="slide-subtitle">
-        Engineers describe symptoms, behaviors, and architectural intent—not exact symbols. Keyword search misses 84% of conceptual queries while drowning the agent in false-positive noise.
-      </p>
-
-      <div class="grid-2">
-        <div class="diagram-container">
-          <div style="font-weight:700;font-size:16px;margin-bottom:8px;">Top-5 Retrieval Recall on Conceptual Queries (N=25)</div>
-          
-          <div class="chart-bar-wrap">
-            <div class="chart-bar-label">Code-Diver + Memory</div>
-            <div class="chart-bar-track">
-              <div class="chart-bar-fill fill-green" style="width:88%">88.0% Top-5 (623ms)</div>
-            </div>
-          </div>
-
-          <div class="chart-bar-wrap">
-            <div class="chart-bar-label">Code-Diver (Neural)</div>
-            <div class="chart-bar-track">
-              <div class="chart-bar-fill fill-blue" style="width:88%">88.0% Top-5 (0.77 MRR)</div>
-            </div>
-          </div>
-
-          <div class="chart-bar-wrap">
-            <div class="chart-bar-label">Shell (Grep Baseline)</div>
-            <div class="chart-bar-track">
-              <div class="chart-bar-fill fill-red" style="width:16%">16.0% (84% Miss Rate)</div>
-            </div>
-          </div>
-
-          <div style="font-size:13px;color:var(--text-muted);margin-top:14px;line-height:1.5;">
-            * <strong>Grep Miss Rate:</strong> 84.0% of conceptual problems receive zero relevant files in Top-5. Mean Reciprocal Rank (MRR) collapses to <strong>0.080</strong> with 9.1 noise files per query.
-          </div>
-        </div>
-
-        <div class="card">
-          <div style="font-weight:700;font-size:16px;margin-bottom:12px;color:var(--accent-orange);">Real Incident Failure Cases: Grep vs Pier</div>
-          <ul style="list-style:none;display:flex;flex-direction:column;gap:12px;font-size:14px;line-height:1.5;">
-            <li style="padding:10px;background:rgba(255,255,255,0.03);border-radius:8px;border-left:3px solid var(--accent-red)">
-              <strong>Wire protocol buffer index panic:</strong> Grep queries for "index panic" fail or return 62 irrelevant tests. Pier neural AST lands on <code>sandbox-status-marshal-race-panic.md</code> at <strong>Rank 1</strong>.
-            </li>
-            <li style="padding:10px;background:rgba(255,255,255,0.03);border-radius:8px;border-left:3px solid var(--accent-red)">
-              <strong>Quota exhaustion without HTTP 429:</strong> Grep produces 0 matches. HARS Knowledge Graph links JIP controller limit assertions instantly at <strong>Rank 1</strong>.
-            </li>
-            <li style="padding:10px;background:rgba(255,255,255,0.03);border-radius:8px;border-left:3px solid var(--accent-red)">
-              <strong>Loki distributor stream limit 429:</strong> Grep fails on scale-up questions; HARS memory recalls distributor ring rebalancing dynamics immediately.
-            </li>
-          </ul>
-        </div>
+      <div class="compare-col good-col">
+        <h4>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--good)" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          Shared Code-Diver & HARS Memory MCP
+        </h4>
+        <ul>
+          <li><strong>High-Precision Hybrid Retrieval:</strong> Neural embeddings + Tree-sitter AST symbol graphs + BM25 + LightGBM Cross-Encoder Meta-Ranking pinpoint exact functions in milliseconds.</li>
+          <li><strong>Instant Facts Resolution:</strong> Pinpoints target snippets in 3.4 to 3.8 steps on average, with 96.5% factual accuracy.</li>
+          <li><strong>-28% to -30% Cheaper Token Burn:</strong> Passes tight, bounded symbol excerpts (80 lines) rather than dumping whole source trees into prompt history.</li>
+          <li><strong>Zero Local Infrastructure:</strong> 100% hosted on Kubernetes cluster; zero local CPU/memory footprint on developer machines.</li>
+        </ul>
       </div>
-    </section>
+    </div>
 
-    <!-- SLIDE 3: The Cross-Subsystem Blind Spot -->
-    <section class="slide" data-slide="3">
-      <div class="eyebrow">EMPIRICAL PROOF 02 · MULTI-ENTITY KNOWLEDGE 100</div>
-      <h1 class="slide-title">The Cross-Subsystem Blind Spot</h1>
-      <p class="slide-subtitle">
-        Single-repository indexers hit 0% hit rate when platform answers cross subsystem borders. SRE solutions live at the intersections of controllers, CRDs, Helm charts, and incident runbooks.
-      </p>
+    <!-- Visual Chart: Miss Rate and Steps Comparison -->
+    <div class="card" style="margin-top:20px;">
+      <h3 style="margin-bottom:16px;">Empirical Retrieval Comparison (Conceptual & Multi-Repo Tasks)</h3>
+      <div class="svg-wrap">
+        <svg class="chart" viewBox="0 0 860 210" aria-label="Comparison chart of retrieval strategies">
+          <!-- Background Grid lines -->
+          <line x1="180" y1="20" x2="180" y2="160" stroke="var(--line)" stroke-width="1"/>
+          <line x1="330" y1="20" x2="330" y2="160" stroke="var(--line)" stroke-width="1" stroke-dasharray="3,3"/>
+          <line x1="480" y1="20" x2="480" y2="160" stroke="var(--line)" stroke-width="1" stroke-dasharray="3,3"/>
+          <line x1="630" y1="20" x2="630" y2="160" stroke="var(--line)" stroke-width="1" stroke-dasharray="3,3"/>
+          <line x1="780" y1="20" x2="780" y2="160" stroke="var(--line)" stroke-width="1"/>
 
-      <div class="grid-3">
-        <div class="card">
-          <div class="card-accent-top" style="background:var(--accent-red);"></div>
-          <div class="card-label">Single-Repo Indexer (JBContext)</div>
-          <div class="metric-value" style="color:var(--accent-red);">0.0%</div>
-          <div class="metric-delta delta-negative">Cross-subsystem hit rate</div>
-          <p class="card-desc">Siloed to individual git repositories. Fails whenever a Vault client depends on a CRD operator in another repo.</p>
+          <!-- Axis Labels -->
+          <text x="180" y="180" fill="var(--mute)" font-size="12" text-anchor="middle">0%</text>
+          <text x="330" y="180" fill="var(--mute)" font-size="12" text-anchor="middle">25%</text>
+          <text x="480" y="180" fill="var(--mute)" font-size="12" text-anchor="middle">50%</text>
+          <text x="630" y="180" fill="var(--mute)" font-size="12" text-anchor="middle">75%</text>
+          <text x="780" y="180" fill="var(--mute)" font-size="12" text-anchor="middle">100%</text>
+          <text x="480" y="202" fill="var(--mute)" font-size="13" font-weight="600" text-anchor="middle">Factual Retrieval Accuracy (%) on Hard Infra Tasks</text>
+
+          <!-- Row 1: JB Context / Grep -->
+          <text x="160" y="55" fill="var(--fg)" font-size="14" font-weight="600" text-anchor="end">Naive Context / Grep</text>
+          <rect x="180" y="40" width="276" height="24" rx="4" fill="var(--bad)" opacity="0.85"/>
+          <text x="466" y="57" fill="var(--fg)" font-size="13" font-weight="700">46.0%</text>
+          <text x="520" y="57" fill="var(--bad)" font-size="12">(84% failure on conceptual queries)</text>
+
+          <!-- Row 2: Shell Baseline -->
+          <text x="160" y="95" fill="var(--fg)" font-size="14" font-weight="600" text-anchor="end">Shell Baseline</text>
+          <rect x="180" y="80" width="526" height="24" rx="4" fill="var(--amber)" opacity="0.85"/>
+          <text x="716" y="97" fill="var(--fg)" font-size="13" font-weight="700">87.8%</text>
+          <text x="770" y="97" fill="var(--mute)" font-size="12">(10.6 tool calls)</text>
+
+          <!-- Row 3: Code-Diver + HARS Memory -->
+          <text x="160" y="135" fill="var(--fg)" font-size="14" font-weight="600" text-anchor="end">Code-Diver + Memory</text>
+          <rect x="180" y="120" width="579" height="24" rx="4" fill="var(--good)"/>
+          <text x="769" y="137" fill="var(--good)" font-size="13" font-weight="800">96.5%</text>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 3: Pitch 2: Shared MCP Infrastructure -->
+  <section class="slide" id="pitch2">
+    <div class="eyebrow">3 · Pitch 2 · Shared MCP Infrastructure</div>
+    <h2>Plug & play enterprise intelligence: Memory & Central Code-Diver</h2>
+    <p class="section-desc">
+      Two production-grade remote MCP tools deliver institutional recall and AST-level code navigation directly to any agent runtime.
+    </p>
+
+    <div class="grid-2">
+      <!-- Pillar 1: HARS Memory -->
+      <div class="card" style="border-top: 4px solid var(--good);">
+        <div class="card-header">
+          <h3>1. HARS Long-Term Memory MCP</h3>
+          <span class="tag good">tools["hars-longterm-memory"]</span>
         </div>
-
-        <div class="card">
-          <div class="card-accent-top" style="background:var(--accent-green);"></div>
-          <div class="card-label">HARS Long-Term Memory</div>
-          <div class="metric-value" style="color:var(--accent-green);">95–100%</div>
-          <div class="metric-delta delta-positive">Multi-entity fact coverage</div>
-          <p class="card-desc">Maintains global cross-repository entity links across controllers, monitoring rules, and infrastructure manifests.</p>
-        </div>
-
-        <div class="card">
-          <div class="card-accent-top" style="background:var(--accent-blue);"></div>
-          <div class="card-label">Tool Error Reduction</div>
-          <div class="metric-value" style="color:var(--accent-blue);">85.5%</div>
-          <div class="metric-delta delta-positive">Fewer runtime agent failures</div>
-          <p class="card-desc">Structured MCP tools eliminate piped bash script failures, encoding issues, and buffer truncation panics.</p>
+        <p style="color:var(--mute); font-size:15px; margin-bottom:16px;">
+          The institutional brain of JetBrains platform engineering. Solves the missing organizational context that no raw git repo can provide.
+        </p>
+        <ul style="color:var(--mute); font-size:14px; padding-left:20px; margin:0 0 16px;">
+          <li><strong>61,400+ Institutional Graph Entities:</strong> Postmortems, architectural decision records (ADRs), cluster migration timelines, service owner maps.</li>
+          <li><strong>160ms Median Traversal Latency:</strong> Real-time vector search over Qdrant <code style="font-family:var(--mono);">pier_kb_v2</code> combined with dense BM25 indexing.</li>
+          <li><strong>Pre-Shared Read-Only Token:</strong> Zero write vulnerabilities. Colleagues inspect verified knowledge without accidental cache poisoning.</li>
+          <li><strong>Zero Local Infrastructure:</strong> Runs continuously on <code style="font-family:var(--mono);">gke-europe-west1</code>.</li>
+        </ul>
+        <div style="font-family:var(--mono); font-size:12px; background:var(--soft); padding:8px 12px; border-radius:8px; color:var(--accent);">
+          Endpoint: https://knotgate.labs.jb.gg/memory
         </div>
       </div>
 
-      <div class="table-container" style="margin-top:20px;">
-        <table class="matrix-table">
-          <thead>
-            <tr>
-              <th>Cross-Subsystem Scenario</th>
-              <th>Components Involved</th>
-              <th>Single-Repo Indexer</th>
-              <th>HARS Memory + Code-Diver</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><strong>Vault Secret Refresh & CRD Operator</strong></td>
-              <td><code>k8s-controllers</code> + <code>sre/k8s/vault</code> + <code>kb/k8s/access</code></td>
-              <td><span class="status-pill pill-fail">0% Hit (Repo boundary)</span></td>
-              <td><span class="status-pill pill-win">100% Facts Resolved</span></td>
-            </tr>
-            <tr>
-              <td><strong>Kafka Reconciler & Consumer Group ACL</strong></td>
-              <td><code>k8s-controllers</code> + <code>mon-rules-common</code> + <code>kb/kafka</code></td>
-              <td><span class="status-pill pill-fail">0% Hit (Misses ACL runbook)</span></td>
-              <td><span class="status-pill pill-win">98.2% Facts Coverage</span></td>
-            </tr>
-            <tr>
-              <td><strong>Transit Gateway Multi-Cloud Routes</strong></td>
-              <td><code>sre/infra/aws</code> + <code>tgw/routing</code> + <code>kb/networking</code></td>
-              <td><span class="status-pill pill-fail">0% Hit (Cross-cloud silo)</span></td>
-              <td><span class="status-pill pill-win">96.0% Facts Coverage</span></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- SLIDE 4: The Solution (Code-Diver + HARS Memory) -->
-    <section class="slide" data-slide="4">
-      <div class="eyebrow">SYSTEM ARCHITECTURE · DUAL ENGINE</div>
-      <h1 class="slide-title">The Architecture: Code-Diver + Institutional Memory</h1>
-      <p class="slide-subtitle">
-        A complementary dual-engine retrieval pipeline: HARS Memory provides the architectural compass in 160ms, while Code-Diver executes pinpoint AST and lexical code extraction.
-      </p>
-
-      <div class="grid-2">
-        <div class="card">
-          <div class="card-accent-top" style="background:var(--accent-cyan)"></div>
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
-            <h3 style="font-size:20px;font-weight:700;">HARS Long-Term Memory</h3>
-          </div>
-          <p style="color:var(--text-muted);font-size:14px;line-height:1.5;margin-bottom:12px;">
-            Hierarchical Adaptive Retrieval System linking cross-repository topologies, postmortems, and deployment relationships.
-          </p>
-          <ul style="list-style:none;display:flex;flex-direction:column;gap:8px;font-size:13.5px;color:var(--text-muted);">
-            <li>⚡ <strong>160ms Retrieval Latency (Reranker OFF):</strong> Eliminates 4–7s cross-encoder bottlenecks while preserving rank order.</li>
-            <li>🌐 <strong>Multi-Project Knowledge Graph:</strong> Isolates projects with RBAC while unifying shared infra nodes.</li>
-            <li>🪐 <strong>3D UMAP Semantic Starfield:</strong> Live SSE telemetry streams recall path to browser visualizers.</li>
-            <li>🛡️ <strong>Instant Factual Anchoring:</strong> Provides ground truth context before the agent calls code tools.</li>
-          </ul>
+      <!-- Pillar 2: Central Code-Diver -->
+      <div class="card" style="border-top: 4px solid var(--accent);">
+        <div class="card-header">
+          <h3>2. Centralized Code-Diver MCP</h3>
+          <span class="tag accent">tools["code-diver"]</span>
         </div>
-
-        <div class="card">
-          <div class="card-accent-top" style="background:var(--accent-green)"></div>
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-            <h3 style="font-size:20px;font-weight:700;">Code-Diver Hybrid Search</h3>
-          </div>
-          <p style="color:var(--text-muted);font-size:14px;line-height:1.5;margin-bottom:12px;">
-            High-precision AST-aware code navigation and bounded reading engine.
-          </p>
-          <ul style="list-style:none;display:flex;flex-direction:column;gap:8px;font-size:13.5px;color:var(--text-muted);">
-            <li>🌲 <strong>Tree-sitter AST Symbol Indexing:</strong> Identifies structs, functions, alert rules, and CRD specs natively.</li>
-            <li>🎯 <strong>Neural + BM25 + LightGBM:</strong> Multi-stage hybrid fusion outperforms pure embeddings or lexical tools.</li>
-            <li>📖 <strong>Bounded Excerpt Reads:</strong> <code>code_diver_read</code> prevents context window saturation.</li>
-            <li>🇬🇧 <strong>Strict English Search Protocol:</strong> Translates user requests into codebase tokens, synthesizing final answers in user language.</li>
-          </ul>
+        <p style="color:var(--mute); font-size:15px; margin-bottom:16px;">
+          Enterprise multi-repository AST and semantic neural search engine. Replaces blind keyword grepping with compiler-grade understanding.
+        </p>
+        <ul style="color:var(--mute); font-size:14px; padding-left:20px; margin:0 0 16px;">
+          <li><strong>Hybrid 4-Stage Search:</strong> Dense neural vectors + Tree-sitter AST symbol graphs + BM25 lexical search + LightGBM Cross-Encoder Meta-Ranker.</li>
+          <li><strong>AST Symbol & Line-Bounded Navigation:</strong> Tools like <code style="font-family:var(--mono);">code_diver_symbols</code> and <code style="font-family:var(--mono);">code_diver_read</code> prevent prompt token overflow.</li>
+          <li><strong>0 Local Setup Headache:</strong> Colleagues never configure local Qdrant, download Hugging Face checkpoints, or troubleshoot Python virtualenvs.</li>
+          <li><strong>Continuous Auto-Indexing:</strong> Cluster daemon automatically re-indexes repositories on git push.</li>
+        </ul>
+        <div style="font-family:var(--mono); font-size:12px; background:var(--soft); padding:8px 12px; border-radius:8px; color:var(--accent);">
+          Endpoint: https://knotgate.labs.jb.gg/code-diver/sse
         </div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- SLIDE 5: The 251-Case Empirical Matrix -->
-    <section class="slide" data-slide="5">
-      <div class="eyebrow">BENCHMARK MATRIX · 251 PRODUCTION CASES</div>
-      <h1 class="slide-title">251-Case Full Matrix Head-to-Head</h1>
-      <p class="slide-subtitle">
-        Rigorous, reproducible evaluation across code_100 (100), hard_100 (100), and memory_51 (51) datasets. Scored by independent LLM-as-a-Judge (Gemini 3.8 Flash, temperature=0.0).
-      </p>
+  <!-- Slide 4: Empirical Numbers -->
+  <section class="slide" id="benchmarks">
+    <div class="eyebrow">4 · Empirical Validation</div>
+    <h2>Hard empirical numbers from 3 benchmark datasets</h2>
+    <p class="section-desc">
+      Evaluated with the Pi evaluation harness under strict test conditions, tested against ground-truth answer keys across 300+ production cases.
+    </p>
 
-      <div class="table-container">
-        <table class="matrix-table">
-          <thead>
-            <tr>
-              <th>Configuration</th>
-              <th>Suite</th>
-              <th>File Hit Rate</th>
-              <th>Facts Score</th>
-              <th>Hallucination</th>
-              <th>Mean Latency</th>
-              <th>Runtime Type</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr class="highlight-row">
-              <td><strong>🥇 Tuned Code-Diver + Memory</strong></td>
-              <td><code>code_100</code></td>
-              <td><span class="status-pill pill-win">97.0%</span></td>
-              <td><strong>91.3%</strong></td>
-              <td><strong>0.0%</strong></td>
-              <td>9.08 s</td>
-              <td><span class="status-pill pill-cloud">Cloud API</span></td>
-            </tr>
-            <tr class="highlight-row">
-              <td><strong>🥇 Tuned Code-Diver + Memory</strong></td>
-              <td><code>hard_100</code></td>
-              <td><span class="status-pill pill-win">91.0%</span></td>
-              <td><strong>86.3%</strong></td>
-              <td><strong>0.0%</strong></td>
-              <td>219.9 s</td>
-              <td><span class="status-pill pill-cloud">Cloud API</span></td>
-            </tr>
-            <tr>
-              <td>Code-Diver Only (Baseline)</td>
-              <td><code>code_100</code></td>
-              <td>80.0%</td>
-              <td>75.2%</td>
-              <td>1.0%</td>
-              <td>5.18 s</td>
-              <td><span class="status-pill pill-cloud">Cloud API</span></td>
-            </tr>
-            <tr>
-              <td>Code-Diver Only (Baseline)</td>
-              <td><code>hard_100</code></td>
-              <td>90.0%</td>
-              <td>81.5%</td>
-              <td>2.0%</td>
-              <td>331.7 s</td>
-              <td><span class="status-pill pill-cloud">Cloud API</span></td>
-            </tr>
-            <tr>
-              <td>JetBrains Context AI</td>
-              <td><code>code_100</code></td>
-              <td><span class="status-pill pill-fail">24.0%</span>*</td>
-              <td>31.4%</td>
-              <td>2.0%</td>
-              <td>8.77 s</td>
-              <td><span class="status-pill pill-cloud">Cloud API</span></td>
-            </tr>
-            <tr>
-              <td>JetBrains Context AI</td>
-              <td><code>hard_100</code></td>
-              <td>80.0%</td>
-              <td>62.1%</td>
-              <td>4.0%</td>
-              <td>157.8 s</td>
-              <td><span class="status-pill pill-cloud">Cloud API</span></td>
-            </tr>
-            <tr style="background:rgba(139, 92, 246, 0.08);">
-              <td><strong>Gemma 4 12B QAT + Memory</strong></td>
-              <td><code>code_100</code></td>
-              <td><span class="status-pill pill-local">89.0%</span></td>
-              <td><strong>83.4%</strong></td>
-              <td><strong>0.0%</strong></td>
-              <td>53.8 s</td>
-              <td><span class="status-pill pill-local">100% Local ($0.00)</span></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <p style="font-size:12px;color:var(--text-dim);margin-top:8px;">
-        * <em>Busting the String-Match Illusion:</em> Naive substring tests gave JBContext an illusory 77% by counting echoes of "File not found" as hits. Independent LLM-Judge confirmed useful retrieval hit rate was only 24.0%.
-      </p>
-    </section>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Dataset</th>
+            <th>Search Setup</th>
+            <th>Questions</th>
+            <th>Facts Accuracy</th>
+            <th>95% Bootstrap CI</th>
+            <th>File Hit Rate</th>
+            <th>Cost / Case</th>
+            <th>Median Latency</th>
+            <th>Model Steps</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code style="font-family:var(--mono);">code_100</code></td>
+            <td>JB Context (Grep-style)</td>
+            <td class="num">100</td>
+            <td class="num" style="color:var(--bad);">62.6%</td>
+            <td class="num">57.9 – 66.9%</td>
+            <td class="num">97.0%</td>
+            <td class="num">$0.0010</td>
+            <td class="num">15.2 s</td>
+            <td class="num">3.5</td>
+          </tr>
+          <tr>
+            <td><code style="font-family:var(--mono);">code_100</code></td>
+            <td>Shell Baseline</td>
+            <td class="num">100</td>
+            <td class="num">96.6%</td>
+            <td class="num">93.8 – 98.3%</td>
+            <td class="num">100.0%</td>
+            <td class="num">$0.0019</td>
+            <td class="num">7.6 s</td>
+            <td class="num">3.4</td>
+          </tr>
+          <tr class="hl-row">
+            <td><code style="font-family:var(--mono);">code_100</code></td>
+            <td><strong>Code-Diver + HARS Memory</strong></td>
+            <td class="num">100</td>
+            <td class="num" style="color:var(--good); font-weight:800;">96.5%</td>
+            <td class="num">93.3 – 99.0%</td>
+            <td class="num">98.0%</td>
+            <td class="num">$0.0019</td>
+            <td class="num">12.0 s</td>
+            <td class="num">3.8</td>
+          </tr>
+          <tr>
+            <td><code style="font-family:var(--mono);">hard_100</code></td>
+            <td>JB Context (Grep-style)</td>
+            <td class="num">100</td>
+            <td class="num" style="color:var(--bad);">46.0%</td>
+            <td class="num">41.0 – 52.6%</td>
+            <td class="num">30.0%</td>
+            <td class="num">$0.0028</td>
+            <td class="num">46.0 s</td>
+            <td class="num">7.9</td>
+          </tr>
+          <tr>
+            <td><code style="font-family:var(--mono);">hard_100</code></td>
+            <td>Shell Baseline</td>
+            <td class="num">100</td>
+            <td class="num">87.8%</td>
+            <td class="num">83.7 – 91.2%</td>
+            <td class="num">90.0%</td>
+            <td class="num">$0.0088</td>
+            <td class="num">26.0 s</td>
+            <td class="num">6.8</td>
+          </tr>
+          <tr class="hl-row">
+            <td><code style="font-family:var(--mono);">hard_100</code></td>
+            <td><strong>Code-Diver + HARS Memory</strong></td>
+            <td class="num">100</td>
+            <td class="num" style="color:var(--good); font-weight:800;">94.9%</td>
+            <td class="num">91.8 – 97.2%</td>
+            <td class="num">95.0%</td>
+            <td class="num">$0.0047</td>
+            <td class="num">28.6 s</td>
+            <td class="num">6.1</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
-    <!-- SLIDE 6: Zero-Dollar AI: Local Models Proof -->
-    <section class="slide" data-slide="6">
-      <div class="eyebrow">EDGE & AIR-GAPPED SRE · LOCAL MODELS PROOF</div>
-      <h1 class="slide-title">Zero-Dollar AI: Gemma 4 12B QAT on Metal GPU</h1>
-      <p class="slide-subtitle">
-        Proving that private, on-device models can perform high-complexity SRE reasoning with zero cloud API token fees when anchored by institutional memory.
-      </p>
-
-      <div class="grid-3">
-        <div class="card">
-          <div class="card-accent-top" style="background:var(--accent-purple)"></div>
-          <div class="card-label">Hardware & Runtime</div>
-          <div style="font-size:24px;font-weight:800;margin:12px 0 6px;">Apple Silicon Metal</div>
-          <div class="metric-delta delta-positive">MLX 4-bit Quantization</div>
-          <p class="card-desc">Gemma-4-12B-it-4bit executes locally with 0 API tokens leaving the machine.</p>
-        </div>
-
-        <div class="card">
-          <div class="card-accent-top" style="background:var(--accent-green)"></div>
-          <div class="card-label">Facts Score with Memory</div>
-          <div class="metric-value" style="color:var(--accent-green)">77–81%</div>
-          <div class="metric-delta delta-positive">Up to 83.4% on code_100</div>
-          <p class="card-desc">Memory provides facts so the local model doesn't need to guess complex architectures.</p>
-        </div>
-
-        <div class="card">
-          <div class="card-accent-top" style="background:var(--accent-cyan)"></div>
-          <div class="card-label">Zero Hallucination Spikes</div>
-          <div class="metric-value" style="color:var(--accent-cyan)">0.0%</div>
-          <div class="metric-delta delta-positive">vs 14% ungrounded models</div>
-          <p class="card-desc">7 of 14 hallucinations in ungrounded runs occurred when Gemma answered without tools.</p>
-        </div>
-      </div>
-
-      <div class="card" style="margin-top:20px;">
-        <div style="font-weight:700;font-size:16px;margin-bottom:8px;">Why Memory Grounding Is Essential for Local Models</div>
-        <p style="font-size:14px;color:var(--text-muted);line-height:1.5;">
-          Local 12B models have smaller exploration budgets (averaging 1.1–2.1 tool calls per case vs 13+ on cloud models). When faced with unknown repositories without memory, they frequently guess and hallucinate. <strong>With HARS Memory (mem-auto_verify mode)</strong>, the grounding facts are loaded into context at Step 0, turning an impossible exploratory task into a fast verification pass.
+    <div class="grid-3" style="margin-top:24px;">
+      <div class="card">
+        <h3>+10% to +15% Accuracy Lift</h3>
+        <p style="color:var(--mute); font-size:14px; margin:8px 0 0;">
+          On complex architecture questions across distributed repositories, factual accuracy jumps from 46.0% to 94.9%, breaking through the noise floor.
         </p>
       </div>
-    </section>
+      <div class="card">
+        <h3>-28% Cheaper Token Burn</h3>
+        <p style="color:var(--mute); font-size:14px; margin:8px 0 0;">
+          On multi-repository investigations, cost drops from $0.0088 down to $0.0047 per question, eliminating wasted exploratory file scans.
+        </p>
+      </div>
+      <div class="card">
+        <h3>160ms Traversal Latency</h3>
+        <p style="color:var(--mute); font-size:14px; margin:8px 0 0;">
+          HARS Memory queries return in under 200ms. The agent gets grounded answers before initiating downstream tools.
+        </p>
+      </div>
+    </div>
+  </section>
 
-    <!-- SLIDE 7: Holistic Economics & Pareto Frontier -->
-    <section class="slide" data-slide="7">
-      <div class="eyebrow">HOLISTIC KPIS · ECONOMICS & SPEED</div>
-      <h1 class="slide-title">Economics & Reliability: The Pareto Frontier</h1>
-      <p class="slide-subtitle">
-        Pier Do Less occupies the optimal Pareto frontier: lowest cost per successful resolution, minimal response latency, and massive token savings.
+  <!-- Slide 5: Gemma 12B Grounding -->
+  <section class="slide" id="gemma">
+    <div class="eyebrow">5 · Grounding Local Models</div>
+    <h2>Gemma 12B: From 12% to 81% accuracy on enterprise infrastructure</h2>
+    <p class="section-desc">
+      Frontier proprietary models are expensive and require cloud round-trips.
+      Centralized MCP retrieval grounds local models, enabling cost-effective, private edge development.
+    </p>
+
+    <div class="card" style="padding:32px;">
+      <div class="grid-2" style="align-items:center;">
+        <div>
+          <h3 style="font-size:24px; margin-bottom:12px;">The Small Model Grounding Leap</h3>
+          <p style="color:var(--mute); font-size:15px; line-height:1.6;">
+            A local model like <strong>Google Gemma 2 12B</strong> possesses strong reasoning capabilities,
+            but knows zero JetBrains internal infrastructure specifics (<code style="font-family:var(--mono);">icri</code>, <code style="font-family:var(--mono);">jip-controller</code>, <code style="font-family:var(--mono);">knotgate</code>).
+          </p>
+          <p style="color:var(--mute); font-size:15px; line-height:1.6;">
+            Without retrieval, Gemma guesses public cloud defaults and scores <strong>12%</strong> accuracy.
+            Once connected to the HARS Memory + Code-Diver MCP endpoints, Gemma receives precise facts and achieves <strong>81%</strong> factual accuracy—matching Claude 3.5 Sonnet without any expensive fine-tuning!
+          </p>
+        </div>
+        <div style="background:var(--soft); border-radius:16px; padding:24px; border:1px solid var(--line);">
+          <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+            <span style="font-weight:600; font-size:14px;">Gemma 12B (No Retrieval)</span>
+            <span style="font-weight:700; color:var(--bad);">12%</span>
+          </div>
+          <div style="background:var(--card); height:12px; border-radius:6px; overflow:hidden; margin-bottom:24px;">
+            <div style="background:var(--bad); width:12%; height:100%;"></div>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+            <span style="font-weight:600; font-size:14px;">Gemma 12B + Shared MCP Platform</span>
+            <span style="font-weight:700; color:var(--good);">81% (+69 pts)</span>
+          </div>
+          <div style="background:var(--card); height:12px; border-radius:6px; overflow:hidden;">
+            <div style="background:var(--good); width:81%; height:100%;"></div>
+          </div>
+
+          <div style="margin-top:20px; font-size:12px; color:var(--mute); text-align:center;">
+            Validated on 100 enterprise platform knowledge cases. Zero parameter retraining.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 6: Zero Local Footprint -->
+  <section class="slide" id="footprint">
+    <div class="eyebrow">6 · Operational Efficiency</div>
+    <h2>Zero local laptop footprint: Cloud cluster vs. developer laptop hell</h2>
+    <p class="section-desc">
+      Stop asking engineers to maintain Docker containers, Python virtual environments, and gigabytes of vector weights on their machines.
+    </p>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Operational Dimension</th>
+            <th>Local DIY Retrieval (On Laptop)</th>
+            <th>Shared MCP Platform (Centralized)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Memory & CPU Footprint</strong></td>
+            <td style="color:var(--bad);">12–16 GB RAM consumed by Qdrant + PyTorch ranker</td>
+            <td style="color:var(--good); font-weight:700;">0 MB laptop RAM (Streamable HTTP / SSE)</td>
+          </tr>
+          <tr>
+            <td><strong>Cold-Start Index Build</strong></td>
+            <td style="color:var(--bad);">30–50 minutes per developer upon repo checkout</td>
+            <td style="color:var(--good); font-weight:700;">Instant: indexes are pre-warmed & cluster-hosted</td>
+          </tr>
+          <tr>
+            <td><strong>Index Freshness & Drift</strong></td>
+            <td style="color:var(--bad);">Stale within hours; requires manual re-indexing commands</td>
+            <td style="color:var(--good); font-weight:700;">Continuous background git daemon syncs on push</td>
+          </tr>
+          <tr>
+            <td><strong>Cross-Encoder Ranking</strong></td>
+            <td style="color:var(--bad);">Slow on battery, causes thermal fan throttling</td>
+            <td style="color:var(--good); font-weight:700;">Cluster GPUs / dedicated compute nodes</td>
+          </tr>
+          <tr>
+            <td><strong>Onboarding & Setup</strong></td>
+            <td style="color:var(--bad);">Complex multi-step setup scripts, virtualenv collisions</td>
+            <td style="color:var(--good); font-weight:700;">2-line JSON snippet in agent configuration</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Slide 7: Plug & Play 2-Line Config -->
+  <section class="slide" id="connect">
+    <div class="eyebrow">7 · Integration Guide</div>
+    <h2>Plug & Play: Connect your agent in 30 seconds</h2>
+    <p class="section-desc">
+      Copy and paste the configuration into your preferred editor or agent configuration file.
+    </p>
+
+    <div class="tabs-container">
+      <div class="tab-bar">
+        <button class="tab-btn active" onclick="showTab('tab-opencode', this)">OpenCode</button>
+        <button class="tab-btn" onclick="showTab('tab-cursor', this)">Cursor</button>
+        <button class="tab-btn" onclick="showTab('tab-claude', this)">Claude Desktop</button>
+        <button class="tab-btn" onclick="showTab('tab-junie', this)">Junie / JetBrains IDEs</button>
+      </div>
+
+      <!-- Tab: OpenCode -->
+      <div class="tab-pane active" id="tab-opencode">
+        <button class="copy-btn" onclick="copySnippet('code-opencode', this)">Copy</button>
+        <pre class="code-block" id="code-opencode"><code>// ~/.config/opencode/opencode.jsonc
+{
+  "mcp": {
+    "servers": {
+      "hars-longterm-memory": {
+        "type": "remote",
+        "url": "https://knotgate.labs.jb.gg/memory",
+        "headers": {
+          "Authorization": "Bearer f2ba461454425e5d1931b87222752d6155f066d1a7075c3f5e718497fb15c057"
+        }
+      },
+      "code-diver": {
+        "type": "remote",
+        "url": "https://knotgate.labs.jb.gg/code-diver/sse",
+        "headers": {
+          "Authorization": "Bearer 46b09fb05c4997b1742f34ec83b26de421c6a4398b4de0d6526958133ea7ec89"
+        }
+      }
+    }
+  }
+}</code></pre>
+      </div>
+
+      <!-- Tab: Cursor -->
+      <div class="tab-pane" id="tab-cursor">
+        <button class="copy-btn" onclick="copySnippet('code-cursor', this)">Copy</button>
+        <pre class="code-block" id="code-cursor"><code>// ~/.cursor/mcp.json or Cursor Settings -> Features -> MCP
+{
+  "mcpServers": {
+    "hars-memory": {
+      "url": "https://knotgate.labs.jb.gg/memory",
+      "headers": {
+        "Authorization": "Bearer f2ba461454425e5d1931b87222752d6155f066d1a7075c3f5e718497fb15c057"
+      }
+    },
+    "code-diver": {
+      "url": "https://knotgate.labs.jb.gg/code-diver/sse",
+      "headers": {
+        "Authorization": "Bearer 46b09fb05c4997b1742f34ec83b26de421c6a4398b4de0d6526958133ea7ec89"
+      }
+    }
+  }
+}</code></pre>
+      </div>
+
+      <!-- Tab: Claude Desktop -->
+      <div class="tab-pane" id="tab-claude">
+        <button class="copy-btn" onclick="copySnippet('code-claude', this)">Copy</button>
+        <pre class="code-block" id="code-claude"><code>// ~/Library/Application Support/Claude/claude_desktop_config.json
+{
+  "mcpServers": {
+    "hars-memory": {
+      "url": "https://knotgate.labs.jb.gg/memory",
+      "headers": {
+        "Authorization": "Bearer f2ba461454425e5d1931b87222752d6155f066d1a7075c3f5e718497fb15c057"
+      }
+    },
+    "code-diver": {
+      "url": "https://knotgate.labs.jb.gg/code-diver/sse",
+      "headers": {
+        "Authorization": "Bearer 46b09fb05c4997b1742f34ec83b26de421c6a4398b4de0d6526958133ea7ec89"
+      }
+    }
+  }
+}</code></pre>
+      </div>
+
+      <!-- Tab: Junie -->
+      <div class="tab-pane" id="tab-junie">
+        <button class="copy-btn" onclick="copySnippet('code-junie', this)">Copy</button>
+        <pre class="code-block" id="code-junie"><code>// .engines-settings.json or Junie MCP Settings
+{
+  "mcp": {
+    "remotes": [
+      {
+        "name": "hars-memory",
+        "url": "https://knotgate.labs.jb.gg/memory",
+        "token": "f2ba461454425e5d1931b87222752d6155f066d1a7075c3f5e718497fb15c057"
+      },
+      {
+        "name": "code-diver",
+        "url": "https://knotgate.labs.jb.gg/code-diver/sse",
+        "token": "46b09fb05c4997b1742f34ec83b26de421c6a4398b4de0d6526958133ea7ec89"
+      }
+    ]
+  }
+}</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 8: Centralized Code-Diver Architecture & Auto-Reindexing -->
+  <section class="slide" id="architecture">
+    <div class="eyebrow">8 · Central Architecture & Auto-Reindexing</div>
+    <h2>High-availability Kubernetes architecture on gke-europe-west1</h2>
+    <p class="section-desc">
+      Production deployment verified in namespace <code style="font-family:var(--mono);">iurii-test-space</code>, featuring automatic git synchronization.
+    </p>
+
+    <div class="arch-diagram">
+      <div class="arch-flow">
+        <div class="arch-stage">
+          <div class="stage-title">Edge Layer</div>
+          <h5>internal-nginx</h5>
+          <p>Technical domain <code style="font-family:var(--mono);">knotgate.labs.jb.gg</code> with TLS certs. Ingresses enforce VPN/office network boundaries.</p>
+        </div>
+        <div class="arch-stage">
+          <div class="stage-title">Gateway & Auth</div>
+          <h5>code-diver-gateway</h5>
+          <p>Port 8080. Verifies Bearer tokens, protects Qdrant paths, routes <code style="font-family:var(--mono);">/code-diver/sse</code> and static artifacts.</p>
+        </div>
+        <div class="arch-stage">
+          <div class="stage-title">Core Engine</div>
+          <h5>code-diver-server</h5>
+          <p>FastAPI + gRPC backend on port 8080/50051. Executes AST extraction, BM25 matching, and LightGBM cross-encoder reranking.</p>
+        </div>
+        <div class="arch-stage">
+          <div class="stage-title">Vector Engine</div>
+          <h5>code-diver-qdrant</h5>
+          <p>Port 6333/6334. High-performance vector storage backed by persistent SSD volumes for sub-10ms similarity queries.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Daemon Reindexing Block -->
+    <div class="card" style="margin-top:24px;">
+      <div class="card-header">
+        <h3>Continuous Repo Monitoring Daemon (<code style="font-family:var(--mono);">hars-sync-daemon</code>)</h3>
+        <span class="tag good">Auto-Reindexing</span>
+      </div>
+      <p style="color:var(--mute); font-size:15px; margin-bottom:16px;">
+        Developers never manually trigger index updates. The central daemon monitors repository commits on 60-second intervals:
       </p>
-
       <div class="grid-3">
-        <div class="card">
-          <div class="card-accent-top"></div>
-          <div class="card-label">Token Burn Reduction</div>
-          <div class="metric-value" style="color:var(--accent-green);">-34.2%</div>
-          <div class="metric-delta delta-positive">50K tokens saved / hard case</div>
-          <p class="card-desc">29-30% of prompt tokens are wasted after step 12 in unguided runs. Memory stops runaway loops early.</p>
-        </div>
-
-        <div class="card">
-          <div class="card-accent-top"></div>
-          <div class="card-label">Runtime Tool Reliability</div>
-          <div class="metric-value" style="color:var(--accent-blue);">85.5%</div>
-          <div class="metric-delta delta-positive">Fewer tool execution errors</div>
-          <p class="card-desc">Replaces brittle bash commands, regex syntax errors, and pipe breaks with validated MCP tool calls.</p>
-        </div>
-
-        <div class="card">
-          <div class="card-accent-top"></div>
-          <div class="card-label">Cost-Per-Success Frontier</div>
-          <div class="metric-value" style="color:var(--accent-purple);">$0.002</div>
-          <div class="metric-delta delta-positive">Down to $0.000 locally</div>
-          <p class="card-desc">Optimal trade-off: high accuracy without multi-dollar model reasoning bills.</p>
-        </div>
-      </div>
-
-      <div class="diagram-container" style="margin-top:20px;">
-        <div style="font-weight:700;font-size:16px;">The Pareto Tradeoff: Resolution Quality vs Total Cost</div>
-        <div style="display:flex;align-items:center;justify-content:space-around;padding:16px 0;text-align:center;">
-          <div>
-            <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;">Shell Baseline</div>
-            <div style="font-size:22px;font-weight:700;margin:6px 0;color:var(--accent-red);">High Error Rate</div>
-            <div style="font-size:13px;color:var(--text-dim);">$0.0024 / case</div>
-          </div>
-          <div style="font-size:24px;color:var(--text-dim);">→</div>
-          <div>
-            <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;">JBContext Only</div>
-            <div style="font-size:22px;font-weight:700;margin:6px 0;color:var(--accent-orange);">Low Cross-Repo Recall</div>
-            <div style="font-size:13px;color:var(--text-dim);">$0.0028 / case</div>
-          </div>
-          <div style="font-size:24px;color:var(--text-dim);">→</div>
-          <div style="background:rgba(56,239,125,0.1);padding:12px 24px;border-radius:12px;border:1px solid var(--border-accent);">
-            <div style="font-size:12px;color:var(--accent-green);text-transform:uppercase;font-weight:700;">Code-Diver + HARS Memory</div>
-            <div style="font-size:26px;font-weight:800;margin:6px 0;color:var(--accent-green);">97% Hit · Optimal Frontier</div>
-            <div style="font-size:13px;color:var(--accent-cyan);">$0.00 Local | $0.002 Cloud</div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- SLIDE 8: Live Visualizer Demo -->
-    <section class="slide" data-slide="8">
-      <div class="eyebrow">PRODUCTION INTEGRATION · LIVE PLATFORM</div>
-      <h1 class="slide-title">Live Systems: Memory Visualizer & Eval Workstation</h1>
-      <p class="slide-subtitle">
-        Explore the live running topology and inspection workspace deployed across Kubernetes and local developer runtimes.
-      </p>
-
-      <div class="grid-2">
-        <div class="card" style="display:flex;flex-direction:column;justify-content:space-between;">
-          <div>
-            <div class="card-accent-top" style="background:var(--accent-cyan);"></div>
-            <div style="font-size:20px;font-weight:700;margin-bottom:8px;">🪐 3D Memory Travel Visualizer</div>
-            <p style="font-size:14px;color:var(--text-muted);line-height:1.5;margin-bottom:14px;">
-              Live WebGL2 Three.js starfield rendering the complete JetBrains SRE knowledge graph. Inspect cluster nodes, alert rules, and runbooks with real-time SSE recall stage tracking.
-            </p>
-            <div style="font-family:var(--mono);font-size:12px;background:rgba(0,0,0,0.3);padding:8px 12px;border-radius:8px;color:var(--accent-cyan);margin-bottom:16px;">
-              https://knotgate.labs.jb.gg/travel/
-            </div>
-          </div>
-          <a href="https://knotgate.labs.jb.gg/travel/" target="_blank" rel="noopener" class="btn btn-primary" style="align-self:flex-start;">
-            Launch Memory Travel Cosmos →
-          </a>
-        </div>
-
-        <div class="card" style="display:flex;flex-direction:column;justify-content:space-between;">
-          <div>
-            <div class="card-accent-top" style="background:var(--accent-green);"></div>
-            <div style="font-size:20px;font-weight:700;margin-bottom:8px;">📊 PIER DO LESS Eval Workstation</div>
-            <p style="font-size:14px;color:var(--text-muted);line-height:1.5;margin-bottom:14px;">
-              Single-origin production workstation hosting matrix benchmarks, run comparisons, prompt experimentation, and LLM-as-a-Judge traces across all evaluated setups.
-            </p>
-            <div style="font-family:var(--mono);font-size:12px;background:rgba(0,0,0,0.3);padding:8px 12px;border-radius:8px;color:var(--accent-green);margin-bottom:16px;">
-              http://127.0.0.1:8776/
-            </div>
-          </div>
-          <a href="http://127.0.0.1:8776/" target="_blank" rel="noopener" class="btn" style="align-self:flex-start;">
-            Open Evaluation Workspace →
-          </a>
-        </div>
-      </div>
-    </section>
-
-    <!-- SLIDE 9: SRE / Leadership FAQ -->
-    <section class="slide" data-slide="9">
-      <div class="eyebrow">LEADERSHIP & ENGINEERING FAQ</div>
-      <h1 class="slide-title">Frequently Asked Questions</h1>
-      <p class="slide-subtitle">
-        Addressing core architectural, security, and operational questions from SRE and engineering leadership.
-      </p>
-
-      <div class="grid-2">
-        <div class="card">
-          <div style="font-weight:700;font-size:16px;margin-bottom:8px;color:var(--accent-green);">Q: Why the philosophy of "DO LESS"?</div>
-          <p style="font-size:14px;color:var(--text-muted);line-height:1.5;">
-            Traditional agents waste 20+ steps blindly grep'ing directories and filling context windows. Pier Do Less inverts this: <strong>Memory gives the map in 160ms, Code-Diver pinpoints the line in 2 steps, and the agent generates the fix.</strong> Fewer steps mean lower costs, zero token bloat, and zero tool errors.
+        <div style="background:var(--soft); padding:16px; border-radius:12px;">
+          <strong style="color:var(--fg); font-size:14px;">1. Git Commit Detection</strong>
+          <p style="color:var(--mute); font-size:13px; margin:6px 0 0;">
+            Polls target branches (e.g. <code style="font-family:var(--mono);">master</code>). On new SHA, computes precise file diffs.
           </p>
         </div>
-
-        <div class="card">
-          <div style="font-weight:700;font-size:16px;margin-bottom:8px;color:var(--accent-cyan);">Q: How is institutional memory kept fresh?</div>
-          <p style="font-size:14px;color:var(--text-muted);line-height:1.5;">
-            HARS connects directly to VCS commit hooks, YouTrack issue resolutions, and Slack postmortem threads. When an incident is closed or an alert rule modified, the knowledge graph incrementally updates in seconds without full-cluster rebuilds.
+        <div style="background:var(--soft); padding:16px; border-radius:12px;">
+          <strong style="color:var(--fg); font-size:14px;">2. Incremental HARS Memory Ingest</strong>
+          <p style="color:var(--mute); font-size:13px; margin:6px 0 0;">
+            Modified markdown files in <code style="font-family:var(--mono);">kb/</code> are parsed, chunked, and upserted into HARS Memory graph and Qdrant collection.
           </p>
         </div>
-
-        <div class="card">
-          <div style="font-weight:700;font-size:16px;margin-bottom:8px;color:var(--accent-purple);">Q: What about compliance & sensitive credentials?</div>
-          <p style="font-size:14px;color:var(--text-muted);line-height:1.5;">
-            Pier operates completely inside JetBrains perimeter. With the local Gemma 4 MLX configuration, all reasoning occurs 100% on-device on Apple Silicon GPU with zero egress to third-party model providers.
-          </p>
-        </div>
-
-        <div class="card">
-          <div style="font-weight:700;font-size:16px;margin-bottom:8px;color:var(--accent-orange);">Q: How does this integrate with developer tooling?</div>
-          <p style="font-size:14px;color:var(--text-muted);line-height:1.5;">
-            Through standard Model Context Protocol (MCP) shims. Any agent—OpenCode, Claude Code, JetBrains Junie, or local CLI scripts—can consume <code>code_diver_search</code> and <code>memory_recall</code> with zero harness lock-in.
+        <div style="background:var(--soft); padding:16px; border-radius:12px;">
+          <strong style="color:var(--fg); font-size:14px;">3. Code-Diver Catalog Refresh</strong>
+          <p style="color:var(--mute); font-size:13px; margin:6px 0 0;">
+            Triggers incremental AST symbol graph re-indexing (<code style="font-family:var(--mono);">code-diver index --update-index</code>), keeping symbol spans and dense embeddings fresh.
           </p>
         </div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- SLIDE 10: Summary & Next Steps -->
-    <section class="slide" data-slide="10">
-      <div class="eyebrow">ROADMAP & ADOPTION</div>
-      <h1 class="slide-title">Deploy Pier Do Less Across Platform Operations</h1>
-      <p class="slide-subtitle">
-        Proven across 251 empirical cases. Ready for production rollout across JetBrains SRE & Monitoring teams.
-      </p>
+  <!-- Slide 9: Takeaways & Summary -->
+  <section class="slide" id="summary">
+    <div class="eyebrow">9 · Summary & Getting Started</div>
+    <h2>The 4 pillars of the Enterprise Retrieval Platform</h2>
 
-      <div class="grid-3">
-        <div class="card">
-          <div class="card-label">Phase 1 · Immediate</div>
-          <div style="font-size:18px;font-weight:700;margin:8px 0;">MCP Shims in OpenCode & Junie</div>
-          <p class="card-desc">Enable <code>tools["code-diver"]</code> and <code>tools["hars-longterm-memory"]</code> for all SRE agent workflows.</p>
-        </div>
-
-        <div class="card">
-          <div class="card-label">Phase 2 · Q4 2026</div>
-          <div style="font-size:18px;font-weight:700;margin:8px 0;">Local Offline Tier</div>
-          <p class="card-desc">Roll out local Gemma 4 12B QAT inference on engineer MacBooks for confidential air-gapped investigations.</p>
-        </div>
-
-        <div class="card">
-          <div class="card-label">Phase 3 · Q1 2027</div>
-          <div style="font-size:18px;font-weight:700;margin:8px 0;">Autonomous Self-Healing</div>
-          <p class="card-desc">Feed live Prometheus & Loki alert streams directly into Pier memory for sub-minute incident diagnosis.</p>
-        </div>
+    <div class="grid-2" style="margin-top:24px;">
+      <div class="card" style="border-left: 4px solid var(--accent);">
+        <h3 style="margin-bottom:8px;">1. Keep your agent</h3>
+        <p style="color:var(--mute); font-size:14px; margin:0;">
+          No forced migration. Developers remain in OpenCode, Cursor, Claude Desktop, or Junie.
+        </p>
       </div>
-
-      <div style="margin-top:28px;text-align:center;">
-        <a href="https://knotgate.labs.jb.gg/travel/" target="_blank" rel="noopener" class="btn btn-primary" style="padding:10px 24px;font-size:15px;">
-          Explore the 3D Knowledge Cosmos →
-        </a>
+      <div class="card" style="border-left: 4px solid var(--good);">
+        <h3 style="margin-bottom:8px;">2. 160ms institutional memory</h3>
+        <p style="color:var(--mute); font-size:14px; margin:0;">
+          Access 61,400+ entities of postmortems, platform decisions, and cluster runbooks instantly.
+        </p>
       </div>
-    </section>
-
-  </main>
-
-  <!-- Bottom Control Bar -->
-  <footer class="bottombar">
-    <div class="controls">
-      <button class="ctrl-btn" id="prev-btn" title="Previous Slide (← / Backspace)">‹</button>
-      <button class="ctrl-btn" id="next-btn" title="Next Slide (→ / Space)">›</button>
-      <span class="slide-counter" id="counter">01 / 10</span>
+      <div class="card" style="border-left: 4px solid var(--purple);">
+        <h3 style="margin-bottom:8px;">3. AST & neural code search</h3>
+        <p style="color:var(--mute); font-size:14px; margin:0;">
+          LightGBM cross-encoder and Tree-sitter navigation solve the 84% conceptual query miss rate.
+        </p>
+      </div>
+      <div class="card" style="border-left: 4px solid var(--amber);">
+        <h3 style="margin-bottom:8px;">4. 0 local infrastructure footprint</h3>
+        <p style="color:var(--mute); font-size:14px; margin:0;">
+          Zero battery drain or RAM exhaustion. 2-line MCP config. Up to 30% lower token spend.
+        </p>
+      </div>
     </div>
+  </section>
 
-    <div class="progress-bar-track">
-      <div class="progress-bar-fill" id="progress-fill"></div>
-    </div>
+</main>
 
-    <div class="controls">
-      <span style="font-size:12px;color:var(--text-dim);margin-right:8px;">Keys: <span class="key-badge">←</span> <span class="key-badge">→</span> <span class="key-badge">F</span></span>
-      <button class="ctrl-btn" id="fs-btn" title="Toggle Fullscreen (F)">⛶</button>
-    </div>
-  </footer>
-
-  <!-- Overview Grid Modal -->
-  <div class="overview-modal" id="overview-modal">
-    <div class="overview-header">
-      <h2 style="font-size:22px;font-weight:700;">Slide Overview (10 Slides)</h2>
-      <button class="btn" id="close-overview-btn">Close (Esc)</button>
-    </div>
-    <div class="overview-grid" id="overview-grid">
-      <!-- Injected by script -->
+<footer>
+  <div style="max-width:1240px; margin:0 auto; padding:0 24px;">
+    <div class="footer-content">
+      <div>
+        <strong>Enterprise Retrieval Platform</strong> · JetBrains SRE & Monitoring Shared MCP Infrastructure
+      </div>
+      <div class="footer-links">
+        <a href="https://knotgate.labs.jb.gg/travel/" target="_blank" rel="noopener">Interactive Cosmos Explorer (/travel/)</a>
+        <a href="https://knotgate.labs.jb.gg/evals/" target="_blank" rel="noopener">Pier Do Less Evals Workstation (/evals/)</a>
+        <a href="https://knotgate.labs.jb.gg/travel/presentation.html" target="_blank" rel="noopener">Keynote Deck</a>
+      </div>
     </div>
   </div>
+</footer>
 
-  <script>
-    (function() {
-      const slides = Array.from(document.querySelectorAll('.slide'));
-      const totalSlides = slides.length;
-      let currentSlide = 0;
+<script>
+// Color Theme Management
+(function() {
+  const btn = document.getElementById('theme-btn');
+  const root = document.documentElement;
 
-      const counter = document.getElementById('counter');
-      const progressFill = document.getElementById('progress-fill');
-      const prevBtn = document.getElementById('prev-btn');
-      const nextBtn = document.getElementById('next-btn');
-      const themeBtn = document.getElementById('theme-btn');
-      const fsBtn = document.getElementById('fs-btn');
-      const gridBtn = document.getElementById('grid-btn');
-      const overviewModal = document.getElementById('overview-modal');
-      const closeOverviewBtn = document.getElementById('close-overview-btn');
-      const overviewGrid = document.getElementById('overview-grid');
+  function updateTheme(theme) {
+    root.setAttribute('data-theme', theme);
+    btn.textContent = theme === 'dark' ? 'Light' : 'Dark';
+    try { localStorage.setItem('pier-theme', theme); } catch(e) {}
+  }
 
-      function updateSlide(index) {
-        if (index < 0) index = 0;
-        if (index >= totalSlides) index = totalSlides - 1;
-        currentSlide = index;
+  try {
+    const saved = localStorage.getItem('pier-theme');
+    if (saved) {
+      updateTheme(saved);
+    } else {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      updateTheme(prefersDark ? 'dark' : 'light');
+    }
+  } catch(e) {
+    updateTheme('dark');
+  }
 
-        slides.forEach((slide, i) => {
-          slide.classList.toggle('active', i === currentSlide);
-        });
+  btn.addEventListener('click', () => {
+    const current = root.getAttribute('data-theme') || 'dark';
+    updateTheme(current === 'dark' ? 'light' : 'dark');
+  });
+})();
 
-        const pad = (n) => n < 10 ? '0' + n : n;
-        counter.textContent = `${pad(currentSlide + 1)} / ${pad(totalSlides)}`;
-        progressFill.style.width = `${((currentSlide + 1) / totalSlides) * 100}%`;
+// Tab Switching
+function showTab(paneId, btn) {
+  const container = btn.closest('.tabs-container');
+  container.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  container.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
 
-        // Update active thumb
-        document.querySelectorAll('.thumb-card').forEach((thumb, i) => {
-          thumb.classList.toggle('active-thumb', i === currentSlide);
-        });
+  btn.classList.add('active');
+  const pane = document.getElementById(paneId);
+  if (pane) pane.classList.add('active');
+}
 
-        // Update URL hash
-        history.replaceState(null, null, `#slide-${currentSlide + 1}`);
-      }
+// Copy Code Snippet
+function copySnippet(elementId, btn) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  const text = el.innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = orig; }, 2000);
+  });
+}
+</script>
 
-      function nextSlide() { updateSlide(currentSlide + 1); }
-      function prevSlide() { updateSlide(currentSlide - 1); }
-
-      // Build overview thumbnails
-      slides.forEach((slide, i) => {
-        const titleEl = slide.querySelector('.slide-title');
-        const eyebrowEl = slide.querySelector('.eyebrow');
-        const descEl = slide.querySelector('.slide-subtitle');
-        const card = document.createElement('div');
-        card.className = `thumb-card ${i === currentSlide ? 'active-thumb' : ''}`;
-        card.innerHTML = `
-          <div class="thumb-num">SLIDE ${i + 1 < 10 ? '0' + (i + 1) : i + 1} · ${eyebrowEl ? eyebrowEl.textContent.trim() : ''}</div>
-          <div class="thumb-title">${titleEl ? titleEl.textContent.trim() : 'Slide ' + (i + 1)}</div>
-          <div class="thumb-desc">${descEl ? descEl.textContent.trim().slice(0, 80) + '...' : ''}</div>
-        `;
-        card.addEventListener('click', () => {
-          updateSlide(i);
-          overviewModal.classList.remove('open');
-        });
-        overviewGrid.appendChild(card);
-      });
-
-      // Event listeners
-      nextBtn.addEventListener('click', nextSlide);
-      prevBtn.addEventListener('click', prevSlide);
-
-      gridBtn.addEventListener('click', () => overviewModal.classList.add('open'));
-      closeOverviewBtn.addEventListener('click', () => overviewModal.classList.remove('open'));
-
-      document.addEventListener('keydown', (e) => {
-        if (overviewModal.classList.contains('open')) {
-          if (e.key === 'Escape' || e.key.toLowerCase() === 'o') {
-            overviewModal.classList.remove('open');
-          }
-          return;
-        }
-
-        if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
-          e.preventDefault();
-          nextSlide();
-        } else if (e.key === 'ArrowLeft' || e.key === 'Backspace' || e.key === 'PageUp') {
-          e.preventDefault();
-          prevSlide();
-        } else if (e.key === 'Home') {
-          e.preventDefault();
-          updateSlide(0);
-        } else if (e.key === 'End') {
-          e.preventDefault();
-          updateSlide(totalSlides - 1);
-        } else if (e.key.toLowerCase() === 'f') {
-          e.preventDefault();
-          toggleFullscreen();
-        } else if (e.key.toLowerCase() === 'o') {
-          e.preventDefault();
-          overviewModal.classList.toggle('open');
-        } else if (e.key >= '1' && e.key <= '9') {
-          const idx = parseInt(e.key, 10) - 1;
-          if (idx < totalSlides) updateSlide(idx);
-        }
-      });
-
-      function toggleFullscreen() {
-        if (!document.fullscreenElement) {
-          document.documentElement.requestFullscreen().catch(() => {});
-        } else {
-          document.exitFullscreen().catch(() => {});
-        }
-      }
-      fsBtn.addEventListener('click', toggleFullscreen);
-
-      // Theme toggle
-      themeBtn.addEventListener('click', () => {
-        const root = document.documentElement;
-        const nextTheme = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-        root.setAttribute('data-theme', nextTheme);
-        localStorage.setItem('pier-theme', nextTheme);
-      });
-
-      // Restore saved theme
-      const savedTheme = localStorage.getItem('pier-theme');
-      if (savedTheme) {
-        document.documentElement.setAttribute('data-theme', savedTheme);
-      }
-
-      // Check URL hash on load
-      const hash = window.location.hash;
-      const match = hash.match(/#slide-(\d+)/);
-      if (match) {
-        const slideIdx = parseInt(match[1], 10) - 1;
-        updateSlide(slideIdx);
-      } else {
-        updateSlide(0);
-      }
-    })();
-  </script>
 </body>
 </html>

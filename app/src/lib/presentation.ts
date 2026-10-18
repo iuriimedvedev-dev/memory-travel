@@ -40,7 +40,7 @@ export interface PresCtx {
  */
 export const PIPELINE = {
   embedder: { model: "EmbeddingGemma", dim: 768, via: "llama.cpp" },
-  reranker: { model: "Qwen3-Reranker-0.6B", device: "iGPU" },
+  reranker: { model: "LightGBM / RRF (Cross-encoder OFF by default)", device: "CPU / Zero-cost" },
 } as const;
 
 export const CHAPTERS: PresentationChapter[] = [
@@ -90,8 +90,8 @@ export const CHAPTERS: PresentationChapter[] = [
     stage: 1,
     title: { ru: "Параллельные каналы", en: "Parallel channels" },
     narration: () => ({
-      ru: `Три поиска бегут параллельно: векторный (смысл, голубой), BM25 (точные слова, зелёный) и расширение по графу (связи, золотой/фиолетовый). У каждого своя природа ошибок: вектор находит «про то же», BM25 — «те же слова», граф добавляет контекст через связи.`,
-      en: `Three searches run in parallel: vector (meaning, cyan), BM25 (exact words, green) and graph expansion (relations, gold/violet). Each fails differently: vector finds “about the same thing”, BM25 finds “the same words”, the graph adds context through connections.`,
+      ru: `Четыре поиска работают гибридно: векторный (смысл, голубой), BM25 (точные слова, зелёный), обход графа (связи, золотой/фиолетовый) и ripgrep (поиск по коду/заметкам). У каждого своя природа: вектор находит «про то же», BM25 — «те же слова», граф добавляет контекст связей, ripgrep гарантирует попадание по именам и идентификаторам.`,
+      en: `Four searches run in hybrid: vector (meaning, cyan), BM25 (exact words, green), graph walk (relations, gold/violet), and ripgrep (code/docs text). Each covers a distinct failure mode: vector finds semantic intent, BM25 finds keywords, graph adds relational context, and ripgrep anchors exact identifiers.`,
     }),
     fact: ({ trace }) => ({
       ru: `Факт: sparse-канал — ${trace?.meta.latency_ms.sparse ?? "?"} мс по ${((trace?.meta.bm25_chunks ?? 0)).toLocaleString("ru-RU")} чанкам BM25-индекса.`,
@@ -104,8 +104,8 @@ export const CHAPTERS: PresentationChapter[] = [
     stage: 4,
     title: { ru: "Фьюжн", en: "Fusion" },
     narration: () => ({
-      ru: `Рейтинги каналов нормализуются и сливаются взвешенно (α = 0.5 — измеренный оптимум на 46 бенчмарк-запросах). Оранжевое — слитый рейтинг: чанки, которые и «про то», и со словами темы, поднимаются наверх. Полоски в карточке — вклад каждого канала.`,
-      en: `Channel rankings are normalised and blended (α = 0.5 — the measured optimum on 46 benchmark queries). Orange is the fused ranking: chunks that are both “about it” and use its words rise. The bars in the card show each channel's contribution.`,
+      ru: `Рейтинги каналов нормализуются и сливаются взвешенно (α = 0.5 — измеренный оптимум на 46 бенчмарк-запросах или прямое слияние Reciprocal Rank Fusion / RRF). Оранжевое — слитый рейтинг: чанки, которые и «про то», и со словами темы, поднимаются наверх. Задержка слияния минимальна.`,
+      en: `Channel rankings are normalised and blended (α = 0.5 — measured optimum on 46 benchmark queries, or direct Reciprocal Rank Fusion / RRF). Orange is the fused ranking: chunks that are both relevant and use the query terms rise. Latency is minimal.`,
     }),
     fact: ({ trace }) => ({
       ru: `Факт: в слитом рейтинге ${trace?.fusion.length ?? "?"} чанков при α = ${trace?.meta.alpha ?? "?"} — веса каналов измерены, не придуманы.`,
@@ -118,12 +118,12 @@ export const CHAPTERS: PresentationChapter[] = [
     stage: 5,
     title: { ru: "Реранк", en: "Rerank" },
     narration: () => ({
-      ru: `Кросс-энкодер (Qwen3-Reranker-0.6B на iGPU) перечитывает пул целиком и переставляет: белым вспыхивает то, что сдвинулось. Предохранитель следит, чтобы сильный fusion-скор не был испорчен: если реранкер не нужен — он пропускается (в этом трейсе: ${"причина ниже в инспекторе"}).`,
-      en: `A cross-encoder (Qwen3-Reranker-0.6B on the iGPU) re-reads the whole pool and reorders: white flares mark what moved. A guardrail protects a strong fusion score: when the reranker isn't needed, it stands down (in this trace: see the reason in the inspector).`,
+      ru: `В HARS v0.7.0 кросс-энкодер ВЫКЛЮЧЕН по умолчанию: ранжирование выполняет легковесный LightGBM или прямой RRF, обеспечивая задержку выборки ~160 мс (вместо секунд на тяжелых моделях). Предохранитель защищает уверенный fusion-порядок от деградации.`,
+      en: `In HARS v0.7.0, the neural cross-encoder is OFF by default: ranking is performed via fast LightGBM or direct RRF, maintaining ~160ms retrieval latency (vs seconds for heavy neural rerankers). A guardrail preserves high-confidence fusion rankings.`,
     }),
-    fact: ({ trace }) => ({
-      ru: `Факт: реранк пула ${trace?.rerank.pool ?? "?"} кандидатов — ${trace?.meta.latency_ms.rerank ?? "?"} мс на этом деплое; заблокированных инверсий: ${trace?.rerank.blocked_inversions ?? "?"}.`,
-      en: `Fact: reranking the ${trace?.rerank.pool ?? "?"}-candidate pool — ${trace?.meta.latency_ms.rerank ?? "?"} ms on this deployment; blocked inversions: ${trace?.rerank.blocked_inversions ?? "?"}.`,
+    fact: () => ({
+      ru: `Факт: кросс-энкодер ВЫКЛЮЧЕН по умолчанию (LightGBM/RRF), сквозная задержка выборки ~160 мс.`,
+      en: `Fact: cross-encoder reranker is OFF by default (LightGBM/RRF), end-to-end recall latency is ~160ms.`,
     }),
   },
   {
@@ -163,8 +163,8 @@ export const CHAPTERS: PresentationChapter[] = [
       en: `Bottom line: ${nodes.toLocaleString("en-US")} entities and ${edges.toLocaleString("en-US")} relations in the connected index — the header and the about card read them live from the bridge, together with the index id and data freshness. Everything you saw is the telemetry of one real query against this memory.`,
     }),
     fact: ({ nodes, edges }) => ({
-      ru: `Факт: ${nodes.toLocaleString("ru-RU")} сущностей · ${edges.toLocaleString("ru-RU")} связей — не мокап, а индекс, к которому подключён мост.`,
-      en: `Fact: ${nodes.toLocaleString("en-US")} entities · ${edges.toLocaleString("en-US")} relations — not a mock, the index the bridge serves.`,
+      ru: `Факт: ${nodes.toLocaleString("ru-RU")} сущностей · ${edges.toLocaleString("ru-RU")} связей · гибрид (BM25 + вектор + граф + ripgrep) со слиянием RRF/LightGBM — задержка ~160 мс.`,
+      en: `Fact: ${nodes.toLocaleString("en-US")} entities · ${edges.toLocaleString("en-US")} relations · hybrid (BM25 + vector + graph + ripgrep) with RRF/LightGBM — latency ~160ms.`,
     }),
   },
 ];

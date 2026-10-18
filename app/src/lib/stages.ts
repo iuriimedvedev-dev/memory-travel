@@ -56,11 +56,11 @@ export const STAGES: StageDef[] = [
     title: { ru: "Реранк", en: "Rerank" },
     caption: (t) => ({
       ru: t.rerank.applied
-        ? `Кросс-энкодер-реранкер (${t.rerank.backend ?? "?"} бэкенд) честно читает топ-${t.rerank.pool ?? "?"} кандидатов — медленно (${t.rerank.latency_ms ? (t.rerank.latency_ms / 1000).toFixed(1) + " с" : "? с"}) — и переставляет их; ${t.rerank.blocked_inversions ?? "?"} перестановок заблокировал защитный предохранитель fusion. Белым — то, что сдвинулось. Этот порядок и подаётся дальше.`
-        : `Сюжетный поворот прямо из телеметрии: реранкер ВОЗДЕРЖАЛСЯ (${t.rerank.fallback_reason ?? "уверенность"} — лучший fused ${t.rerank.max_fusion_score ?? "?"} превзошёл порог пропуска ${t.rerank.skip_threshold ?? "?"}), поэтому порядок слияния ушёл как есть. Белые маркеры показывают, что сдвинулось относительно чистого векторного порядка.`,
+        ? `Ранкер (${t.rerank.backend ?? "LightGBM/RRF"} бэкенд) переставляет кандидатов; ${t.rerank.blocked_inversions ?? 0} перестановок заблокировал защитный предохранитель fusion. Белым — то, что сдвинулось. Этот порядок и подаётся дальше.`
+        : `В HARS v0.7.0 тяжелый кросс-энкодер ВЫКЛЮЧЕН по умолчанию (${t.rerank.fallback_reason ?? "zero-cost fast path"}): ранжирование идёт через LightGBM или прямой RRF за ~160 мс. Белые маркеры показывают сдвиг относительно чистого векторного порядка.`,
       en: t.rerank.applied
-        ? `A cross-encoder reranker (${t.rerank.backend ?? "?"} backend) reads the top-${t.rerank.pool ?? "?"} candidates properly — slowly (${t.rerank.latency_ms ? (t.rerank.latency_ms / 1000).toFixed(1) + " s" : "? s"}) — and reorders them, with ${t.rerank.blocked_inversions ?? "?"} would-be swaps blocked by a fusion guardrail. White = chunks that moved. This final order is what gets served.`
-        : `Plot twist, straight from telemetry: the reranker STOOD DOWN (${t.rerank.fallback_reason ?? "confident"} — best fused score ${t.rerank.max_fusion_score ?? "?"} beat the ${t.rerank.skip_threshold ?? "?"} skip threshold), so the fusion order was served as-is. White markers show where the fusion blend alone moved chunks versus pure vector order.`,
+        ? `The ranker (${t.rerank.backend ?? "LightGBM/RRF"} backend) reorders candidates, with ${t.rerank.blocked_inversions ?? 0} would-be swaps blocked by a fusion guardrail. White = chunks that moved. This final order is what gets served.`
+        : `In HARS v0.7.0, the heavy cross-encoder is OFF by default (${t.rerank.fallback_reason ?? "zero-cost fast path"}): ranking is handled via LightGBM or direct RRF in ~160ms. White markers show where fusion/ranking moved chunks versus pure vector order.`,
     }),
   },
   {
