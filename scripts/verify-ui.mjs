@@ -376,7 +376,6 @@ try {
       await screenshot(off.cdp, "verify-demo.png"); // the explicit DEMO state
     }
     await sleep(1500);
-    await screenshot(off.cdp, "verify-offline.png");
   } finally {
     off.cleanup();
   }
