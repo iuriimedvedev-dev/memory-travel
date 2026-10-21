@@ -132,7 +132,7 @@ async function launchChrome({ blockApi = false } = {}) {
     // stays reachable: the demo dataset must still open behind its button.
     const patterns = [
       { urlPattern: `${BASE.replace(/\*/g, "\\*")}/api/*`, requestStage: "Request" },
-      { urlPattern: "http://10.66.66.99:*/*", requestStage: "Request" },
+      { urlPattern: "http://memory-host:*/*", requestStage: "Request" },
     ];
     await cdp.send("Fetch.enable", { patterns });
     cdp.on("Fetch.requestPaused", async (p) => {

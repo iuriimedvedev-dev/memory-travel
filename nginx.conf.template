@@ -8,6 +8,7 @@ map $http_authorization $final_auth {
 
 server {
     listen 8080;
+    listen 4400;
     server_name _;
     absolute_redirect off;
     root /usr/share/nginx/html;
@@ -97,7 +98,7 @@ server {
     # Read-only cosmos starfield data source served by trace server on port 8098.
     # -------------------------------------------------------------------------
     location /travel/api/graph-stats {
-        set $backend_trace "${BACKEND_TRACE_URL}";
+        set $backend_trace "${BACKEND_COSMOS_URL}";
         rewrite ^/travel/api/graph-stats/?(.*)$ /$1 break;
         proxy_pass $backend_trace;
         proxy_http_version 1.1;
@@ -112,7 +113,7 @@ server {
     }
 
     location /api/graph-stats {
-        set $backend_trace "${BACKEND_TRACE_URL}";
+        set $backend_trace "${BACKEND_COSMOS_URL}";
         rewrite ^/api/graph-stats/?(.*)$ /$1 break;
         proxy_pass $backend_trace;
         proxy_http_version 1.1;

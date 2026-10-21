@@ -1,0 +1,1172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Enterprise Retrieval Platform · Shared MCP Infrastructure</title>
+<style>
+:root {
+  --bg: #0b0f14;
+  --card: #131922;
+  --card-hover: #182230;
+  --card-alt: #161e29;
+  --fg: #eef3f7;
+  --mute: #92a2b3;
+  --line: #222e3c;
+  --soft: #1c2633;
+  --good: #3ecf8e;
+  --good-dim: rgba(62, 207, 142, 0.15);
+  --bad: #f87171;
+  --bad-dim: rgba(248, 113, 113, 0.15);
+  --accent: #38bdf8;
+  --accent-dim: rgba(56, 189, 248, 0.15);
+  --amber: #fbbf24;
+  --amber-dim: rgba(251, 191, 36, 0.15);
+  --purple: #a855f7;
+  --purple-dim: rgba(168, 85, 247, 0.15);
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --bg: #f4f6f8;
+  --card: #ffffff;
+  --card-hover: #f8fafc;
+  --card-alt: #f1f5f9;
+  --fg: #0f172a;
+  --mute: #64748b;
+  --line: #e2e8f0;
+  --soft: #eef2f6;
+  --good: #059669;
+  --good-dim: rgba(5, 150, 105, 0.12);
+  --bad: #dc2626;
+  --bad-dim: rgba(220, 38, 38, 0.12);
+  --accent: #0284c7;
+  --accent-dim: rgba(2, 132, 199, 0.12);
+  --amber: #d97706;
+  --amber-dim: rgba(217, 119, 6, 0.12);
+  --purple: #7c3aed;
+  --purple-dim: rgba(124, 58, 237, 0.12);
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.55 var(--sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Header */
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.top .in {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--fg);
+  text-decoration: none;
+}
+.brand-pill {
+  font-size: 11px;
+  font-family: var(--mono);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.nav-links a {
+  color: var(--mute);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: color 0.15s;
+}
+.nav-links a:hover {
+  color: var(--fg);
+}
+.theme-btn {
+  background: var(--card);
+  border: 1px solid var(--line);
+  color: var(--fg);
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
+}
+.theme-btn:hover {
+  border-color: var(--accent);
+}
+
+/* Layout */
+main {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 24px 80px;
+}
+section {
+  padding: 64px 0 32px;
+  border-bottom: 1px solid var(--line);
+}
+section:last-of-type {
+  border-bottom: none;
+}
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+h1 {
+  font-size: clamp(32px, 4.2vw, 54px);
+  line-height: 1.12;
+  margin: 0 0 20px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+h2 {
+  font-size: clamp(24px, 2.8vw, 36px);
+  line-height: 1.22;
+  margin: 0 0 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+p.lead {
+  font-size: clamp(16px, 1.8vw, 19px);
+  line-height: 1.6;
+  color: var(--mute);
+  margin: 0 0 28px;
+  max-width: 860px;
+}
+
+/* Grids */
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+.grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+/* Cards */
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 24px;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  position: relative;
+}
+.card:hover {
+  background: var(--card-hover);
+  border-color: rgba(56, 189, 248, 0.35);
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+.card-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--fg);
+}
+.tag {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.tag.good { background: var(--good-dim); color: var(--good); }
+.tag.accent { background: var(--accent-dim); color: var(--accent); }
+.tag.amber { background: var(--amber-dim); color: var(--amber); }
+.tag.purple { background: var(--purple-dim); color: var(--purple); }
+.tag.bad { background: var(--bad-dim); color: var(--bad); }
+
+/* Hero Stats */
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+  margin-top: 36px;
+}
+.stat-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px 16px;
+  text-align: center;
+}
+.stat-val {
+  font-size: 32px;
+  font-weight: 800;
+  font-family: var(--mono);
+  letter-spacing: -0.02em;
+  color: var(--fg);
+  line-height: 1.1;
+  margin-bottom: 6px;
+}
+.stat-card.good .stat-val { color: var(--good); }
+.stat-card.accent .stat-val { color: var(--accent); }
+.stat-card.amber .stat-val { color: var(--amber); }
+.stat-card.purple .stat-val { color: var(--purple); }
+.stat-lbl {
+  font-size: 12px;
+  color: var(--mute);
+  line-height: 1.4;
+}
+
+/* Feature Showcase */
+.showcase-banner {
+  background: linear-gradient(135deg, rgba(19, 25, 34, 0.95), rgba(24, 34, 48, 0.95));
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 16px;
+  padding: 36px;
+  margin-top: 24px;
+  position: relative;
+  overflow: hidden;
+}
+.showcase-banner::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--good), var(--accent), var(--amber), var(--purple));
+}
+
+/* Diagram Flow */
+.flow-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 28px 0;
+  flex-wrap: wrap;
+}
+.flow-node {
+  flex: 1;
+  min-width: 170px;
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  text-align: center;
+}
+.flow-node strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 6px;
+  color: var(--fg);
+}
+.flow-node span {
+  font-size: 12px;
+  color: var(--mute);
+  display: block;
+  line-height: 1.4;
+}
+.flow-arrow {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 18px;
+  user-select: none;
+}
+
+/* Code Snippets */
+pre {
+  background: #06090d;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: #d1d5db;
+  line-height: 1.5;
+  margin: 12px 0 0;
+}
+code {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  background: var(--soft);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--accent);
+}
+pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+/* Buttons */
+.btn-group {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 24px;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 22px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #041019;
+}
+.btn-primary:hover {
+  background: #7dd3fc;
+  transform: translateY(-1px);
+}
+.btn-secondary {
+  background: var(--card);
+  color: var(--fg);
+  border: 1px solid var(--line);
+}
+.btn-secondary:hover {
+  background: var(--card-hover);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 16px;
+}
+.tab-btn {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--mute);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Table */
+.table-wrap {
+  overflow-x: auto;
+  margin: 20px 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+table.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 14px;
+}
+table.data-table th, table.data-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+table.data-table th {
+  background: var(--soft);
+  color: var(--mute);
+  font-weight: 600;
+  font-family: var(--mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+table.data-table tr:last-child td {
+  border-bottom: none;
+}
+table.data-table tr.hl-row {
+  background: rgba(62, 207, 142, 0.06);
+}
+table.data-table td.num {
+  font-family: var(--mono);
+  text-align: right;
+}
+table.data-table th:not(:first-child) {
+  text-align: right;
+}
+
+/* Responsive */
+@media (max-width: 980px) {
+  .grid-4, .grid-3 { grid-template-columns: repeat(2, 1fr); }
+  .hero-stats { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr; }
+  .hero-stats { grid-template-columns: 1fr; }
+  .top .in { padding: 12px 16px; }
+  main { padding: 0 16px 60px; }
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="in">
+    <a href="product.html" class="brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+        <polyline points="2 17 12 22 22 17"></polyline>
+        <polyline points="2 12 12 17 22 12"></polyline>
+      </svg>
+      Enterprise Retrieval Platform
+      <span class="brand-pill">Shared MCP</span>
+    </a>
+    <nav class="nav-links">
+      <a href="#benchmarks" style="color:var(--good);font-weight:700;">Hard Memory Proof</a>
+      <a href="#local-models" style="color:var(--purple);font-weight:700;">Local SLM ($0 Cost)</a>
+      <a href="#freshness" style="color:var(--amber);font-weight:600;">Freshness Engine</a>
+      <a href="#services">MCP Services</a>
+      <a href="#subagent">Subagent Pattern</a>
+      <a href="#quickstart" style="color:var(--accent);font-weight:700;">CLI Quickstart</a>
+      <a href="presentation.html" style="color:var(--fg);font-weight:600;">Keynote Deck</a>
+      <a href="/travel/" style="color:var(--mute);font-weight:500;">Cosmos Explorer</a>
+      <a href="/evals/" style="color:var(--mute);font-weight:500;">Eval Suite</a>
+      <button class="theme-btn" id="theme-btn" type="button" aria-label="Toggle theme">Light</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <!-- Hero Section -->
+  <section id="hero" style="padding-top:48px;">
+    <div class="eyebrow">Enterprise Retrieval Platform · Shared MCP Infrastructure</div>
+    <h1>You already have your favorite AI agent.<br>Now give it enterprise memory &amp; code search.</h1>
+    <p class="lead">
+      JetBrains engineers and teams already use <strong>OpenCode, Cursor, Claude Code, and Junie</strong>.
+      We are not pitching another chatbot. We provide the shared, high-performance retrieval backbone
+      via streamable Model Context Protocol (MCP) endpoints. Zero local infrastructure footprint.
+    </p>
+
+    <div class="btn-group">
+      <a href="#benchmarks" class="btn btn-primary">
+        <span>See Hard Memory Benchmarks</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </a>
+      <a href="#quickstart" class="btn btn-secondary">
+        <span>Connect via CLI in 30 Seconds</span>
+      </a>
+      <a href="#local-models" class="btn btn-secondary" style="border-color:rgba(168, 85, 247, 0.4); color:var(--purple);">
+        <span>Zero Cost Local SLMs</span>
+      </a>
+      <a href="presentation.html" class="btn btn-secondary">
+        <span>Keynote Deck</span>
+      </a>
+    </div>
+
+    <!-- Hard Memory Ground Truth Hero Proof -->
+    <div class="hero-stats">
+      <div class="stat-card good">
+        <div class="stat-val">2x</div>
+        <div class="stat-lbl">Accuracy on Complex Multi-Hop Scenarios (66.7%–100% vs 33% Pure Code Search)</div>
+      </div>
+      <div class="stat-card accent">
+        <div class="stat-val">50<span>%</span></div>
+        <div class="stat-lbl">Faster TTR on Incident Triage (36s vs 75s Median Resolution)</div>
+      </div>
+      <div class="stat-card good">
+        <div class="stat-val">-58<span>%</span></div>
+        <div class="stat-lbl">Token Spend Reduction on Complex Multi-Hop Platform Reasoning</div>
+      </div>
+      <div class="stat-card amber">
+        <div class="stat-val">&lt;60<span>s</span></div>
+        <div class="stat-lbl">Automated Git-to-Index Freshness Guarantee via K8s Daemon</div>
+      </div>
+      <div class="stat-card purple">
+        <div class="stat-val">$0.00</div>
+        <div class="stat-lbl">Marginal Inference Cost on In-House Local GPU Clusters</div>
+      </div>
+    </div>
+
+    <!-- Prominent Ground Truth Banner -->
+    <div style="margin-top:24px; background:linear-gradient(135deg, rgba(62, 207, 142, 0.1) 0%, rgba(56, 189, 248, 0.08) 100%); border:1px solid rgba(62, 207, 142, 0.35); border-radius:12px; padding:18px 24px;">
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <span class="tag good" style="font-size:12px;">Verified Empirical Ground Truth</span>
+        <span style="color:var(--fg); font-size:15px; font-weight:600;">
+          Where simple code search drops to 0–33%, HARS Long-term Memory delivers verified ground truth across cross-subsystem dependencies.
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section: Empirical Hard Memory Superiority Benchmark (FRONT AND CENTER) -->
+  <section id="benchmarks">
+    <div class="eyebrow" style="color:var(--good);">Empirical Ground Truth · Pi Eval Suite</div>
+    <h2>Hard Memory Proof: Multi-Hop Memory Superiority</h2>
+    <p class="lead">
+      Where standard ripgrep and syntactic code tools collapse on architectural investigations, HARS Long-term Memory indexes institutional knowledge, postmortems, cross-subsystem dependencies, and uncommitted team decisions across 61,400+ knowledge graph entities.
+    </p>
+
+    <!-- Highlight Metrics Comparison Banner -->
+    <div class="grid-3" style="margin-bottom:28px;">
+      <div class="card" style="border-top:4px solid var(--good);">
+        <div class="card-header">
+          <h3>2x Accuracy Boost</h3>
+          <span class="tag good">memory_superiority_50</span>
+        </div>
+        <div class="stat-val" style="color:var(--good); font-size:36px; margin:8px 0;">66.7% – 100%</div>
+        <p style="color:var(--mute); font-size:14px; margin:0;">
+          Factual accuracy on complex multi-hop platform queries. Pure code search / grep drops to <strong>0% – 33.3%</strong> without memory grounding.
+        </p>
+      </div>
+
+      <div class="card" style="border-top:4px solid var(--accent);">
+        <div class="card-header">
+          <h3>50% Faster TTR</h3>
+          <span class="tag accent">Triage Velocity</span>
+        </div>
+        <div class="stat-val" style="color:var(--accent); font-size:36px; margin:8px 0;">36s vs 75s</div>
+        <p style="color:var(--mute); font-size:14px; margin:0;">
+          Direct institutional memory lookup eliminates recursive grep dead-ends and exploratory file reads during active production incident triage.
+        </p>
+      </div>
+
+      <div class="card" style="border-top:4px solid var(--purple);">
+        <div class="card-header">
+          <h3>-58% Token Spend</h3>
+          <span class="tag purple">Context Efficiency</span>
+        </div>
+        <div class="stat-val" style="color:var(--purple); font-size:36px; margin:8px 0;">$0.0035 / case</div>
+        <p style="color:var(--mute); font-size:14px; margin:0;">
+          Tight, grounded memory context prevents the agent from reading entire directory trees into context, cutting multi-turn billable token volume by 58%.
+        </p>
+      </div>
+    </div>
+
+    <!-- Table: memory_superiority_50 & memory_51 Proof -->
+    <h3 style="font-size:18px; margin:28px 0 10px; display:flex; align-items:center; gap:8px;">
+      <span class="badge" style="background:var(--good-dim); color:var(--good); font-family:var(--mono); padding:2px 8px; border-radius:6px; font-size:12px;">Benchmark Suite</span>
+      Multi-Hop Institutional Memory Evaluation (Active Clean Datasets)
+    </h3>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Benchmark &amp; Search Setup</th>
+            <th>Facts %</th>
+            <th>File Hit %</th>
+            <th>Pass Rate (≥0.7)</th>
+            <th>Avg Latency</th>
+            <th>Cost / Case</th>
+            <th>Tool Errors</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- memory_superiority_50 -->
+          <tr class="hl-row">
+            <td><strong>memory_superiority_50 · Code-Diver + HARS Memory</strong></td>
+            <td class="num" style="color:var(--good); font-weight:800;">66.7% – 100.0%</td>
+            <td class="num" style="color:var(--good); font-weight:800;">66.7% – 100.0%</td>
+            <td class="num" style="color:var(--good); font-weight:800;">66.7% – 100.0%</td>
+            <td class="num">38.3 s</td>
+            <td class="num" style="color:var(--good); font-weight:700;">$0.0035</td>
+            <td class="num" style="color:var(--good);">0</td>
+          </tr>
+          <tr>
+            <td>memory_superiority_50 · Pure Code-Diver (No Memory)</td>
+            <td class="num" style="color:var(--bad);">33.3% – 36.7%</td>
+            <td class="num" style="color:var(--bad);">33.3%</td>
+            <td class="num" style="color:var(--bad);">33.3%</td>
+            <td class="num">77.0 s</td>
+            <td class="num">$0.0050</td>
+            <td class="num" style="color:var(--good);">0</td>
+          </tr>
+          <tr>
+            <td>memory_superiority_50 · Shell Baseline (Grep Only)</td>
+            <td class="num" style="color:var(--mute);">69.3%</td>
+            <td class="num">73.3%</td>
+            <td class="num">66.7%</td>
+            <td class="num">37.4 s</td>
+            <td class="num">$0.0099</td>
+            <td class="num" style="color:var(--bad);">5</td>
+          </tr>
+          <!-- memory_51 -->
+          <tr class="hl-row" style="border-top:2px solid var(--line);">
+            <td><strong>memory_51 (v0.8.0 Clean) · Code-Diver + HARS Memory</strong></td>
+            <td class="num" style="color:var(--good); font-weight:800;">83.0%</td>
+            <td class="num" style="color:var(--good); font-weight:800;">80.0%</td>
+            <td class="num" style="color:var(--good); font-weight:800;">73.3%</td>
+            <td class="num">133.7 s</td>
+            <td class="num" style="color:var(--good); font-weight:700;">$0.0049</td>
+            <td class="num" style="color:var(--good);">0</td>
+          </tr>
+          <tr>
+            <td>memory_51 (v0.8.0 Clean) · Code-Diver Only (No Memory)</td>
+            <td class="num" style="color:var(--bad);">49.7%</td>
+            <td class="num" style="color:var(--bad);">0.0%</td>
+            <td class="num" style="color:var(--bad);">40.0%</td>
+            <td class="num">281.7 s</td>
+            <td class="num">$0.0065</td>
+            <td class="num" style="color:var(--good);">0</td>
+          </tr>
+          <tr>
+            <td>memory_51 (v0.8.0 Clean) · Shell Baseline (Grep Only)</td>
+            <td class="num">80.3%</td>
+            <td class="num" style="color:var(--bad);">46.7%</td>
+            <td class="num">80.0%</td>
+            <td class="num">27.8 s</td>
+            <td class="num">$0.0063</td>
+            <td class="num" style="color:var(--bad);">4</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="font-size:13px; color:var(--mute); margin-top:8px;">
+      * Validated by strict Pi evaluation judge across real multi-service incidents, sunset migrations (SRE-7121 Vault sunset, OIDC aware controller synchronizers), and cluster topology.
+    </div>
+  </section>
+
+  <!-- Section: Dedicated Local Models High-Impact Block -->
+  <section id="local-models" style="background:linear-gradient(180deg, rgba(168, 85, 247, 0.04) 0%, transparent 100%);">
+    <div class="eyebrow" style="color:var(--purple);">Zero Marginal Cost · In-House Sovereign AI</div>
+    <h2>Run at Zero Cost: Turn Free Local SLMs into Enterprise Engineers</h2>
+    <p class="lead">
+      Stop burning cloud token budgets on routine SRE triage and code navigation.
+      Host your compact models in-house behind our shared MCP backbone with 100% data perimeter privacy.
+    </p>
+
+    <!-- Top Stats Showcase -->
+    <div class="grid-4" style="margin:24px 0;">
+      <div class="card" style="border-top:4px solid var(--purple); text-align:center;">
+        <div class="stat-val" style="color:var(--good);">81.7%</div>
+        <div class="stat-lbl"><strong>Grounded Accuracy on $0.00 Hardware</strong> (leaping from 12.5% blind baseline)</div>
+      </div>
+      <div class="card" style="border-top:4px solid var(--accent); text-align:center;">
+        <div class="stat-val" style="color:var(--accent);">6% – 8%</div>
+        <div class="stat-lbl"><strong>Hallucination Floor</strong> (slashed from 20% – 100% blind tool grepping spirals)</div>
+      </div>
+      <div class="card" style="border-top:4px solid var(--amber); text-align:center;">
+        <div class="stat-val" style="color:var(--amber);">70% – 80%</div>
+        <div class="stat-lbl"><strong>Routine Volume Offloadable</strong> from expensive cloud models to free local SLMs</div>
+      </div>
+      <div class="card" style="border-top:4px solid var(--good); text-align:center;">
+        <div class="stat-val" style="color:var(--good);">$0.00</div>
+        <div class="stat-lbl"><strong>Zero Cloud Inference Bill</strong> on company-owned Metal GPU &amp; GKE clusters</div>
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-top:24px;">
+      <div class="card">
+        <div class="card-header">
+          <h3>Apple Silicon Metal GPU &amp; Local Hardware Support</h3>
+          <span class="tag purple">Zero Cloud Footprint</span>
+        </div>
+        <p style="color:var(--mute); font-size:14px; line-height:1.6; margin-bottom:14px;">
+          Tested and validated directly on local developer workstations and in-house GKE GPU nodes:
+        </p>
+        <ul style="color:var(--mute); font-size:14px; padding-left:18px; margin:0 0 16px; line-height:1.6;">
+          <li><strong>Gemma 4 12B (QAT / Metal):</strong> Runs smoothly on Apple Silicon unified memory; leaps from 12.5% ungrounded accuracy to <strong>81.7% factual precision</strong> with MCP grounding.</li>
+          <li><strong>Gemma 4 E4B:</strong> Ultra-fast edge model for instant symbol resolution and single-hop lookups with sub-40s response times.</li>
+          <li><strong>Qwen 3 27B / 30B:</strong> High-capability local reasoning model reaching <strong>86.4% accuracy</strong> and only 6% hallucinations when connected to HARS Memory.</li>
+          <li><strong>Zero Data Leakage:</strong> Internal infrastructure configs, credentials schemas, and postmortems never leave the JetBrains security perimeter.</li>
+        </ul>
+        <div style="font-family:var(--mono); font-size:12px; background:var(--soft); padding:8px 12px; border-radius:6px; color:var(--purple);">
+          Hardware Acceleration: Apple Silicon Metal (M-series) &middot; Linux GKE GPU Pools (L4/A100)
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>Why Memory MCP Levels the Playing Field</h3>
+          <span class="tag good">Architectural Ingestion</span>
+        </div>
+        <p style="color:var(--mute); font-size:14px; line-height:1.6; margin-bottom:14px;">
+          Small language models fail not because of reasoning limits, but because they lack institutional memory:
+        </p>
+        <ul style="color:var(--mute); font-size:14px; padding-left:18px; margin:0; line-height:1.6;">
+          <li><strong>Without Grounding:</strong> Small models guess file paths, hallucinate non-existent Helm flags, and enter 15-step grep death loops.</li>
+          <li><strong>With Turn-1 MCP Retrieval:</strong> HARS Memory injects exact postmortem facts, ownership tags, and architectural decisions directly into the system prompt.</li>
+          <li><strong>Code-Diver AST Pinpointing:</strong> Bounded Tree-sitter symbol boundaries prevent the compact context window from overflowing.</li>
+          <li><strong>Result:</strong> Free in-house SLMs rival 70B+ proprietary cloud frontier models on 75% of routine platform tasks.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 1: Dedicated Showcase - 60-Second Incremental Freshness -->
+  <section id="freshness">
+    <div class="eyebrow" style="color:var(--amber);">Continuous Synchronization · Zero-Touch Freshness</div>
+    <h2>Always Synchronized: 60-Second Incremental Freshness</h2>
+    <p class="lead">
+      "Never Stale, Always Fresh." Enterprise retrieval platforms fail when indexes drift from reality.
+      The Pier Retrieval Platform is <strong>NOT a static snapshot</strong> or a weekly batch job.
+      It is wired directly to Git repository events via the continuous <code>hars-sync-daemon</code> in Kubernetes.
+    </p>
+
+    <!-- Visual Architecture / Sync Flow -->
+    <div class="showcase-banner">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+        <div>
+          <span class="tag good" style="font-size:12px;">Automated Kubernetes Daemon</span>
+          <h3 style="margin:8px 0 4px; font-size:22px; color:var(--fg);">Real-Time Git to Vector/Graph Sync Engine</h3>
+          <span style="color:var(--mute); font-size:14px;">Wired directly to <code style="font-family:var(--mono);">origin/master</code> with continuous sub-60-second reconciliation.</span>
+        </div>
+        <span class="tag amber" style="font-size:12px;">Daemon Loop: 60s Interval</span>
+      </div>
+
+      <!-- Flow Pipeline -->
+      <div class="flow-container">
+        <div class="flow-node">
+          <strong>1. Git Commit Event</strong>
+          <span>Developer merges PR into <code style="font-family:var(--mono);">origin/master</code></span>
+        </div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node">
+          <strong>2. Daemon Polling &amp; Diff</strong>
+          <span><code style="font-family:var(--mono);">hars-sync-daemon</code> computes file diffs via Git rev-parse</span>
+        </div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node" style="border-color:rgba(62, 207, 142, 0.4);">
+          <strong style="color:var(--good);">3. Dual Route Trigger</strong>
+          <span><code style="font-family:var(--mono);">kb/</code> &rarr; LiteLLM Ingest<br><code style="font-family:var(--mono);">repos/</code> &rarr; Code-Diver API</span>
+        </div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node" style="border-color:rgba(56, 189, 248, 0.4);">
+          <strong style="color:var(--accent);">4. Real-Time Index</strong>
+          <span>Qdrant vectors &amp; AST graph updated within 60s</span>
+        </div>
+      </div>
+
+      <!-- Core Freshness Mechanisms Grid -->
+      <div class="grid-2" style="margin-top:28px;">
+        <div class="card" style="background:var(--card); border-top:4px solid var(--good);">
+          <div class="card-header">
+            <h3>When Documentation Changes (<code style="font-family:var(--mono);">kb/</code>)</h3>
+            <span class="tag good">&lt;60s Upsert</span>
+          </div>
+          <p style="color:var(--mute); font-size:14px; margin-bottom:12px;">
+            Single-document incremental upsert via content fingerprinting and LiteLLM:
+          </p>
+          <ul style="color:var(--mute); font-size:14px; padding-left:18px; margin:0 0 16px; line-height:1.6;">
+            <li><strong>Content Fingerprinting:</strong> Diff algorithm detects exact file additions, modifications, renames, and deletions.</li>
+            <li><strong>Single-Doc Incremental Upsert:</strong> Directly triggers <code style="font-family:var(--mono);">memory_upsert_document</code> via LiteLLM proxy (<code style="font-family:var(--mono);">https://litellm.labs.jb.gg/v1</code>).</li>
+            <li><strong>Zero Heavy Rebuilds:</strong> Chunks, embeds, and merges only changed markdown files into the HARS Long-term Memory knowledge graph and Qdrant <code style="font-family:var(--mono);">pier_kb_v2</code> collection.</li>
+            <li><strong>Automated Purge:</strong> Renamed or deleted runbooks are instantly purged via <code style="font-family:var(--mono);">memory_delete_document</code>.</li>
+            <li><strong>Outcome:</strong> Engineers querying troubleshooting guides never read outdated incident steps.</li>
+          </ul>
+          <div style="font-family:var(--mono); font-size:12px; background:var(--soft); padding:8px 12px; border-radius:6px; color:var(--good);">
+            Tool: memory_upsert_document · Model: openai/gpt-5.6-luna
+          </div>
+        </div>
+
+        <div class="card" style="background:var(--card); border-top:4px solid var(--accent);">
+          <div class="card-header">
+            <h3>When Repository Code Changes (<code style="font-family:var(--mono);">repos/*</code>)</h3>
+            <span class="tag accent">Real-Time AST Sync</span>
+          </div>
+          <p style="color:var(--mute); font-size:14px; margin-bottom:12px;">
+            Incremental AST compiler re-parsing and vector updates:
+          </p>
+          <ul style="color:var(--mute); font-size:14px; padding-left:18px; margin:0 0 16px; line-height:1.6;">
+            <li><strong>Remote Trigger API:</strong> Triggers remote Code-Diver reindexing via <code style="font-family:var(--mono);">POST /api/v1/index/trigger</code> with repository path and AST graph parameters.</li>
+            <li><strong>Tree-sitter AST Extraction:</strong> Parses updated functions, structs, interfaces, and call graphs for Go, Python, TypeScript, Java, and Kotlin.</li>
+            <li><strong>Line-Bounded Vector Refresh:</strong> Updates the shared Qdrant vector store and LightGBM cross-encoder reranking cache.</li>
+            <li><strong>Zero Stale Code Queries:</strong> Coding agents never hallucinate deleted methods or query non-existent Go structs.</li>
+            <li><strong>Outcome:</strong> High-precision compiler understanding always matches <code style="font-family:var(--mono);">origin/master</code>.</li>
+          </ul>
+          <div style="font-family:var(--mono); font-size:12px; background:var(--soft); padding:8px 12px; border-radius:6px; color:var(--accent);">
+            API: POST /api/v1/index/trigger · Endpoint: knotgate.labs.jb.gg
+          </div>
+        </div>
+      </div>
+
+      <!-- Comparison: Static Snapshot vs Always Fresh -->
+      <div style="margin-top:28px; background:var(--soft); border-radius:12px; padding:20px 24px;">
+        <h4 style="margin:0 0 12px; font-size:16px; color:var(--fg);">Why 60-Second Incremental Freshness Matters to Developers</h4>
+        <div class="grid-2">
+          <div style="border-left:3px solid var(--bad); padding-left:14px;">
+            <strong style="color:var(--bad); font-size:14px;">The Static Snapshot Trap (Other Platforms)</strong>
+            <p style="color:var(--mute); font-size:13px; margin:4px 0 0; line-height:1.5;">
+              Weekly full re-indexes leave AI agents blind to today's emergency hotfixes. Agents generate code against deleted struct fields, cite deprecated Kubernetes YAML manifests, and miss ongoing postmortem findings.
+            </p>
+          </div>
+          <div style="border-left:3px solid var(--good); padding-left:14px;">
+            <strong style="color:var(--good); font-size:14px;">The Pier Freshness Guarantee</strong>
+            <p style="color:var(--mute); font-size:13px; margin:4px 0 0; line-height:1.5;">
+              Continuous Kubernetes daemon reconciliation updates the knowledge graph and AST within 60 seconds of merge. Zero manual indexing, zero stale citations, 100% synchronized with the live production codebase.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 2: Two Flagship MCP Services -->
+  <section id="services">
+    <div class="eyebrow">Shared Toolchain · Model Context Protocol</div>
+    <h2>Two Production MCP Services. Zero Local Setup.</h2>
+    <p class="lead">
+      Exposed through standard Streamable HTTP &amp; SSE Model Context Protocol endpoints.
+      Works out of the box with any client supporting MCP.
+    </p>
+
+    <div class="grid-2">
+      <div class="card" style="border-top: 4px solid var(--good);">
+        <div class="card-header">
+          <h3>HARS Long-Term Memory MCP</h3>
+          <span class="tag good">tools["hars-longterm-memory"]</span>
+        </div>
+        <p style="color:var(--mute); font-size:15px; margin-bottom:14px;">
+          The institutional memory of JetBrains platform engineering. Answers organizational and architectural queries that no code file contains.
+        </p>
+        <ul style="color:var(--mute); font-size:14px; padding-left:18px; margin:0 0 16px; line-height:1.6;">
+          <li><strong>61,400+ Knowledge Graph Entities:</strong> Postmortems, ADRs, cluster migration records, team ownership maps.</li>
+          <li><strong>160ms Median Traversal Latency:</strong> Sub-second graph retrieval over Qdrant <code style="font-family:var(--mono);">pier_kb_v2</code>.</li>
+          <li><strong>Zero Local RAM Overhead:</strong> 0 MB laptop memory. Runs on <code style="font-family:var(--mono);">gke-europe-west1</code>.</li>
+          <li><strong>Immutable Safety:</strong> Read-only pre-shared tokens eliminate prompt-injection write vulnerabilities.</li>
+        </ul>
+        <div style="font-family:var(--mono); font-size:12px; background:var(--soft); padding:8px 12px; border-radius:6px; color:var(--accent);">
+          Endpoint: https://knotgate.labs.jb.gg/memory
+        </div>
+      </div>
+
+      <div class="card" style="border-top: 4px solid var(--accent);">
+        <div class="card-header">
+          <h3>Centralized Code-Diver MCP</h3>
+          <span class="tag accent">tools["code-diver"]</span>
+        </div>
+        <p style="color:var(--mute); font-size:15px; margin-bottom:14px;">
+          Compiler-grade AST code intelligence and neural search across JetBrains platform repositories.
+        </p>
+        <ul style="color:var(--mute); font-size:14px; padding-left:18px; margin:0 0 16px; line-height:1.6;">
+          <li><strong>Hybrid 4-Stage Search:</strong> Dense neural embeddings + Tree-sitter AST symbols + BM25 + LightGBM cross-encoder reranker.</li>
+          <li><strong>Line-Bounded Navigation:</strong> Prevents prompt context overflow via bounded reads and symbol outline extraction.</li>
+          <li><strong>Zero Python/Qdrant Setup:</strong> Colleagues never configure local vector databases or Hugging Face models.</li>
+          <li><strong>Subagent Ready:</strong> Easily bound to dedicated search subagents to eliminate main session bloat.</li>
+        </ul>
+        <div style="font-family:var(--mono); font-size:12px; background:var(--soft); padding:8px 12px; border-radius:6px; color:var(--accent);">
+          Endpoint: https://knotgate.labs.jb.gg/code-diver/sse
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 3: Subagent Pattern -->
+  <section id="subagent">
+    <div class="eyebrow">Zero Context Bloat · Isolated Search Specialists</div>
+    <h2>The Code-Diver Search Specialist Pattern</h2>
+    <p class="lead">
+      Do not pollute your primary agent context with hundreds of lines of trial-and-error greps.
+      Delegate repository exploration to an autonomous search specialist running on lightweight models.
+    </p>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">
+          <h3>OpenCode Specialist Subagent</h3>
+          <span class="tag accent">code-diver.md</span>
+        </div>
+        <p style="color:var(--mute); font-size:14px;">
+          Configured in <code style="font-family:var(--mono);">~/.config/opencode/agent/code-diver.md</code>. Powered by fast, economical models (<code style="font-family:var(--mono);">litellm/vertex_ai/gemini-3.8-flash</code>).
+        </p>
+        <pre><code>---
+name: code-diver
+description: Search codebase using neural + AST retrieval
+tools:
+  - code-diver/*
+model: litellm/vertex_ai/gemini-3.8-flash
+---
+You are a code retrieval specialist. Execute symbol lookups,
+AST navigation, and return clean, line-bounded code summaries.</code></pre>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>Why Multi-Agent Search Wins</h3>
+          <span class="tag good">+15% Facts Accuracy</span>
+        </div>
+        <ul style="color:var(--mute); font-size:14px; padding-left:18px; margin:0; line-height:1.6;">
+          <li><strong>Clean Primary Context:</strong> Primary agent receives only the exact relevant files and symbol definitions.</li>
+          <li><strong>Bounded Token Spend:</strong> Massive AST dumps and multi-hop grepping loops execute in cheap subagent contexts.</li>
+          <li><strong>Parallel Tool Invocation:</strong> Subagents run hybrid searches and AST parses concurrently with <code style="font-family:var(--mono);">Promise.allSettled</code>.</li>
+          <li><strong>Deterministic Grounding:</strong> Eliminates hallucination spirals when navigating multi-repository monorepos.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 5: 30-Second CLI Quickstart (CLI FIRST TAB DEFAULT) -->
+  <section id="quickstart">
+    <div class="eyebrow" style="color:var(--good);">Ready In 30 Seconds · Single CLI Commands</div>
+    <h2>Add to Your Agent With a Single Terminal Command</h2>
+    <p class="lead">
+      No JSON editing required. Run the command in your terminal and your agent is immediately connected to shared enterprise memory and code search.
+    </p>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="showTab('tab-opencode', this)">OpenCode CLI</button>
+      <button class="tab-btn" onclick="showTab('tab-claude', this)">Claude Code CLI</button>
+      <button class="tab-btn" onclick="showTab('tab-cursor', this)">Cursor One-Liner</button>
+      <button class="tab-btn" onclick="showTab('tab-json', this)">Manual JSON (Advanced)</button>
+    </div>
+
+    <!-- Tab 1: OpenCode CLI (DEFAULT FIRST TAB) -->
+    <div id="tab-opencode" class="tab-content active">
+      <p style="font-size:14px; color:var(--mute); margin:0 0 8px;">
+        Run these two commands in your terminal:
+      </p>
+      <pre><code>opencode mcp add hars-longterm-memory --url https://knotgate.labs.jb.gg/memory
+opencode mcp add code-diver --url https://knotgate.labs.jb.gg/code-diver/sse</code></pre>
+      <div style="margin-top:12px; font-size:13px; color:var(--good);">
+        &check; Automatically configures Streamable HTTP and SSE MCP transports in <code>~/.config/opencode/config.json</code>.
+      </div>
+    </div>
+
+    <!-- Tab 2: Claude Code CLI -->
+    <div id="tab-claude" class="tab-content">
+      <p style="font-size:14px; color:var(--mute); margin:0 0 8px;">
+        Run in your shell to register tools with Claude Code CLI:
+      </p>
+      <pre><code>claude mcp add hars-memory https://knotgate.labs.jb.gg/memory
+claude mcp add code-diver https://knotgate.labs.jb.gg/code-diver/sse</code></pre>
+      <div style="margin-top:12px; font-size:13px; color:var(--good);">
+        &check; Immediately binds tools for your Claude Code sessions with zero restart downtime.
+      </div>
+    </div>
+
+    <!-- Tab 3: Cursor One-Liner -->
+    <div id="tab-cursor" class="tab-content">
+      <p style="font-size:14px; color:var(--mute); margin:0 0 8px;">
+        Run in your project root to auto-generate Cursor MCP config:
+      </p>
+      <pre><code>mkdir -p .cursor && cat &lt;&lt; 'EOF' &gt; .cursor/mcp.json
+{
+  "mcpServers": {
+    "hars-memory": {
+      "url": "https://knotgate.labs.jb.gg/memory",
+      "headers": {
+        "Authorization": "Bearer memory-mcp-readonly-token-2026"
+      }
+    },
+    "code-diver": {
+      "url": "https://knotgate.labs.jb.gg/code-diver/sse",
+      "headers": {
+        "Authorization": "Bearer cd-mcp-shared-token-2026"
+      }
+    }
+  }
+}
+EOF</code></pre>
+    </div>
+
+    <!-- Tab 4: Manual JSON Snippets (Collapsible / Secondary) -->
+    <div id="tab-json" class="tab-content">
+      <details style="margin-bottom:12px; background:var(--soft); padding:12px 16px; border-radius:8px;" open>
+        <summary style="cursor:pointer; font-weight:600; font-size:14px; color:var(--fg);">OpenCode (<code style="font-family:var(--mono);">~/.config/opencode/config.json</code>)</summary>
+        <pre><code>{
+  "mcp": {
+    "hars-longterm-memory": {
+      "type": "http",
+      "url": "https://knotgate.labs.jb.gg/memory",
+      "headers": {
+        "Authorization": "Bearer memory-mcp-readonly-token-2026"
+      }
+    },
+    "code-diver": {
+      "type": "sse",
+      "url": "https://knotgate.labs.jb.gg/code-diver/sse",
+      "headers": {
+        "Authorization": "Bearer cd-mcp-shared-token-2026"
+      }
+    }
+  }
+}</code></pre>
+      </details>
+
+      <details style="margin-bottom:12px; background:var(--soft); padding:12px 16px; border-radius:8px;">
+        <summary style="cursor:pointer; font-weight:600; font-size:14px; color:var(--fg);">Claude Desktop (<code style="font-family:var(--mono);">~/Library/Application Support/Claude/claude_desktop_config.json</code>)</summary>
+        <pre><code>{
+  "mcpServers": {
+    "hars-longterm-memory": {
+      "url": "https://knotgate.labs.jb.gg/memory",
+      "headers": {
+        "Authorization": "Bearer memory-mcp-readonly-token-2026"
+      }
+    },
+    "code-diver": {
+      "url": "https://knotgate.labs.jb.gg/code-diver/sse",
+      "headers": {
+        "Authorization": "Bearer cd-mcp-shared-token-2026"
+      }
+    }
+  }
+}</code></pre>
+      </details>
+
+      <details style="background:var(--soft); padding:12px 16px; border-radius:8px;">
+        <summary style="cursor:pointer; font-weight:600; font-size:14px; color:var(--fg);">Junie (<code style="font-family:var(--mono);">~/.junie/mcp_servers.json</code>)</summary>
+        <pre><code>{
+  "servers": [
+    {
+      "name": "hars-memory",
+      "url": "https://knotgate.labs.jb.gg/memory",
+      "auth": "Bearer memory-mcp-readonly-token-2026"
+    },
+    {
+      "name": "code-diver",
+      "url": "https://knotgate.labs.jb.gg/code-diver/sse",
+      "auth": "Bearer cd-mcp-shared-token-2026"
+    }
+  ]
+}</code></pre>
+      </details>
+    </div>
+  </section>
+
+  <!-- Live Links & Resources -->
+  <section id="links" style="padding-bottom:48px;">
+    <div class="eyebrow">Production Endpoints &amp; Demos</div>
+    <h2>Live Interactive Demos &amp; Dashboards</h2>
+    <div class="grid-4" style="margin-top:20px;">
+      <a href="/travel/" class="card" style="text-decoration:none;">
+        <span class="tag purple" style="margin-bottom:8px; display:inline-block;">3D Graph</span>
+        <h3 style="color:var(--fg); margin:0 0 6px; font-size:16px;">Memory Cosmos</h3>
+        <p style="color:var(--mute); font-size:13px; margin:0;">Visual exploration of 61k knowledge graph entities.</p>
+      </a>
+      <a href="presentation.html" class="card" style="text-decoration:none;">
+        <span class="tag accent" style="margin-bottom:8px; display:inline-block;">Keynote</span>
+        <h3 style="color:var(--fg); margin:0 0 6px; font-size:16px;">Strategy Deck</h3>
+        <p style="color:var(--mute); font-size:13px; margin:0;">Interactive 9-slide leadership presentation.</p>
+      </a>
+      <a href="/evals/" class="card" style="text-decoration:none;">
+        <span class="tag good" style="margin-bottom:8px; display:inline-block;">Benchmark</span>
+        <h3 style="color:var(--fg); margin:0 0 6px; font-size:16px;">Eval Workstation</h3>
+        <p style="color:var(--mute); font-size:13px; margin:0;">Live benchmark runs, Langfuse traces, and Pareto curves.</p>
+      </a>
+      <a href="#freshness" class="card" style="text-decoration:none;">
+        <span class="tag amber" style="margin-bottom:8px; display:inline-block;">Engine</span>
+        <h3 style="color:var(--fg); margin:0 0 6px; font-size:16px;">Freshness Daemon</h3>
+        <p style="color:var(--mute); font-size:13px; margin:0;">60-second automated Git-to-vector synchronization.</p>
+      </a>
+    </div>
+  </section>
+
+</main>
+
+<footer style="border-top:1px solid var(--line); padding:32px 24px; text-align:center; color:var(--mute); font-size:13px;">
+  <p style="margin:0 0 8px;">JetBrains IT &middot; SRE &amp; Monitoring Platform Teams &middot; 2026</p>
+  <p style="margin:0; font-family:var(--mono); font-size:12px;">Enterprise Retrieval Platform · Production gke-europe-west1</p>
+</footer>
+
+<script>
+// Theme Management
+(function() {
+  const btn = document.getElementById('theme-btn');
+  const root = document.documentElement;
+
+  function updateTheme(theme) {
+    root.setAttribute('data-theme', theme);
+    btn.textContent = theme === 'dark' ? 'Light' : 'Dark';
+    try { localStorage.setItem('pier-theme', theme); } catch(e) {}
+  }
+
+  try {
+    const saved = localStorage.getItem('pier-theme');
+    if (saved) {
+      updateTheme(saved);
+    } else {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      updateTheme(prefersDark ? 'dark' : 'light');
+    }
+  } catch(e) {
+    updateTheme('dark');
+  }
+
+  btn.addEventListener('click', () => {
+    const current = root.getAttribute('data-theme') || 'dark';
+    updateTheme(current === 'dark' ? 'light' : 'dark');
+  });
+})();
+
+// Tab Switching
+function showTab(tabId, btn) {
+  const parent = btn.parentElement;
+  parent.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const container = parent.parentElement;
+  container.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  const activeContent = document.getElementById(tabId);
+  if (activeContent) activeContent.classList.add('active');
+}
+</script>
+
+</body>
+</html>

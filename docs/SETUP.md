@@ -84,7 +84,7 @@ Wants=network-online.target
 
 [Service]
 Environment=PATH=/home/angkira/.nvm/versions/node/v25.0.0/bin:/usr/local/bin:/usr/bin:/bin
-Environment=MEMORY_BRIDGE_URL=http://10.66.66.99:8099/mcp
+Environment=MEMORY_BRIDGE_URL=http://memory-host:8099/mcp
 Type=simple
 WorkingDirectory=/home/angkira/Project/software/memory-travel/app
 ExecStart=/home/angkira/.nvm/versions/node/v25.0.0/bin/npm run dev -- --host 127.0.0.1 --port 5174

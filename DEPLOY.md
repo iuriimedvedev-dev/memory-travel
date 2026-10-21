@@ -64,7 +64,7 @@ Visit http://localhost:8080/travel/ (or http://localhost:8080/ if built with `VI
 Point the container at an existing MCP bridge and trace service:
 ```bash
 docker run -d --name memory-travel -p 8080:8080 \
-  -e BACKEND_HOST="10.66.66.99" \
+  -e BACKEND_HOST="memory-host" \
   -e BACKEND_MEMORY_PORT="8099" \
   -e BACKEND_TRACE_PORT="8098" \
   -e AUTH_TOKEN="optional-secret-token" \

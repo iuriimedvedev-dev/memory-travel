@@ -18,7 +18,7 @@ Spec only — the live service is deliberately NOT modified (no branch, no patch
 ## Endpoint
 
 ```
-GET http://10.66.66.99:8098/trace?question=...&mode=hybrid&top_k=10&...   (SSE)
+GET http://memory-host:8098/trace?question=...&mode=hybrid&top_k=10&...   (SSE)
 ```
 
 The draft's `GET /mcp/trace` on the Streamable-HTTP surface is **not** what

@@ -36,7 +36,7 @@ Two origins are involved:
 
 | Env var | Points at | Default | Used for |
 |---|---|---|---|
-| `MEMORY_BRIDGE_URL` | MCP bridge (Streamable HTTP) | `http://10.66.66.99:8099/mcp` | `memory_recall`, `memory_status` (read-only tools) |
+| `MEMORY_BRIDGE_URL` | MCP bridge (Streamable HTTP) | `http://memory-host:8099/mcp` | `memory_recall`, `memory_status` (read-only tools) |
 | `MEMORY_TRACE_URL` (optional) | trace service root | derived: bridge host, port `8098` | `/stats` `/graph` `/coords` (cosmos export) + `/trace` `/healthz` (SSE) |
 
 Dev (`npm run dev`) proxies — all same-origin from the page's point of view:
@@ -234,7 +234,7 @@ measured/derived tables: `hars-longterm-memory/docs/trace-api.md`.
 
 | Переменная | Куда смотрит | По умолчанию | Для чего |
 |---|---|---|---|
-| `MEMORY_BRIDGE_URL` | MCP-мост (Streamable HTTP) | `http://10.66.66.99:8099/mcp` | `memory_recall`, `memory_status` (read-only) |
+| `MEMORY_BRIDGE_URL` | MCP-мост (Streamable HTTP) | `http://memory-host:8099/mcp` | `memory_recall`, `memory_status` (read-only) |
 | `MEMORY_TRACE_URL` (опционально) | корень trace-сервиса | производная: хост моста, порт `8098` | `/stats` `/graph` `/coords` + `/trace` `/healthz` |
 
 Прокси dev-сервера — все same-origin для страницы:

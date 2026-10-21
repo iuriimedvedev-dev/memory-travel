@@ -65,7 +65,7 @@ CORS). The client tries the same-origin path first, then the baked direct URL:
 
 | Client path | Proxy target (dev-mode equivalent) |
 |---|---|
-| `/api/memory` | `<bridge-origin>/mcp` (e.g. `http://10.66.66.99:8099/mcp`) |
+| `/api/memory` | `<bridge-origin>/mcp` (e.g. `http://memory-host:8099/mcp`) |
 | `/api/trace/`  | `http://<trace-host>:8098/` (SSE; `/api/trace/healthz` → `/healthz`) |
 
 Caddy:
@@ -77,11 +77,11 @@ Caddy:
 
   handle /api/memory* {
     uri strip_prefix /api/memory
-    reverse_proxy http://10.66.66.99:8099
+    reverse_proxy http://memory-host:8099
   }
   handle /api/trace* {
     uri strip_prefix /api/trace
-    reverse_proxy http://10.66.66.99:8098
+    reverse_proxy http://memory-host:8098
   }
 }
 ```
@@ -94,9 +94,9 @@ server {
   root /path/to/memory-travel/app/dist;
   index index.html;
 
-  location /api/memory { proxy_pass http://10.66.66.99:8099/mcp; proxy_set_header Host $host; }
+  location /api/memory { proxy_pass http://memory-host:8099/mcp; proxy_set_header Host $host; }
   location /api/trace/ {
-    proxy_pass http://10.66.66.99:8098/;
+    proxy_pass http://memory-host:8098/;
     proxy_http_version 1.1;
     proxy_set_header Connection "";
     proxy_buffering off;          # SSE — do not buffer
