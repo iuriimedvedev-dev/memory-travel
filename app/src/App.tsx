@@ -6,14 +6,12 @@ import ErrorOverlay from "./components/ErrorOverlay";
 import PresentationView from "./components/PresentationView";
 import QueryBar, { type HistoryEntry } from "./components/QueryBar";
 import PipelineWidget from "./components/PipelineWidget";
-import TravelView from "./components/TravelView";
 import UiScaleSlider from "./components/UiScaleSlider";
 import { SparkIcon, XIcon } from "./components/icons";
 import { INK, toWorld3, type XYZ } from "./lib/cosmos";
 import type { AnyCosmos } from "./lib/cosmos2d";
 import { asJourney3D } from "./lib/cosmos3d";
 import { compileLiveTrace } from "./lib/compileLive";
-import { loadManifest } from "./lib/data";
 import {
   loadDemoCosmos,
   loadLiveCosmos,
@@ -22,7 +20,7 @@ import {
   type SourcePhase,
 } from "./lib/cosmosSource";
 import { memoryRecallLive, keywordsFor, estimateSteps, emptySteps, markStepsError, parseRecallTelemetry, stepsFromTelemetry, probeTraceSupport, streamRecallTrace, applyTraceEvent, mergeTraceStart, memoryStatusLive, emptyBridgeInfo, BRIDGE_PROXY_PATH, type ConnState, type RecallStep } from "./lib/live";
-import type { CosmosGraph, TraceManifestEntry, TravelTrace } from "./lib/types";
+import type { CosmosGraph, TravelTrace } from "./lib/types";
 import { fmt } from "./i18n/strings";
 import { useI18n } from "./i18n/useI18n";
 
@@ -47,13 +45,10 @@ function saveHistory(h: HistoryEntry[]): void {
 
 export default function App() {
   const { t, lang, setLangL10n } = useI18n();
-  const [tab, setTab] = useState<"cosmos" | "travel">("cosmos");
   const [presenting, setPresenting] = useState(false);
   const [cosmosFull, setCosmosFull] = useState<AnyCosmos | null>(null);
-  const [cosmosTravel, setCosmosTravel] = useState<AnyCosmos | null>(null);
   const [graph, setGraph] = useState<CosmosGraph | null>(null);
   const [names, setNames] = useState<string[] | null>(null);
-  const [manifest, setManifest] = useState<TraceManifestEntry[] | null>(null);
   const [progress, setProgress] = useState<string | null>(t.loadingIndex);
   const [dataError, setDataError] = useState<string | null>(null);
   const [canvasError, setCanvasError] = useState<string | null>(null);
@@ -284,7 +279,6 @@ export default function App() {
     setSource({ phase: "probing" });
     setSourceError(null);
     setProgress(t.srcProbing);
-    setManifest(null); // fixture traces are demo-only
     probeGraphStats()
       .then((stats) => {
         if (dead || gen !== loadGenRef.current) return;
@@ -312,11 +306,10 @@ export default function App() {
     const gen = ++loadGenRef.current;
     setProgress(t.loadingIndex);
     setSourceError(null);
-    Promise.all([loadDemoCosmos(), loadManifest()])
-      .then(([data, man]) => {
+    loadDemoCosmos()
+      .then((data) => {
         if (gen !== loadGenRef.current) return;
         applyCosmosData(data);
-        setManifest(man);
         setSource({ phase: "demo" });
       })
       .catch((e: unknown) => {
@@ -573,11 +566,8 @@ export default function App() {
         />
       ) : (
         <>
-          <div className={tab === "cosmos" ? "canvaswrap" : "canvaswrap hidden"}>
+          <div className="canvaswrap">
             <CosmosCanvas label="cosmos" onCosmos={setCosmosFull} onSelect={() => {}} onHover={() => {}} onError={onCanvasError} onMode={onMode} />
-          </div>
-          <div className={tab === "travel" ? "canvaswrap" : "canvaswrap hidden"}>
-            <CosmosCanvas label="travel" onCosmos={setCosmosTravel} onSelect={() => {}} onHover={() => {}} onError={onCanvasError} onMode={onMode} />
           </div>
 
           <header className="topbar">
@@ -585,8 +575,7 @@ export default function App() {
               <SparkIcon size={13} /> MEMORY TRAVEL <span className="dim">{t.brandSub}</span>
             </span>
             <nav>
-              <button className={tab === "cosmos" && !presenting ? "on" : ""} onClick={() => { setPresenting(false); setTab("cosmos"); }}>{t.tabCosmos}</button>
-              <button className={tab === "travel" && !presenting ? "on" : ""} onClick={() => { setPresenting(false); setTab("travel"); }}>{t.tabTravel}</button>
+              <button className={!presenting ? "on" : ""} onClick={() => setPresenting(false)}>{t.tabCosmos}</button>
               <button className={presenting ? "on" : ""} onClick={enterPresentation} title={t.howItWorksTitle}>{t.tabHowItWorks}</button>
               <a className="doclink" href="/travel/presentation.html" target="_blank" rel="noopener">{t.tabPresentation}</a>
               <a className="doclink" href="/evals/" target="_blank" rel="noopener" title={t.evalsTitle}>{t.tabEvals}</a>
@@ -658,18 +647,15 @@ export default function App() {
             elapsedS={elapsedS}
           />
 
-          {tab === "cosmos" && (
-            <CosmosView
-              cosmos={cosmosFull}
-              graph={graph}
-              names={names}
-              loading={progress}
-              focusNode={focusNode}
-              mode={renderMode}
-              conn={conn}
-            />
-          )}
-          {tab === "travel" && <TravelView cosmos={cosmosTravel} manifest={manifest} liveTrace={liveTrace} />}
+          <CosmosView
+            cosmos={cosmosFull}
+            graph={graph}
+            names={names}
+            loading={progress}
+            focusNode={focusNode}
+            mode={renderMode}
+            conn={conn}
+          />
 
           {/* demo-mode note: the snapshot is explicit, but it must stay obvious */}
           {source.phase === "demo" && !demoNoteDismissed && (
@@ -717,7 +703,7 @@ export default function App() {
         />
       )}
       {!dataError && !canvasError && renderMode === "canvas2d" && !modeDismissed && (
-        <div className={`modebadge ${tab === "travel" ? "raised" : ""}`} role="status">
+        <div className="modebadge" role="status">
           <span>{t.fallbackBadge}</span>
           <button className="ghostbtn" onClick={() => setModeDismissed(true)} title={t.commonDismiss}>
             <XIcon size={11} />
