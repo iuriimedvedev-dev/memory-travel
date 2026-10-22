@@ -987,6 +987,9 @@ opencode mcp add code-diver --url https://knotgate.labs.jb.gg/code-diver/sse</co
       <div style="margin-top:12px; font-size:13px; color:var(--good);">
         &check; Automatically configures Streamable HTTP and SSE MCP transports in <code>~/.config/opencode/config.json</code>.
       </div>
+      <div style="margin-top:8px; font-size:13px; color:var(--mute);">
+        Tokens are never baked into pages. Supply your own via env, e.g. <code>export HARS_MEMORY_ACCESS_TOKEN=... CODE_DIVER_TOKEN=...</code> and reference <code>$HARS_MEMORY_ACCESS_TOKEN</code> / <code>${CODE_DIVER_TOKEN}</code> in configs.
+      </div>
     </div>
 
     <!-- Tab 2: Claude Code CLI -->
@@ -1012,13 +1015,13 @@ claude mcp add code-diver https://knotgate.labs.jb.gg/code-diver/sse</code></pre
     "hars-memory": {
       "url": "https://knotgate.labs.jb.gg/memory",
       "headers": {
-        "Authorization": "Bearer memory-mcp-readonly-token-2026"
+        "Authorization": "Bearer <YOUR_MEMORY_TOKEN>"
       }
     },
     "code-diver": {
       "url": "https://knotgate.labs.jb.gg/code-diver/sse",
       "headers": {
-        "Authorization": "Bearer cd-mcp-shared-token-2026"
+        "Authorization": "Bearer <YOUR_CODE_DIVER_TOKEN>"
       }
     }
   }
@@ -1036,14 +1039,14 @@ EOF</code></pre>
       "type": "http",
       "url": "https://knotgate.labs.jb.gg/memory",
       "headers": {
-        "Authorization": "Bearer memory-mcp-readonly-token-2026"
+        "Authorization": "Bearer <YOUR_MEMORY_TOKEN>"
       }
     },
     "code-diver": {
       "type": "sse",
       "url": "https://knotgate.labs.jb.gg/code-diver/sse",
       "headers": {
-        "Authorization": "Bearer cd-mcp-shared-token-2026"
+        "Authorization": "Bearer <YOUR_CODE_DIVER_TOKEN>"
       }
     }
   }
@@ -1057,13 +1060,13 @@ EOF</code></pre>
     "hars-longterm-memory": {
       "url": "https://knotgate.labs.jb.gg/memory",
       "headers": {
-        "Authorization": "Bearer memory-mcp-readonly-token-2026"
+        "Authorization": "Bearer <YOUR_MEMORY_TOKEN>"
       }
     },
     "code-diver": {
       "url": "https://knotgate.labs.jb.gg/code-diver/sse",
       "headers": {
-        "Authorization": "Bearer cd-mcp-shared-token-2026"
+        "Authorization": "Bearer <YOUR_CODE_DIVER_TOKEN>"
       }
     }
   }
@@ -1077,12 +1080,12 @@ EOF</code></pre>
     {
       "name": "hars-memory",
       "url": "https://knotgate.labs.jb.gg/memory",
-      "auth": "Bearer memory-mcp-readonly-token-2026"
+      "auth": "Bearer <YOUR_MEMORY_TOKEN>"
     },
     {
       "name": "code-diver",
       "url": "https://knotgate.labs.jb.gg/code-diver/sse",
-      "auth": "Bearer cd-mcp-shared-token-2026"
+      "auth": "Bearer <YOUR_CODE_DIVER_TOKEN>"
     }
   ]
 }</code></pre>
