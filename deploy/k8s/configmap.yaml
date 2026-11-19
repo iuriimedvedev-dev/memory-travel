@@ -9,6 +9,6 @@ metadata:
 data:
   BACKEND_HOST: "trace-server"
   BACKEND_MEMORY_PORT: "8096"
-  BACKEND_MEMORY_PATH: "/mcp"
+  BACKEND_MEMORY_PATH: "/mcp/"
   BACKEND_TRACE_HOST: "trace-server"
   BACKEND_TRACE_PORT: "8098"

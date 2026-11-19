@@ -10,12 +10,18 @@ import './presentation-layout.css'
 // ui-scale sheet: #root{zoom} + the .canvaswrap counter-zoom (see ui-scale.css).
 import './ui-scale.css'
 import App from './App.tsx'
+import { ensureOAuthCallbackHandled } from './lib/oauth'
 import { initUiScale } from './lib/uiScale'
 
 // Resolve and apply the UI scale (saved preference, else the big-screen default
 // for this viewport) BEFORE the first paint, so a 4K screen never flashes the
 // unscaled layout. Sets CSS custom properties only — no React state involved.
 initUiScale()
+
+// Kick off OAuth 2.1 PKCE `?code=...&state=...` callback exchange & URL cleanup
+// immediately on entry (before React mounts), so StrictMode double-effects and
+// initial bridge calls share one single-flight token exchange.
+void ensureOAuthCallbackHandled()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

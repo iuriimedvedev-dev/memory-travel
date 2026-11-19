@@ -20,6 +20,7 @@ import {
   type SourcePhase,
 } from "./lib/cosmosSource";
 import { memoryRecallLive, keywordsFor, estimateSteps, emptySteps, markStepsError, parseRecallTelemetry, stepsFromTelemetry, probeTraceSupport, streamRecallTrace, applyTraceEvent, mergeTraceStart, memoryStatusLive, emptyBridgeInfo, BRIDGE_PROXY_PATH, type ConnState, type RecallStep } from "./lib/live";
+import { OAuthRedirectInProgressError, isOAuthRedirectInProgress } from "./lib/oauth";
 import type { CosmosGraph, TravelTrace } from "./lib/types";
 import { fmt } from "./i18n/strings";
 import { useI18n } from "./i18n/useI18n";
@@ -86,7 +87,13 @@ export default function App() {
     // rendered until the fresh memory_status answer lands
     memoryStatusLive()
       .then((info) => setConn({ kind: "connected", info }))
-      .catch((e: unknown) => setConn({ kind: "offline", error: e instanceof Error ? e.message : String(e) }));
+      .catch((e: unknown) => {
+        if (e instanceof OAuthRedirectInProgressError || isOAuthRedirectInProgress()) {
+          setConn({ kind: "connecting" });
+          return;
+        }
+        setConn({ kind: "offline", error: e instanceof Error ? e.message : String(e) });
+      });
   }, []);
 
   useEffect(() => {
@@ -504,6 +511,9 @@ export default function App() {
         }
       } catch (e) {
         tracingRef.current = true; // lock the estimator: keep the error state
+        if (e instanceof OAuthRedirectInProgressError || isOAuthRedirectInProgress()) {
+          return;
+        }
         if (e instanceof DOMException && e.name === "AbortError") {
           setAskError(t.askCancelled);
           setSteps((prev) => markStepsError(prev, "cancelled"));

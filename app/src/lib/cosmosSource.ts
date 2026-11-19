@@ -58,7 +58,12 @@ const TRACE_DIRECT_URL =
   typeof __MEMORY_TRACE_URL__ === "string" ? __MEMORY_TRACE_URL__ : "";
 
 function graphBases(): string[] {
-  return [GRAPH_PROXY_PATH, TRACE_DIRECT_URL].filter(Boolean);
+  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+  const onMemoryMount = pathname === "/memory" || pathname.startsWith("/memory/");
+  const candidates = onMemoryMount
+    ? ["/memory/api/graph-stats", GRAPH_PROXY_PATH, "/travel/api/graph-stats", TRACE_DIRECT_URL]
+    : [GRAPH_PROXY_PATH, "/travel/api/graph-stats", "/memory/api/graph-stats", TRACE_DIRECT_URL];
+  return [...new Set(candidates.filter(Boolean))];
 }
 
 /** fetch JSON with the HTML-masquerade check (Vite SPA fallback answers 200). */

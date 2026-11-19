@@ -13,11 +13,29 @@
 
 // Bridge target: set at build/dev time via MEMORY_BRIDGE_URL (vite.config
 // injects __MEMORY_BRIDGE_URL__). Same default as the dev proxy.
+import {
+  OAuthLoopGuardError,
+  OAuthRedirectInProgressError,
+  getBridgeAccessToken,
+  isOAuthRedirectInProgress,
+  recoverFromBridge401,
+} from "./oauth";
+
 declare const __MEMORY_BRIDGE_URL__: string;
 export const BRIDGE_DIRECT_URL =
   typeof __MEMORY_BRIDGE_URL__ === "string" ? __MEMORY_BRIDGE_URL__ : "";
 const API_BASE = (import.meta.env.BASE_URL ?? "").replace(/\/+$/, "");
 export const BRIDGE_PROXY_PATH = `${API_BASE}/api/memory`;
+
+/** Ordered bridge proxy/direct endpoints for both `/memory` and `/travel` mounts. */
+export function bridgeUrls(): string[] {
+  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+  const onMemoryMount = pathname === "/memory" || pathname.startsWith("/memory/");
+  const candidates = onMemoryMount
+    ? ["/memory/api/memory", "/travel/api/memory", BRIDGE_PROXY_PATH, BRIDGE_DIRECT_URL]
+    : [BRIDGE_PROXY_PATH, "/travel/api/memory", "/memory/api/memory", BRIDGE_DIRECT_URL];
+  return [...new Set(candidates.filter(Boolean))];
+}
 
 export const LIVE_TIMEOUT_MS = 120_000;
 export const MAX_QUESTION_CHARS = 500;
@@ -80,14 +98,46 @@ export function unwrapBody(body: string): unknown {
 }
 
 async function postJSON(url: string, payload: unknown, headers: Record<string, string>, signal: AbortSignal) {
-  const r = await fetch(url, {
+  const initialToken = await getBridgeAccessToken();
+  const reqHeaders: Record<string, string> = { ...headers };
+  if (initialToken && !reqHeaders["Authorization"]) {
+    reqHeaders["Authorization"] = `Bearer ${initialToken}`;
+  }
+  let r = await fetch(url, {
     method: "POST",
-    headers,
+    headers: reqHeaders,
     body: JSON.stringify(payload),
     signal,
   });
+  let text = await r.text();
+
+  if (r.status === 401) {
+    const freshToken = await recoverFromBridge401({
+      wwwAuthenticate: r.headers.get("www-authenticate"),
+      bodyText: text,
+      hadBearer: Boolean(initialToken),
+    });
+    const retryHeaders: Record<string, string> = {
+      ...headers,
+      Authorization: `Bearer ${freshToken}`,
+    };
+    r = await fetch(url, {
+      method: "POST",
+      headers: retryHeaders,
+      body: JSON.stringify(payload),
+      signal,
+    });
+    text = await r.text();
+    if (r.status === 401) {
+      await recoverFromBridge401({
+        wwwAuthenticate: r.headers.get("www-authenticate"),
+        bodyText: text,
+        hadBearer: false,
+      });
+    }
+  }
+
   const sid = r.headers.get("mcp-session-id");
-  const text = await r.text();
   if (!r.ok && r.status !== 202) {
     throw new Error(`bridge HTTP ${r.status} at ${url}: ${text.slice(0, 200)}`);
   }
@@ -171,16 +221,20 @@ export async function memoryRecallLive(
   }
   try {
     const failures: string[] = [];
-    for (const url of [BRIDGE_PROXY_PATH, BRIDGE_DIRECT_URL].filter(Boolean)) {
+    const urls = bridgeUrls();
+    for (const url of urls) {
       try {
         return await recallVia(q, url, ctrl.signal);
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") throw e;
+        if (e instanceof OAuthRedirectInProgressError || e instanceof OAuthLoopGuardError || isOAuthRedirectInProgress()) {
+          throw e;
+        }
         failures.push(`${url}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
     throw new Error(
-      `memory bridge unreachable. Tried ${BRIDGE_PROXY_PATH} (Vite dev proxy) and ${BRIDGE_DIRECT_URL} (direct). ` +
+      `memory bridge unreachable. Tried ${urls.join(", ")}. ` +
         failures.join(" | "),
     );
   } finally {
@@ -266,7 +320,8 @@ export async function memoryStatusLive(opts: { timeoutMs?: number } = {}): Promi
   const timer = setTimeout(() => ctrl.abort(new DOMException(`memory bridge timed out after ${timeoutMs / 1000}s`, "AbortError")), timeoutMs);
   try {
     const failures: string[] = [];
-    for (const url of [BRIDGE_PROXY_PATH, BRIDGE_DIRECT_URL].filter(Boolean)) {
+    const urls = bridgeUrls();
+    for (const url of urls) {
       try {
         const init = await postJSON(
           url,
@@ -286,6 +341,7 @@ export async function memoryStatusLive(opts: { timeoutMs?: number } = {}): Promi
           await postJSON(url, { jsonrpc: "2.0", method: "notifications/initialized" }, h, ctrl.signal);
         } catch (e) {
           if (e instanceof DOMException && e.name === "AbortError") throw e;
+          if (e instanceof OAuthRedirectInProgressError || e instanceof OAuthLoopGuardError) throw e;
           if (e instanceof TypeError) throw e;
         }
         const call = await postJSON(
@@ -304,11 +360,14 @@ export async function memoryStatusLive(opts: { timeoutMs?: number } = {}): Promi
         return bridgeInfoFromStatus(JSON.parse(text) as Record<string, unknown>, url);
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") throw e;
+        if (e instanceof OAuthRedirectInProgressError || e instanceof OAuthLoopGuardError || isOAuthRedirectInProgress()) {
+          throw e;
+        }
         failures.push(`${url}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
     throw new Error(
-      `memory bridge unreachable. Tried ${BRIDGE_PROXY_PATH} (Vite dev proxy) and ${BRIDGE_DIRECT_URL} (direct). ` +
+      `memory bridge unreachable. Tried ${urls.join(", ")}. ` +
         failures.join(" | "),
     );
   } finally {
@@ -593,10 +652,14 @@ export const TRACE_DIRECT_URL =
   typeof __MEMORY_TRACE_URL__ === "string" ? __MEMORY_TRACE_URL__ : "";
 
 export function traceBases(): string[] {
+  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+  const onMemoryMount = pathname === "/memory" || pathname.startsWith("/memory/");
   const bases = [
+    onMemoryMount ? "/memory/api/trace" : null,
     TRACE_PROXY_PATH,
     API_BASE ? `${API_BASE}/api/trace` : null,
     "/travel/api/trace",
+    "/memory/api/trace",
     "/api/trace",
     TRACE_DIRECT_URL,
     "http://127.0.0.1:8098",
@@ -636,10 +699,12 @@ export async function fetchLiveTraceJson(
 
   try {
     const failures: string[] = [];
+    const token = await getBridgeAccessToken();
+    const traceHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
     for (const base of traceBases()) {
       try {
         const url = `${base}/trace?${query}`;
-        const r = await fetch(url, { signal: ctrl.signal });
+        const r = await fetch(url, { headers: traceHeaders, signal: ctrl.signal });
         if (!r.ok) {
           failures.push(`${url}: HTTP ${r.status}`);
           continue;
@@ -754,6 +819,7 @@ export async function streamRecallTrace(
     `question=${q}&context_only=true&mode=hybrid&top_k=10` +
     `&ll_keywords=${encodeURIComponent(kws.join(","))}` +
     `&hl_keywords=${encodeURIComponent(kws.slice(0, 3).join(","))}`;
+  const token = await getBridgeAccessToken();
   for (const base of traceBases()) {
     const ctrl = new AbortController();
     const forward = () => ctrl.abort(opts.signal?.reason as Error | undefined);
@@ -762,8 +828,10 @@ export async function streamRecallTrace(
       opts.signal.addEventListener("abort", forward, { once: true });
     }
     try {
+      const headers: Record<string, string> = { Accept: "text/event-stream" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
       const r = await fetch(`${base}/trace?${query}`, {
-        headers: { Accept: "text/event-stream" },
+        headers,
         signal: ctrl.signal,
       });
       if (!r.ok || !r.body) continue;
