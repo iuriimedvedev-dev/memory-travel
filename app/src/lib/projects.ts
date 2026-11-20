@@ -296,18 +296,20 @@ const API_BASE = (import.meta.env?.BASE_URL ?? "").replace(/\/+$/, "");
 function defaultGraphBases(): string[] {
   const pathname = typeof window !== "undefined" ? window.location.pathname : "";
   const onMemoryMount = pathname === "/memory" || pathname.startsWith("/memory/");
-  const candidates = onMemoryMount
-    ? ["/memory/api/graph-stats", `${API_BASE}/api/graph-stats`, "/travel/api/graph-stats", "/api/graph-stats"]
-    : [`${API_BASE}/api/graph-stats`, "/memory/api/graph-stats", "/travel/api/graph-stats", "/api/graph-stats"];
+  if (onMemoryMount) {
+    return ["/memory/api/graph-stats"];
+  }
+  const candidates = [`${API_BASE}/api/graph-stats`, "/memory/api/graph-stats", "/travel/api/graph-stats", "/api/graph-stats"];
   return [...new Set(candidates.filter(Boolean))];
 }
 
 function defaultBridgeUrls(): string[] {
   const pathname = typeof window !== "undefined" ? window.location.pathname : "";
   const onMemoryMount = pathname === "/memory" || pathname.startsWith("/memory/");
-  const candidates = onMemoryMount
-    ? ["/memory/api/memory", `${API_BASE}/api/memory`, "/travel/api/memory", "/api/memory"]
-    : [`${API_BASE}/api/memory`, "/memory/api/memory", "/travel/api/memory", "/api/memory"];
+  if (onMemoryMount) {
+    return ["/memory/api/memory"];
+  }
+  const candidates = [`${API_BASE}/api/memory`, "/memory/api/memory", "/travel/api/memory", "/api/memory"];
   return [...new Set(candidates.filter(Boolean))];
 }
 

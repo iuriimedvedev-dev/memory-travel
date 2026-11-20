@@ -49,10 +49,11 @@
   min-height: 0;
   min-width: 0;
   background: var(--glass);
-  backdrop-filter: blur(14px);
+  backdrop-filter: blur(20px) saturate(165%);
+  -webkit-backdrop-filter: blur(20px) saturate(165%);
   border: 1px solid var(--line);
-  border-radius: 16px;
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.5);
+  border-radius: 14px;
+  box-shadow: var(--shadow-panel);
   overflow: hidden;
 }
 
@@ -309,17 +310,17 @@
   padding: 8px 9px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: rgba(20, 28, 60, 0.35);
+  background: var(--surface-soft);
 }
 .pd-chancard b { font-size: 20px; font-weight: 500; font-variant-numeric: tabular-nums; }
 .pd-chancard small { font-size: 9.5px; color: var(--dim); }
 .pd-channame { font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); }
-.pd-chancard.dense { border-color: rgba(125, 243, 255, 0.35); }
+.pd-chancard.dense { border-color: var(--line-strong); }
 .pd-chancard.dense b { color: var(--accent); }
-.pd-chancard.bm25 { border-color: rgba(255, 183, 36, 0.35); }
-.pd-chancard.bm25 b { color: var(--gold); }
-.pd-chancard.graph { border-color: rgba(191, 102, 255, 0.35); }
-.pd-chancard.graph b { color: #bf66ff; }
+.pd-chancard.bm25 { border-color: var(--green-soft); }
+.pd-chancard.bm25 b { color: var(--green); }
+.pd-chancard.graph { border-color: var(--violet-soft); }
+.pd-chancard.graph b { color: var(--violet); }
 
 .pd-bars { display: flex; flex-direction: column; gap: 4px; }
 .pd-barrow {
@@ -345,9 +346,9 @@
   gap: 4px 8px;
   align-items: baseline;
   padding: 5px 7px;
-  border: 1px solid rgba(120, 150, 255, 0.12);
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(20, 28, 60, 0.25);
+  background: var(--surface-soft);
 }
 .pd-source b { font-size: 11px; font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
 .pd-source p { grid-column: 1 / -1; margin: 0; font-size: 10px; line-height: 1.5; color: var(--dim); }
@@ -363,8 +364,8 @@
   padding: 7px 8px;
   font: inherit;
   color: inherit;
-  background: rgba(20, 28, 60, 0.28);
-  border: 1px solid rgba(120, 150, 255, 0.14);
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
   border-radius: 9px;
 }
 .pd-cite:hover, .pd-cite.on { border-color: var(--gold); background: rgba(255, 209, 102, 0.07); }

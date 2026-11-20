@@ -20,11 +20,22 @@ import {
   XIcon,
 } from "./icons";
 
+export type ProjectConnStatus = "live" | "probing" | "demo" | "offline";
+
 export interface ProjectSelectorProps {
   projects: MemoryProject[];
   activeProjectId: string;
   onSelectProject: (projectId: string) => void;
   loading?: boolean;
+  status?: ProjectConnStatus;
+  liveNodeCount?: number | null;
+}
+
+export function formatCompactCount(n: number | null | undefined): string | null {
+  if (typeof n !== "number" || !Number.isFinite(n) || n < 0) return null;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}k`;
+  return String(n);
 }
 
 function ScopeIcon({ kind, size = 13 }: { kind: ProjectKind; size?: number }) {
@@ -39,6 +50,8 @@ export default function ProjectSelector({
   activeProjectId,
   onSelectProject,
   loading = false,
+  status = "probing",
+  liveNodeCount = null,
 }: ProjectSelectorProps) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -110,6 +123,11 @@ export default function ProjectSelector({
     { key: "departments_environments", label: t.projCatDeptsEnvs },
   ];
 
+  const pillNodeCount = useMemo(
+    () => formatCompactCount(liveNodeCount ?? activeProject.nodes ?? null),
+    [liveNodeCount, activeProject.nodes],
+  );
+
   return (
     <div className="proj-selector" ref={rootRef}>
       <button
@@ -121,10 +139,12 @@ export default function ProjectSelector({
         aria-label={`${t.projPickerLabel}: ${activeProject.name}`}
         title={`${activeProject.name} (${activeProject.id})`}
       >
+        <span className={`proj-live-dot ${status}`} aria-hidden="true" />
         <span className="proj-pill-icon">
           <ScopeIcon kind={activeProject.kind} size={13} />
         </span>
         <span className="proj-pill-name">{activeProject.name}</span>
+        {pillNodeCount && <span className="proj-node-chip">{pillNodeCount}</span>}
         {activeProject.id !== "default" && activeProject.id !== activeProject.name && (
           <span className="proj-pill-id">{activeProject.id}</span>
         )}

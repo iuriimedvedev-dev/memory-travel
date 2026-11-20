@@ -201,7 +201,7 @@ export default function App() {
             .map((_, i) => i);
         }
         if (hitIdxs.length) {
-          cosmosFull.pulseCluster(hitIdxs, INK.cyan, true);
+          cosmosFull.pulseCluster(hitIdxs, INK.vector, true);
         }
       } else if (stageIdx === 2) {
         let hitIdxs: number[] = [];
@@ -219,12 +219,16 @@ export default function App() {
             .map((_, i) => i + 5);
         }
         if (hitIdxs.length) {
-          cosmosFull.pulseCluster(hitIdxs, INK.green, true);
+          cosmosFull.pulseCluster(hitIdxs, INK.bm25, true);
         }
       } else if (stageIdx === 3) {
         let allGraphIdxs: number[] = [];
+        const seedIdxSet = new Set<number>();
         if (tr && tr.graph.nodes.length) {
-          allGraphIdxs = tr.graph.nodes.map((n) => n.i);
+          allGraphIdxs = tr.graph.nodes.map((n) => n.i).filter((i) => i >= 0 && i < graph.nodes.length);
+          tr.graph.nodes.forEach((n) => {
+            if (n.seed && n.i >= 0 && n.i < graph.nodes.length) seedIdxSet.add(n.i);
+          });
         }
         if (!allGraphIdxs.length && qText) {
           const kws = keywordsFor(qText).map((k) => k.toLowerCase());
@@ -232,6 +236,7 @@ export default function App() {
             .map((name, i) => (kws.some((k) => name.toLowerCase().includes(k)) ? i : -1))
             .filter((i) => i >= 0)
             .slice(0, 15);
+          allGraphIdxs.slice(0, 5).forEach((i) => seedIdxSet.add(i));
         }
         if (!allGraphIdxs.length && graph && graph.nodes.length) {
           allGraphIdxs = graph.nodes
@@ -239,11 +244,23 @@ export default function App() {
             .sort((a, b) => b.deg - a.deg)
             .slice(0, 14)
             .map((_, i) => i + 12);
+          allGraphIdxs.slice(0, 4).forEach((i) => seedIdxSet.add(i));
         }
         if (allGraphIdxs.length) {
+          // Graph Walk: Polar Gold (#EBCB8B) seeds + Borealis Violet (#B48EAD) walked neighbors
           cosmosFull.pulseCluster(allGraphIdxs, INK.gold, true);
+          const paints = new Map<number, { color: typeof INK.gold; size?: number }>();
+          const halos: { idx: number; color: typeof INK.gold; size: number }[] = [];
+          for (const idx of allGraphIdxs) {
+            const isSeed = seedIdxSet.has(idx);
+            const col = isSeed ? INK.gold : INK.violet;
+            paints.set(idx, { color: col, size: isSeed ? 3.2 : 2.5 });
+            halos.push({ idx, color: col, size: isSeed ? 1.4 : 1.05 });
+          }
+          cosmosFull.paint(paints);
+          cosmosFull.setHalos(halos);
         }
-      } else if (stageIdx === 4) {
+      } else if (stageIdx === 4 || stageIdx === 5) {
         let hitIdxs: number[] = [];
         if (tr && tr.fusion.length) {
           const entNames = new Set(tr.fusion.flatMap((h) => h.entities));
@@ -252,7 +269,7 @@ export default function App() {
             .filter((i) => i >= 0);
         }
         if (hitIdxs.length) {
-          cosmosFull.pulseCluster(hitIdxs, INK.orange, true);
+          cosmosFull.pulseCluster(hitIdxs, stageIdx === 5 ? INK.rerank : INK.orange, true);
         }
       } else if (stageIdx === 6) {
         let ansIdxs: number[] = [];
@@ -269,7 +286,7 @@ export default function App() {
             .filter((i) => i >= 0);
         }
         if (ansIdxs.length) {
-          cosmosFull.pulseCluster(ansIdxs, INK.gold, true);
+          cosmosFull.pulseCluster(ansIdxs, INK.frost, true);
         }
       }
     },
@@ -659,29 +676,45 @@ export default function App() {
 
   return (
     <div className={`app theme-${theme}`} data-theme={theme}>
-      {/* Unified KnotGate Nord Frozen Glass Header Bar */}
+      {/* Nord Cosmos Floating Frozen-Glass Cockpit Header */}
       <header className="topbar">
         <div className="topbar-left">
           <a
-            className="kg-back-link"
+            className="kg-back-btn kg-back-link"
             href={returnToHref}
             title={t.backToKnotGateTitle}
-            aria-label={t.backToKnotGateTitle}
+            aria-label="Back to KnotGate"
           >
-            <span className="kg-back-arrow">
-              <ArrowLeftIcon size={14} />
-            </span>
+            <ArrowLeftIcon size={15} />
+          </a>
+
+          <div className="kg-brand-cluster">
             <KnotGateLogoMark size={24} />
             <span className="kg-wordmark">
               KnotGate <span className="kg-wordmark-accent">Memory</span>
             </span>
-          </a>
+            <span className="kg-cosmos-pill">{t.nordCosmosBadge}</span>
+          </div>
 
           <ProjectSelector
             projects={projects}
             activeProjectId={projectId}
             onSelectProject={handleSelectProject}
             loading={projectsLoading || source.phase === "probing"}
+            status={
+              source.phase === "live"
+                ? "live"
+                : source.phase === "demo"
+                  ? "demo"
+                  : source.phase === "probing"
+                    ? "probing"
+                    : "offline"
+            }
+            liveNodeCount={
+              source.phase === "live" || source.phase === "demo"
+                ? (identity?.nodes ?? (graph ? graph.nodes.length : null))
+                : null
+            }
           />
         </div>
 
@@ -809,6 +842,17 @@ export default function App() {
               highlightStageInCosmos(s, liveTrace, activeQuestion ?? "");
             }}
             onFocusNode={focusNode}
+            onFocusEntityName={(entityName) => {
+              if (!names) return;
+              const exactIdx = names.indexOf(entityName);
+              if (exactIdx >= 0) {
+                focusNode(exactIdx);
+                return;
+              }
+              const lower = entityName.toLowerCase();
+              const fuzzyIdx = names.findIndex((nm) => nm.toLowerCase() === lower);
+              if (fuzzyIdx >= 0) focusNode(fuzzyIdx);
+            }}
             onFocusChunk={(h) => {
               if (!names) return;
               const ent = h.entities[0];

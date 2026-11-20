@@ -29,15 +29,23 @@ export const BRIDGE_DIRECT_URL =
 const API_BASE = (import.meta.env?.BASE_URL ?? "").replace(/\/+$/, "");
 export const BRIDGE_PROXY_PATH = `${API_BASE}/api/memory`;
 
-/** Ordered bridge proxy/direct endpoints for both `/memory` and `/travel` mounts. */
-export function bridgeUrls(): string[] {
-  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+/** Ordered bridge proxy/direct endpoints for `/memory` (clean, no `/travel` spam) and legacy mounts. */
+export function bridgeUrls(pathnameOverride?: string): string[] {
+  const pathname =
+    pathnameOverride !== undefined
+      ? pathnameOverride
+      : typeof window !== "undefined"
+        ? window.location.pathname
+        : "";
   const onMemoryMount = pathname === "/memory" || pathname.startsWith("/memory/");
-  const candidates = onMemoryMount
-    ? ["/memory/api/memory", "/travel/api/memory", BRIDGE_PROXY_PATH, BRIDGE_DIRECT_URL]
-    : [BRIDGE_PROXY_PATH, "/travel/api/memory", "/memory/api/memory", BRIDGE_DIRECT_URL];
+  if (onMemoryMount) {
+    return [...new Set(["/memory/api/memory", BRIDGE_DIRECT_URL].filter(Boolean))];
+  }
+  const candidates = [BRIDGE_PROXY_PATH, "/travel/api/memory", "/memory/api/memory", BRIDGE_DIRECT_URL];
   return [...new Set(candidates.filter(Boolean))];
 }
+
+export const bridgeEndpoints = bridgeUrls;
 
 export const LIVE_TIMEOUT_MS = 120_000;
 export const MAX_QUESTION_CHARS = 500;
@@ -669,11 +677,18 @@ declare const __MEMORY_TRACE_URL__: string;
 export const TRACE_DIRECT_URL =
   typeof __MEMORY_TRACE_URL__ === "string" ? __MEMORY_TRACE_URL__ : "";
 
-export function traceBases(): string[] {
-  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+export function traceBases(pathnameOverride?: string): string[] {
+  const pathname =
+    pathnameOverride !== undefined
+      ? pathnameOverride
+      : typeof window !== "undefined"
+        ? window.location.pathname
+        : "";
   const onMemoryMount = pathname === "/memory" || pathname.startsWith("/memory/");
+  if (onMemoryMount) {
+    return [...new Set(["/memory/api/trace", TRACE_DIRECT_URL].filter(Boolean))];
+  }
   const bases = [
-    onMemoryMount ? "/memory/api/trace" : null,
     TRACE_PROXY_PATH,
     API_BASE ? `${API_BASE}/api/trace` : null,
     "/travel/api/trace",

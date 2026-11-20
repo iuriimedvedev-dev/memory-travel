@@ -5,6 +5,7 @@
 // blocks — everywhere a chunk appears it is clickable.
 import { useMemo, useState } from "react";
 import { colorForType } from "../lib/palette";
+import { useTheme } from "../lib/theme";
 import type { ChunkHit, TravelTrace } from "../lib/types";
 import { fmt, type Dict } from "../i18n/strings";
 import { XIcon } from "./icons";
@@ -89,6 +90,7 @@ function StageInspector({
   onFocusPoint: (p: [number, number, number], names: string[]) => void;
   t: Dict;
 }) {
+  const { theme } = useTheme();
   const [showAll, setShowAll] = useState(false);
   const [sortDesc, setSortDesc] = useState(true);
 
@@ -113,7 +115,7 @@ function StageInspector({
       <HitTable
         hits={trace.vector_hits}
         max={max}
-        color="#33f3ff"
+        color="#88C0D0"
         scoreKey="dense"
         showAll={showAll}
         setShowAll={setShowAll}
@@ -175,8 +177,9 @@ function StageInspector({
                       if (p) onFocusPoint(p as [number, number, number], [n.name]);
                     }}
                   >
-                    <i className="swatch" style={{ background: colorForType(n.type) }} />
-                    <b>{n.name}</b> <span className="dim">{n.type}</span>
+                    <i className="swatch" style={{ background: colorForType(n.type, theme) }} />
+                    <b>{n.name}</b>{" "}
+                    <span className="entity-type-pill">{n.type}</span>
                   </button>
                 </li>
               );
@@ -194,7 +197,7 @@ function StageInspector({
       <HitTable
         hits={trace.bm25_hits}
         max={max}
-        color="#59ff8c"
+        color="#A3BE8C"
         scoreKey="sparse"
         showAll={showAll}
         setShowAll={setShowAll}
@@ -228,7 +231,7 @@ function StageInspector({
                 <td>{h.dense.toFixed(3)}</td>
                 <td>{h.sparse.toFixed(2)}</td>
                 <td>
-                  <Bar v={h.fused} max={max} color="#ff9d4d" /> {h.fused.toFixed(3)}
+                  <Bar v={h.fused} max={max} color="#D08770" /> {h.fused.toFixed(3)}
                 </td>
                 <td className="dim">{(trace.fusion[0].fused - h.fused).toFixed(3)}</td>
               </tr>
@@ -411,6 +414,7 @@ function ChunkViewer({
   onFocusPoint: (p: [number, number, number], names: string[]) => void;
   t: Dict;
 }) {
+  const { theme } = useTheme();
   const hit =
     trace.vector_hits.find((h) => h.chunk_id === chunkId) ??
     trace.bm25_hits.find((h) => h.chunk_id === chunkId) ??
@@ -459,22 +463,28 @@ function ChunkViewer({
         </tbody>
       </table>
       {hit && hit.entities.length > 0 && (
-        <p className="dim">
-          {t.inspEntitiesShort}:{" "}
-          {[...new Set(hit.entities)].slice(0, 8).map((e) => (
-            <button
-              key={e}
-              className="linkish"
-              onClick={() => {
-                const node = trace.graph.nodes.find((n) => n.name === e);
-                const p = node ? (node.xyz ?? (node.xy ? [node.xy[0], node.xy[1], 0] : null)) : null;
-                if (p) onFocusPoint(p as [number, number, number], [e]);
-              }}
-            >
-              {e}
-            </button>
-          ))}
-        </p>
+        <div className="neighbor-section">
+          <span className="neighbor-heading">{t.inspEntitiesShort}</span>
+          <div className="neighbor-chips">
+            {[...new Set(hit.entities)].slice(0, 10).map((e) => {
+              const node = trace.graph.nodes.find((n) => n.name === e);
+              const p = node ? (node.xyz ?? (node.xy ? [node.xy[0], node.xy[1], 0] : null)) : null;
+              return (
+                <button
+                  key={e}
+                  type="button"
+                  className="neighbor-chip"
+                  onClick={() => {
+                    if (p) onFocusPoint(p as [number, number, number], [e]);
+                  }}
+                >
+                  <i className="swatch" style={{ background: colorForType(node?.type ?? "concept", theme) }} />
+                  <span className="neighbor-chip-label">{e}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       )}
       <h4>{t.chunkTitle}</h4>
       <pre className="chunktext">{full?.content ?? t.inspContentMissing}</pre>

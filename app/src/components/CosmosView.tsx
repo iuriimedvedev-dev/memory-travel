@@ -178,10 +178,22 @@ export default function CosmosView({ cosmos, graph, names, loading, focusNode, m
       return;
     }
     focusNode(idx);
-    cosmos?.paint(new Map([[idx, { color: [1.0, 0.85, 0.3, 1] as [number, number, number, number] }]]));
+    cosmos?.paint(new Map([[idx, { color: INK.gold }]]));
   };
 
   const node = sel !== null && graph ? graph.nodes[sel] : null;
+
+  const connectedNeighbors = useMemo(() => {
+    if (sel === null || !graph) return [];
+    const seen = new Set<number>();
+    for (const [s, tg] of graph.edges) {
+      if (s === sel && tg !== sel && tg >= 0 && tg < graph.nodes.length) seen.add(tg);
+      else if (tg === sel && s !== sel && s >= 0 && s < graph.nodes.length) seen.add(s);
+    }
+    return [...seen]
+      .sort((a, b) => (graph.nodes[b]?.deg ?? 0) - (graph.nodes[a]?.deg ?? 0))
+      .slice(0, 14);
+  }, [sel, graph]);
 
   // ---- connection chip: what the bridge actually serves, straight from
   // memory_status / trace_start (never a hardcoded deployment identity)
@@ -371,10 +383,40 @@ export default function CosmosView({ cosmos, graph, names, loading, focusNode, m
                 <XIcon size={11} />
               </button>
             </div>
-            <p className="dim cardtype">
-              {node.t} · {node.deg === 1 ? t.degreeLinks1 : fmt(t.degreeLinksN, { n: node.deg })}
-            </p>
+            <div className="cardmeta-row">
+              <span className="entity-type-pill">
+                <i className="swatch" style={{ background: colorForType(node.t, theme) }} />
+                <span>{node.t}</span>
+              </span>
+              <span className="dim cardtype">
+                {node.deg === 1 ? t.degreeLinks1 : fmt(t.degreeLinksN, { n: node.deg })}
+              </span>
+            </div>
             <p className="carddesc">{node.d ? snippet(node.d, 240) : t.noDesc}</p>
+            {connectedNeighbors.length > 0 && (
+              <div className="neighbor-section">
+                <span className="neighbor-heading">
+                  {fmt(t.inspectNeighbors, { n: connectedNeighbors.length })}
+                </span>
+                <div className="neighbor-chips">
+                  {connectedNeighbors.map((nbIdx) => {
+                    const nb = graph!.nodes[nbIdx];
+                    return (
+                      <button
+                        key={nbIdx}
+                        type="button"
+                        className="neighbor-chip"
+                        onClick={() => select(nbIdx)}
+                        title={`${nb.id} (${nb.t})`}
+                      >
+                        <i className="swatch" style={{ background: colorForType(nb.t, theme) }} />
+                        <span className="neighbor-chip-label">{nb.id}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <div className="row">
               <button onClick={() => focusNode(sel!)}>{t.flyTo}</button>
               <button
@@ -500,9 +542,11 @@ function SelectionTooltip({
       }}
     >
       <div className="seltiprow">
-        <i className="swatch" style={{ background: colorForType(node.t, theme) }} />
-        <span>{node.t}</span>
-        <span className="dim">· {node.deg === 1 ? t.degreeLinks1 : fmt(t.degreeLinksN, { n: node.deg })}</span>
+        <span className="entity-type-pill">
+          <i className="swatch" style={{ background: colorForType(node.t, theme) }} />
+          <span>{node.t}</span>
+        </span>
+        <span className="dim">{node.deg === 1 ? t.degreeLinks1 : fmt(t.degreeLinksN, { n: node.deg })}</span>
       </div>
       {node.d && <p className="dim seltipdesc">{snippet(node.d, 110)}</p>}
     </AnimatedCard>

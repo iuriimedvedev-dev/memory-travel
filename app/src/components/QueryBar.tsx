@@ -80,9 +80,13 @@ export default function QueryBar({
 
   /** Any row carrying a measured (non-estimated) value => streaming trace. */
   const streaming = steps.some((s) => !s.estimated);
+  const barCls = ["querybar", asking ? "asking" : "", asking && streaming ? "streaming" : ""]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <div className="querybar" role="search">
+    <div className={barCls} role="search">
+      <i className="querybar-aurora" aria-hidden="true" />
       <div className="qrow">
         <SearchIcon size={15} />
         <input

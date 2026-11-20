@@ -63,12 +63,24 @@ declare const __MEMORY_TRACE_URL__: string;
 const TRACE_DIRECT_URL =
   typeof __MEMORY_TRACE_URL__ === "string" ? __MEMORY_TRACE_URL__ : "";
 
-export function graphBases(): string[] {
-  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+export function graphBases(pathnameOverride?: string): string[] {
+  const pathname =
+    pathnameOverride !== undefined
+      ? pathnameOverride
+      : typeof window !== "undefined"
+        ? window.location.pathname
+        : "";
   const onMemoryMount = pathname === "/memory" || pathname.startsWith("/memory/");
-  const candidates = onMemoryMount
-    ? ["/memory/api/graph-stats", GRAPH_PROXY_PATH, "/travel/api/graph-stats", "/api/graph-stats", TRACE_DIRECT_URL]
-    : [GRAPH_PROXY_PATH, "/memory/api/graph-stats", "/travel/api/graph-stats", "/api/graph-stats", TRACE_DIRECT_URL];
+  if (onMemoryMount) {
+    return [...new Set(["/memory/api/graph-stats", TRACE_DIRECT_URL].filter(Boolean))];
+  }
+  const candidates = [
+    GRAPH_PROXY_PATH,
+    "/memory/api/graph-stats",
+    "/travel/api/graph-stats",
+    "/api/graph-stats",
+    TRACE_DIRECT_URL,
+  ];
   return [...new Set(candidates.filter(Boolean))];
 }
 

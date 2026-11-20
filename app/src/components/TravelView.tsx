@@ -732,7 +732,7 @@ function StageBody({
         {trace.vector_hits.map((h, i) => (
           <li key={h.chunk_id} style={{ animationDelay: `${i * 70}ms` }}><button onClick={() => { onFocusChunk(h); onOpenChunk(h.chunk_id); }}>
             <span className="rank">{i + 1}</span> {h.doc}
-            <ScoreBar v={h.dense} max={max} color="#33f3ff" /> <span className="dim">{h.dense.toFixed(3)}</span>
+            <ScoreBar v={h.dense} max={max} color="#88C0D0" /> <span className="dim">{h.dense.toFixed(3)}</span>
           </button></li>
         ))}
       </ol>
@@ -762,7 +762,7 @@ function StageBody({
         {trace.bm25_hits.slice(0, 12).map((h, i) => (
           <li key={h.chunk_id} style={{ animationDelay: `${i * 60}ms` }}><button onClick={() => { onFocusChunk(h); onOpenChunk(h.chunk_id); }}>
             <span className="rank">{i + 1}</span> {h.doc}
-            <ScoreBar v={h.sparse} max={max} color="#59ff8c" /> <span className="dim">{h.sparse.toFixed(2)}</span>
+            <ScoreBar v={h.sparse} max={max} color="#A3BE8C" /> <span className="dim">{h.sparse.toFixed(2)}</span>
           </button></li>
         ))}
       </ol>

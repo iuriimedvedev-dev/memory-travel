@@ -7,36 +7,38 @@
 // functions, so a colour in the legend is the colour on the canvas.
 
 export const FAMILY_COLORS: Record<string, string> = {
-  // Nord Frost & Aurora semantic family hues (Polar Night dark starfield):
-  // balanced saturation so AdditiveBlending glows cleanly without washing out.
-  docs: "#81a1c1", // Nord Frost blue — documents, specs
-  knowledge: "#b48ead", // Nord Aurora violet — concepts, findings, decisions, hypotheses
-  engineering: "#88c0d0", // Nord Frost cyan — components, tools, encoders, agents
-  models: "#c989ad", // Nord rose-violet — models, backbones, adapters
-  data: "#a3be8c", // Nord Aurora green — datasets, artifacts, checkpoints, content
-  work: "#ebcb8b", // Nord Aurora gold — tasks, plans, pipelines, job runs
-  results: "#8fbcbb", // Nord Frost teal — metrics, reports, analyses, tests
-  experiments: "#d08770", // Nord Aurora orange — experiments
-  config: "#9db88a", // Nord sage — configs, architecture, programs
-  people: "#bf616a", // Nord Aurora red — people, organizations, locations
-  events: "#5e81ac", // Nord Frost deep blue — events
-  other: "#9aa7b8", // Nord slate — everything else (incl. UNKNOWN)
+  // Nord Cosmos Constellation Palette (Polar Night + Aurora Borealis):
+  // Frost Ice #88C0D0, Polar Teal #8FBCBB, Glacial Blue #81A1C1, Fjord #5E81AC,
+  // Aurora Sage #A3BE8C, Polar Gold #EBCB8B, Borealis Violet #B48EAD, Aurora Coral #D08770.
+  docs: "#81a1c1", // Glacial Blue — documents, specs
+  knowledge: "#b48ead", // Borealis Violet — concepts, findings, decisions, hypotheses
+  engineering: "#88c0d0", // Frost Ice — components, tools, encoders, agents
+  models: "#a988ad", // Borealis Orchid — models, backbones, adapters
+  data: "#a3be8c", // Aurora Sage — datasets, artifacts, checkpoints, content
+  work: "#ebcb8b", // Polar Gold — tasks, plans, pipelines, job runs
+  results: "#8fbcbb", // Polar Teal — metrics, reports, analyses, tests
+  experiments: "#d08770", // Aurora Coral — experiments
+  config: "#7fa6b8", // Polar Mist Teal — configs, architecture, programs
+  people: "#bf616a", // Aurora Crimson — people, organizations, locations
+  events: "#5e81ac", // Fjord — events
+  other: "#8c9ab0", // Polar Slate — everything else (incl. UNKNOWN)
 };
 
 export const FAMILY_COLORS_LIGHT: Record<string, string> = {
-  // Engineered deeper Nord tones for Snow Storm (#E8EDF4) light mode legibility
-  docs: "#3b6ea5",
-  knowledge: "#825096",
+  // Nord Light Arctic Cosmos: deep slate/fjord/arctic stars (#2e3440, #3b4252,
+  // #5e81ac, #0f6d8c, #4f7a5b, #8f5685) for crisp legibility on glacial mist.
+  docs: "#5e81ac",
+  knowledge: "#8f5685",
   engineering: "#0f6d8c",
-  models: "#984b78",
-  data: "#3a7d44",
-  work: "#b07612",
-  results: "#2a7b78",
-  experiments: "#b85638",
-  config: "#52733b",
-  people: "#b43e48",
-  events: "#43628d",
-  other: "#5b677a",
+  models: "#74507d",
+  data: "#4f7a5b",
+  work: "#9c6b1c",
+  results: "#1b6e72",
+  experiments: "#a6533a",
+  config: "#3b4252",
+  people: "#9d3d47",
+  events: "#2e3440",
+  other: "#4c566a",
 };
 
 /** type string -> family key. Explicit for all 44 types seen in the index. */

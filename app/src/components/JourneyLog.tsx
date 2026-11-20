@@ -49,7 +49,7 @@ export function buildJourneyLog(trace: TravelTrace): { byStage: LogEntry[][]; dr
     const key = `c:${chunkId}`;
     if (seen.has(key)) return;
     seen.add(key);
-    byStage[stage].push({ stage, name: doc, kind: "chunk", world, color: "#8d95ce", chunkId });
+    byStage[stage].push({ stage, name: doc, kind: "chunk", world, color: "#81a1c1", chunkId });
   };
 
   // stage 1 — entities of the top vector hits

@@ -6,9 +6,11 @@ import {
   OAUTH_PKCE_SESSION_KEY,
   OAUTH_TOKENS_STORAGE_KEY,
   OAuthLoopGuardError,
+  OAuthRedirectInProgressError,
   computeCodeChallengeS256,
   discoverOAuthEndpoints,
   extractResourceMetadataUrl,
+  fetchWithOAuth,
   generateCodeVerifier,
   initiateSsoPkceRedirect,
   processOAuthCallback,
@@ -82,6 +84,45 @@ function jsonResp(status, obj, headers = {}) {
     fromFallback === "https://knotgate.labs.jb.gg/memory/.well-known/oauth-protected-resource",
     "extractResourceMetadataUrl falls back to origin + /memory/.well-known/oauth-protected-resource",
   );
+
+  // Mixed-content guard: upgrade same-host http:// metadata URL to https:// when page is on https:
+  const prevWindow = globalThis.window;
+  try {
+    globalThis.window = {
+      location: {
+        protocol: "https:",
+        host: "knotgate.labs.jb.gg",
+        origin: "https://knotgate.labs.jb.gg",
+      },
+    };
+    const upgradedHeader = extractResourceMetadataUrl(
+      'Bearer resource_metadata="http://knotgate.labs.jb.gg/memory/.well-known/oauth-protected-resource", error="invalid_token"',
+      "",
+    );
+    ok(
+      upgradedHeader === "https://knotgate.labs.jb.gg/memory/.well-known/oauth-protected-resource",
+      "extractResourceMetadataUrl upgrades same-host http:// header URL to https:// when page is on https:",
+    );
+    const upgradedBody = extractResourceMetadataUrl(
+      null,
+      JSON.stringify({ resource_metadata: "http://knotgate.labs.jb.gg/memory/.well-known/oauth-protected-resource" }),
+    );
+    ok(
+      upgradedBody === "https://knotgate.labs.jb.gg/memory/.well-known/oauth-protected-resource",
+      "extractResourceMetadataUrl upgrades same-host http:// JSON body URL to https:// when page is on https:",
+    );
+    const otherHost = extractResourceMetadataUrl(
+      'Bearer resource_metadata="http://other.internal:8098/memory/.well-known/oauth-protected-resource"',
+      "",
+    );
+    ok(
+      otherHost === "http://other.internal:8098/memory/.well-known/oauth-protected-resource",
+      "extractResourceMetadataUrl preserves cross-host http:// URL untouched",
+    );
+  } finally {
+    if (prevWindow === undefined) delete globalThis.window;
+    else globalThis.window = prevWindow;
+  }
 }
 
 // 3. Full Discovery -> DCR caching -> PKCE SSO redirect -> Loop guard -> Callback -> Refresh
@@ -247,6 +288,160 @@ function jsonResp(status, obj, headers = {}) {
   ok(
     stripOAuthCallbackParams("/travel/", "?code=abc&state=def&iss=https%3A%2F%2Fx", "") === "/travel/",
     "stripOAuthCallbackParams leaves no trailing ? when all params removed",
+  );
+}
+
+// 5. Stale Bearer resilience on pod restart:
+//    401 with stale Bearer + failed refresh -> clears stale token & succeeds via clean tokenless retry (200 OK) without SSO redirect!
+{
+  const local = new MemoryStorage();
+  const session = new MemoryStorage();
+  const navigated = [];
+  const seenRequests = [];
+
+  local.setItem(
+    OAUTH_TOKENS_STORAGE_KEY,
+    JSON.stringify({
+      access_token: "stale_pod_token_v0",
+      refresh_token: "stale_pod_refresh_v0",
+      expires_at: 1_700_000_999_000,
+      client_id: "hmc_stale_client",
+      token_endpoint: "https://knotgate.labs.jb.gg/memory/token",
+      issuer: "https://knotgate.labs.jb.gg/memory",
+    }),
+  );
+  session.setItem(
+    OAUTH_LOOP_GUARD_SESSION_KEY,
+    JSON.stringify({ count: 1, window_start: 1_700_000_000_000 }),
+  );
+
+  const env = {
+    localStorage: local,
+    sessionStorage: session,
+    getLocation: () => ({
+      origin: "https://knotgate.labs.jb.gg",
+      pathname: "/memory",
+      search: "",
+      hash: "",
+    }),
+    replaceUrl: () => {},
+    navigate: (u) => navigated.push(u),
+    now: () => 1_700_000_010_000,
+    fetchFn: async (url, init = {}) => {
+      const u = String(url);
+      if (u === "https://knotgate.labs.jb.gg/memory/token") {
+        return jsonResp(400, { error: "invalid_grant", error_description: "Unknown refresh token after pod restart" });
+      }
+      const auth = init?.headers?.Authorization ?? init?.headers?.authorization ?? "";
+      seenRequests.push({ url: u, auth });
+      if (u === "/memory/api/graph-stats/stats?project=default") {
+        // Reject stale Bearer with 401, but allow clean tokenless public PIER KB request with 200 OK!
+        if (auth) {
+          return jsonResp(
+            401,
+            { error: "invalid_token" },
+            { "www-authenticate": 'Bearer resource_metadata="http://knotgate.labs.jb.gg/memory/.well-known/oauth-protected-resource"' },
+          );
+        }
+        return jsonResp(200, { index_id: "default", nodes: 61900, edges: 142000 });
+      }
+      return jsonResp(404, {});
+    },
+  };
+
+  const resp = await fetchWithOAuth("/memory/api/graph-stats/stats?project=default", { method: "GET" }, { env });
+  const payload = await resp.json();
+  ok(
+    resp.status === 200 && payload.nodes === 61900,
+    "fetchWithOAuth recovers from stale Bearer + failed refresh via clean tokenless retry (200 OK)",
+  );
+  ok(
+    seenRequests.length === 2 &&
+      seenRequests[0].auth === "Bearer stale_pod_token_v0" &&
+      seenRequests[1].auth === "",
+    "fetchWithOAuth sends stale Bearer first, then retries once without Authorization header",
+  );
+  ok(local.getItem(OAUTH_TOKENS_STORAGE_KEY) === null, "fetchWithOAuth clears stale token from localStorage");
+  ok(navigated.length === 0, "fetchWithOAuth does NOT trigger SSO redirect when clean tokenless retry returns 200 OK");
+
+  // Also verify private scope (tokenless retry ALSO returns 401 -> triggers PKCE SSO redirect!)
+  local.setItem(
+    OAUTH_TOKENS_STORAGE_KEY,
+    JSON.stringify({
+      access_token: "stale_private_token",
+      expires_at: 1_700_000_999_000,
+      client_id: "hmc_stale_client",
+      token_endpoint: "https://knotgate.labs.jb.gg/memory/token",
+      issuer: "https://knotgate.labs.jb.gg/memory",
+    }),
+  );
+  const privateEnv = {
+    ...env,
+    fetchFn: async (url) => {
+      const u = String(url);
+      if (u === "https://knotgate.labs.jb.gg/memory/.well-known/oauth-protected-resource") {
+        return jsonResp(200, {
+          resource: "https://knotgate.labs.jb.gg/memory/mcp/",
+          authorization_servers: ["https://knotgate.labs.jb.gg/memory"],
+        });
+      }
+      if (u === "https://knotgate.labs.jb.gg/memory/.well-known/oauth-authorization-server") {
+        return jsonResp(200, {
+          issuer: "https://knotgate.labs.jb.gg/memory",
+          sso_authorization_endpoint: "https://knotgate.labs.jb.gg/memory/sso/authorize",
+          token_endpoint: "https://knotgate.labs.jb.gg/memory/token",
+          registration_endpoint: "https://knotgate.labs.jb.gg/memory/register",
+        });
+      }
+      if (u === "https://knotgate.labs.jb.gg/memory/register") {
+        return jsonResp(201, { client_id: "hmc_re_registered" });
+      }
+      return jsonResp(
+        401,
+        { error: "unauthorized" },
+        { "www-authenticate": 'Bearer resource_metadata="https://knotgate.labs.jb.gg/memory/.well-known/oauth-protected-resource"' },
+      );
+    },
+  };
+  let redirectedPrivate = false;
+  try {
+    await fetchWithOAuth("/memory/api/graph-stats/stats?project=user_secret", { method: "GET" }, { env: privateEnv });
+  } catch (e) {
+    redirectedPrivate = e instanceof OAuthRedirectInProgressError;
+  }
+  ok(
+    redirectedPrivate && navigated.length === 1,
+    "fetchWithOAuth triggers PKCE S256 SSO redirect only when clean tokenless retry also returns 401",
+  );
+
+  // Verify successful Bearer usage resets loop guard
+  local.setItem(
+    OAUTH_TOKENS_STORAGE_KEY,
+    JSON.stringify({
+      access_token: "valid_token_v3",
+      expires_at: 1_700_000_999_000,
+      client_id: "hmc_re_registered",
+      token_endpoint: "https://knotgate.labs.jb.gg/memory/token",
+      issuer: "https://knotgate.labs.jb.gg/memory",
+    }),
+  );
+  session.setItem(
+    OAUTH_LOOP_GUARD_SESSION_KEY,
+    JSON.stringify({ count: 1, window_start: 1_700_000_005_000 }),
+  );
+  const okResp = await fetchWithOAuth(
+    "/memory/api/graph-stats/stats?project=user_secret",
+    { method: "GET" },
+    {
+      env: {
+        ...env,
+        fetchFn: async () => jsonResp(200, { ok: true }),
+      },
+    },
+  );
+  ok(
+    okResp.status === 200 && session.getItem(OAUTH_LOOP_GUARD_SESSION_KEY) === null,
+    "fetchWithOAuth resets redirect loop-guard counter when a Bearer token is successfully used",
   );
 }
 

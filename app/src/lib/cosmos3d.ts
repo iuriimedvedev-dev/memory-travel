@@ -40,8 +40,8 @@ import type { CosmosGraph } from "./types";
 
 export type { SelectedNode } from "./cosmos";
 
-const BG_DARK = 0x181d26;
-const BG_LIGHT = 0xe8edf4;
+const BG_DARK = 0x0d121b;
+const BG_LIGHT = 0xe7edf5;
 /** Spotlight dim factor: non-matching stars drop to ~20% brightness. */
 const SPOT_DIM = 0.18;
 
@@ -143,6 +143,7 @@ const POINT_VERT = /* glsl */ `
   attribute vec3 aColor;
   attribute float aAlpha;
   attribute float aTwinkle;
+  attribute float aHub;   // 0..1 hub prominence -> soft Nord Frost corona
   attribute float aSel;   // 1 on the selected star: size + brightness boost
   uniform float uScale;   // px-per-world at unit distance (set on resize)
   uniform float uTime;    // seconds, for the gentle twinkle
@@ -151,19 +152,21 @@ const POINT_VERT = /* glsl */ `
   uniform float uLightMode; // 1.0 in Nord Light mode, 0.0 in Nord Dark
   varying vec3 vColor;
   varying float vAlpha;
+  varying float vHub;
   void main() {
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     float dist = max(0.1, -mv.z);
-    // size attenuation: farther stars are smaller…
-    float px = aSize * (1.0 + aSel * 1.1) * uScale / dist;
-    // …and slightly dimmer (exponential fog) — subtle depth cue
+    // size attenuation: farther stars are smaller; hubs carry a gentle corona skirt
+    float px = aSize * (1.0 + aHub * 0.30 + aSel * 1.12) * uScale / dist;
+    // subtle exponential depth fog
     float fog = exp(-uFog * (dist - uFogRef) / max(1.0, uFogRef));
-    float tw = 0.92 + 0.08 * sin(uTime * (0.6 + aTwinkle * 1.7) + aTwinkle * 40.0);
+    float tw = 0.92 + 0.08 * sin(uTime * (0.6 + aTwinkle * 1.6) + aTwinkle * 40.0);
     vColor = uLightMode > 0.5
-      ? mix(aColor, vec3(0.06, 0.43, 0.55), aSel * 0.72)
-      : aColor + vec3(1.0) * aSel * 0.35;
-    vAlpha = aAlpha * tw * clamp(fog, 0.55, 1.0) * (1.0 + aSel * 0.9);
-    gl_PointSize = clamp(px * (uLightMode > 0.5 ? 1.15 : 1.0), 1.2, 90.0);
+      ? mix(aColor, vec3(0.059, 0.427, 0.549), aSel * 0.72)
+      : mix(aColor, vec3(0.925, 0.937, 0.957), aSel * 0.42);
+    vAlpha = aAlpha * tw * clamp(fog, 0.56, 1.0) * (1.0 + aSel * 0.9);
+    vHub = aHub;
+    gl_PointSize = clamp(px * (uLightMode > 0.5 ? 1.18 : 1.04), 1.3, 92.0);
     gl_Position = projectionMatrix * mv;
   }
 `;
@@ -172,22 +175,26 @@ const POINT_FRAG = /* glsl */ `
   uniform float uLightMode;
   varying vec3 vColor;
   varying float vAlpha;
+  varying float vHub;
   void main() {
     vec2 uv = gl_PointCoord - 0.5;
     float d = length(uv) * 2.0;          // 0 at centre, 1 at edge
     if (d > 1.0) discard;                 // round sprite, never a square
-    float core = smoothstep(0.42, 0.0, d);   // hot centre
-    float halo = smoothstep(1.0, 0.3, d);    // soft radial falloff
+    float core = smoothstep(0.42, 0.0, d);   // crisp star core
+    float halo = smoothstep(1.0, 0.26, d);   // soft radial falloff
+    float corona = smoothstep(1.0, 0.16, d) * (1.0 - core * 0.45);
     if (uLightMode > 0.5) {
-      float a = clamp((core * 0.88 + halo * 0.24) * vAlpha, 0.0, 0.96);
-      vec3 inkCol = vColor * mix(0.68, 0.44, core);
+      vec3 frostTint = vec3(0.059, 0.427, 0.549); // Deep Polar Frost #0f6d8c
+      float a = clamp((core * 0.92 + halo * 0.24 + corona * vHub * 0.18) * vAlpha, 0.0, 0.96);
+      vec3 inkCol = mix(vColor * 0.92, vColor * 0.64, core * 0.55);
+      inkCol = mix(inkCol, frostTint, corona * vHub * 0.28);
       gl_FragColor = vec4(inkCol, a);
     } else {
-      // Small per-star contribution: with 47k stars the GLOW comes from
-      // additive overlap in dense clusters — vivid cores wash to white if
-      // each sprite contributes too much.
-      float a = (core * 0.28 + halo * 0.10) * vAlpha;
-      gl_FragColor = vec4(vColor * (0.72 + core * 0.55), a);
+      // Nord Dark Cosmos: additive glow + soft Nord Frost (#88C0D0) corona on hub stars
+      vec3 frostCorona = vec3(0.533, 0.753, 0.816) * corona * vHub * 0.42;
+      float a = clamp((core * 0.30 + halo * 0.11 + corona * vHub * 0.11) * vAlpha, 0.0, 1.0);
+      vec3 starCol = vColor * (0.74 + core * 0.56) + frostCorona;
+      gl_FragColor = vec4(starCol, a);
     }
   }
 `;
@@ -228,15 +235,16 @@ const EDGE_FRAG = /* glsl */ `
     float selW = mix(1.0, uSelDim + (uSelBoost - uSelDim) * vFocus, uFocus);
     float hovW = mix(1.0, uHovDim + (uHovBoost - uHovDim) * vHover, uHover);
     float w = min(selW * hovW, 1.35);
+    float emph = clamp(vFocus * uFocus + vHover * uHover, 0.0, 1.0);
     if (uLightMode > 0.5) {
-      float emph = clamp(vFocus * uFocus + vHover * uHover, 0.0, 1.0);
-      vec3 lCol = mix(vec3(0.30, 0.36, 0.46), vec3(0.06, 0.43, 0.55), emph);
-      float lAlpha = clamp(uOpacity * 2.2 * vRingA * w, 0.0, 0.82);
+      vec3 lCol = mix(vec3(0.24, 0.31, 0.42), vec3(0.059, 0.427, 0.549), emph);
+      float lAlpha = clamp(uOpacity * 2.25 * vRingA * w, 0.0, 0.84);
       gl_FragColor = vec4(lCol, lAlpha);
     } else {
-      // focused/hovered edges glow: push colour toward white a touch
-      vec3 col = vColor * (1.0 + (vFocus * uFocus + vHover * uHover) * 0.6);
-      gl_FragColor = vec4(col, uOpacity * vRingA * w);
+      // Nord Frost constellation filaments: focused/hovered edges glow toward Frost Ice (#88C0D0)
+      vec3 frostGlow = vec3(0.533, 0.753, 0.816);
+      vec3 col = mix(vColor, frostGlow, emph * 0.48) * (1.0 + emph * 0.58);
+      gl_FragColor = vec4(col, clamp(uOpacity * vRingA * w, 0.0, 0.95));
     }
   }
 `;
@@ -437,7 +445,8 @@ export class Cosmos3D implements CosmosLike, Journey3D {
       renderer = new THREE.WebGLRenderer({
         canvas,
         antialias: true,
-        alpha: false,
+        alpha: true,
+        premultipliedAlpha: true,
         powerPreference: "high-performance",
       });
     } catch (e) {
@@ -449,7 +458,8 @@ export class Cosmos3D implements CosmosLike, Journey3D {
     // points; 1.5 keeps real-GPU sharpness while staying fast in software.
     this.dpr = Math.min(1.5, window.devicePixelRatio || 1);
     renderer.setPixelRatio(this.dpr);
-    renderer.setClearColor(this.theme === "light" ? BG_LIGHT : BG_DARK, 1);
+    // Clear with alpha=0 so the layered CSS Nord radial aurora / glacial mist backdrop shines behind <canvas>
+    renderer.setClearColor(this.theme === "light" ? BG_LIGHT : BG_DARK, 0);
     this.camera = new THREE.PerspectiveCamera(55, 1, 0.1, 4000);
     this.camera.position.set(0, 90, this.fitDist);
     const controls = new OrbitControls(this.camera, canvas);
@@ -504,7 +514,7 @@ export class Cosmos3D implements CosmosLike, Journey3D {
     this.theme = theme;
     const isLight = theme === "light";
     if (this.renderer) {
-      this.renderer.setClearColor(isLight ? BG_LIGHT : BG_DARK, 1);
+      this.renderer.setClearColor(isLight ? BG_LIGHT : BG_DARK, 0);
     }
     const blend = this.blendMode();
     if (this.ptsMat) {
@@ -569,6 +579,7 @@ export class Cosmos3D implements CosmosLike, Journey3D {
     const sizes = new Float32Array(n);
     const alphas = new Float32Array(n);
     const twinkle = new Float32Array(n);
+    const hubs = new Float32Array(n);
     this.baseSize = new Float32Array(n);
     this.baseCol = new Float32Array(n * 3);
     this.baseAlpha = new Float32Array(n);
@@ -594,12 +605,13 @@ export class Cosmos3D implements CosmosLike, Journey3D {
       colors[i * 3] = c[0];
       colors[i * 3 + 1] = c[1];
       colors[i * 3 + 2] = c[2];
-      // hubs slightly larger: degree -> world size (tuned so regular stars
-      // are ~2px at fit distance, hubs ~10px)
-      const s = 0.16 + Math.min(0.7, Math.sqrt(nd.deg) * 0.075);
+      // hubs slightly larger: degree -> world size + Nord Frost corona factor
+      const degSqrt = Math.sqrt(Math.max(0, nd.deg));
+      const s = 0.16 + Math.min(0.72, degSqrt * 0.075);
       sizes[i] = s;
       alphas[i] = 1;
       twinkle[i] = Math.random();
+      hubs[i] = nd.deg >= 6 ? Math.min(1, (degSqrt - 2.0) / 6.0) : 0;
       this.baseSize[i] = s;
       this.baseCol[i * 3] = c[0];
       this.baseCol[i * 3 + 1] = c[1];
@@ -621,6 +633,7 @@ export class Cosmos3D implements CosmosLike, Journey3D {
     geo.setAttribute("aSize", this.sizeAttr);
     geo.setAttribute("aAlpha", this.alphaAttr);
     geo.setAttribute("aTwinkle", new THREE.BufferAttribute(twinkle, 1));
+    geo.setAttribute("aHub", new THREE.BufferAttribute(hubs, 1));
     geo.setAttribute("aSel", this.selAttr = new THREE.BufferAttribute(new Float32Array(n), 1));
     this.geo = geo;
     this.ptsMat = new THREE.ShaderMaterial({
@@ -659,12 +672,13 @@ export class Cosmos3D implements CosmosLike, Journey3D {
         this.edgeT[k] = t;
         this.adj[s].push(k);
         if (t !== s) this.adj[t].push(k);
+        const fjord: [number, number, number] = [0.369, 0.506, 0.675]; // Nord Fjord #5E81AC
         for (let c = 0; c < 3; c++) {
           ep[k * 6 + c] = this.pos[s * 3 + c];
           ep[k * 6 + 3 + c] = this.pos[t * 3 + c];
-          // dim desaturated blue, halfway to the node colours
-          ec[k * 6 + c] = 0.24 + 0.35 * this.baseCol[s * 3 + c];
-          ec[k * 6 + 3 + c] = 0.24 + 0.35 * this.baseCol[t * 3 + c];
+          // Nord Fjord + endpoint constellation filament tint
+          ec[k * 6 + c] = 0.44 * fjord[c] + 0.36 * this.baseCol[s * 3 + c];
+          ec[k * 6 + 3 + c] = 0.44 * fjord[c] + 0.36 * this.baseCol[t * 3 + c];
         }
         er[k * 2] = 1e9;
         er[k * 2 + 1] = 1e9;
@@ -787,6 +801,7 @@ export class Cosmos3D implements CosmosLike, Journey3D {
     g.setAttribute("aSize", new THREE.BufferAttribute(new Float32Array([size]), 1));
     g.setAttribute("aAlpha", new THREE.BufferAttribute(new Float32Array([1]), 1));
     g.setAttribute("aTwinkle", new THREE.BufferAttribute(new Float32Array([0]), 1));
+    g.setAttribute("aHub", new THREE.BufferAttribute(new Float32Array([0.65]), 1));
     g.setAttribute("aSel", new THREE.BufferAttribute(new Float32Array([0]), 1));
     const mat = new THREE.ShaderMaterial({
       vertexShader: MARKER_VERT,

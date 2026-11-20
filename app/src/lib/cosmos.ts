@@ -28,24 +28,31 @@ export function toWorld3(xyz: XYZ | null | undefined): XYZ {
 }
 
 /**
- * Nord Frost & Aurora stage highlight palette (journey stages, search hits,
- * selection). Harmonised with KnotGate's Nord Frozen Glass design language.
+ * Nord Cosmos stage & constellation highlight palette:
+ *   - Vector: Frost Cyan (#88C0D0)
+ *   - BM25: Aurora Sage (#A3BE8C)
+ *   - Graph Walk: Polar Gold (#EBCB8B) + Borealis Violet (#B48EAD)
+ *   - Rerank / Synthesis: Frost Ice (#88C0D0) + Polar Teal (#8FBCBB)
  */
 export const INK: Record<string, RGBA> = {
-  base: [0.369, 0.506, 0.675, 1], // Nord Frost #5E81AC
-  dim: [0.231, 0.259, 0.322, 1], // Nord Polar #3B4252
-  cyan: [0.533, 0.753, 0.816, 1], // Nord Frost #88C0D0
-  vector: [0.533, 0.753, 0.816, 1], // Nord Frost #88C0D0
-  gold: [0.922, 0.796, 0.545, 1], // Nord Aurora #EBCB8B
-  amber: [0.922, 0.796, 0.545, 1], // Nord Aurora #EBCB8B
-  bm25: [0.878, 0.722, 0.44, 1], // Warm Nord Gold
-  overlap: [0.639, 0.745, 0.549, 1], // Nord Aurora #A3BE8C
-  magenta: [0.706, 0.557, 0.678, 1], // Nord Aurora #B48EAD
-  violet: [0.706, 0.557, 0.678, 1], // Nord Aurora #B48EAD
-  green: [0.639, 0.745, 0.549, 1], // Nord Aurora #A3BE8C
-  orange: [0.816, 0.529, 0.439, 1], // Nord Aurora #D08770
-  white: [0.925, 0.937, 0.957, 1], // Nord Snow Storm #ECEFF4
-  query: [0.749, 0.38, 0.416, 1], // Nord Aurora #BF616A
+  base: [0.369, 0.506, 0.675, 1], // Fjord #5E81AC
+  dim: [0.231, 0.259, 0.322, 1], // Polar Slate #3B4252
+  cyan: [0.533, 0.753, 0.816, 1], // Frost Ice #88C0D0
+  frost: [0.533, 0.753, 0.816, 1], // Frost Ice #88C0D0
+  teal: [0.561, 0.737, 0.733, 1], // Polar Teal #8FBCBB
+  glacial: [0.506, 0.631, 0.757, 1], // Glacial Blue #81A1C1
+  vector: [0.533, 0.753, 0.816, 1], // Frost Cyan #88C0D0
+  bm25: [0.639, 0.745, 0.549, 1], // Aurora Sage #A3BE8C
+  overlap: [0.561, 0.737, 0.733, 1], // Polar Teal #8FBCBB
+  gold: [0.922, 0.796, 0.545, 1], // Polar Gold #EBCB8B
+  amber: [0.922, 0.796, 0.545, 1], // Polar Gold #EBCB8B
+  magenta: [0.706, 0.557, 0.678, 1], // Borealis Violet #B48EAD
+  violet: [0.706, 0.557, 0.678, 1], // Borealis Violet #B48EAD
+  green: [0.639, 0.745, 0.549, 1], // Aurora Sage #A3BE8C
+  orange: [0.816, 0.529, 0.439, 1], // Aurora Coral #D08770
+  rerank: [0.533, 0.753, 0.816, 1], // Frost Ice #88C0D0
+  white: [0.925, 0.937, 0.957, 1], // Snow Storm #ECEFF4
+  query: [0.749, 0.38, 0.416, 1], // Aurora Crimson #BF616A
 };
 
 export interface SelectedNode {

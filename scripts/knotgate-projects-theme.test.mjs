@@ -16,8 +16,10 @@ import {
   readInitialQuestionFromUrl,
   resolveSafeReturnTo,
 } from "../app/src/lib/projects.ts";
-import { loadLiveCosmos, probeGraphStats } from "../app/src/lib/cosmosSource.ts";
-import { memoryRecallLive, memoryStatusLive, streamRecallTrace } from "../app/src/lib/live.ts";
+import { graphBases, loadLiveCosmos, probeGraphStats } from "../app/src/lib/cosmosSource.ts";
+import { bridgeEndpoints, bridgeUrls, memoryRecallLive, memoryStatusLive, streamRecallTrace, traceBases } from "../app/src/lib/live.ts";
+import { FAMILY_COLORS, FAMILY_COLORS_LIGHT, colorForType } from "../app/src/lib/palette.ts";
+import { INK } from "../app/src/lib/cosmos.ts";
 import {
   KNOTGATE_THEME_KEY,
   applyThemeToDocument,
@@ -192,18 +194,25 @@ function jsonResp(status, obj, headers = {}) {
   );
 }
 
-// 4. fetchWithOAuth 401 token refresh + retry
+// 4. fetchWithOAuth: 401 token refresh + retry AND stale-token clean tokenless retry
 {
   const seenAuth = [];
   let attempt = 0;
+  let loopReset = false;
   const resp = await fetchWithOAuth(
     "/memory/api/graph-stats/stats?project=user_1",
     { method: "GET" },
     {
       getToken: async () => "expired_token_1",
-      recover401: async ({ hadBearer }) => {
-        ok(hadBearer === true, "fetchWithOAuth informs recover401 that expired bearer was sent");
-        return "fresh_token_2";
+      refreshTokens: async () => ({
+        access_token: "fresh_token_2",
+        expires_at: Date.now() + 3600_000,
+        client_id: "hmc_1",
+        token_endpoint: "https://knotgate.labs.jb.gg/memory/token",
+        issuer: "https://knotgate.labs.jb.gg/memory",
+      }),
+      resetLoopGuard: () => {
+        loopReset = true;
       },
       fetchFn: async (_url, init) => {
         attempt++;
@@ -218,10 +227,82 @@ function jsonResp(status, obj, headers = {}) {
   );
   ok(
     resp.status === 200 &&
+      loopReset &&
       seenAuth[0] === "Bearer expired_token_1" &&
       seenAuth[1] === "Bearer fresh_token_2",
-    "fetchWithOAuth retries seamlessly with refreshed OAuth 2.1 Bearer token after 401",
+    "fetchWithOAuth retries seamlessly with refreshed OAuth 2.1 Bearer token after 401 and resets loop guard",
   );
+
+  // Stale Bearer + failed refresh on public PIER KB -> clears stale token & succeeds via clean tokenless retry (200 OK)
+  const staleSeenAuth = [];
+  let cleared = false;
+  let recoverCalled = false;
+  const staleResp = await fetchWithOAuth(
+    "/memory/api/graph-stats/stats?project=default",
+    { method: "GET" },
+    {
+      getToken: async () => "stale_bearer_after_restart",
+      refreshTokens: async () => null,
+      clearTokens: () => {
+        cleared = true;
+      },
+      recover401: async () => {
+        recoverCalled = true;
+        return "should_not_be_used";
+      },
+      fetchFn: async (_url, init) => {
+        const auth = init?.headers?.Authorization ?? init?.headers?.authorization ?? "";
+        staleSeenAuth.push(auth);
+        if (auth) {
+          return jsonResp(401, { error: "invalid_token" });
+        }
+        return jsonResp(200, { ok: true, index_id: "default" });
+      },
+    },
+  );
+  ok(
+    staleResp.status === 200 &&
+      cleared &&
+      !recoverCalled &&
+      staleSeenAuth.length === 2 &&
+      staleSeenAuth[0] === "Bearer stale_bearer_after_restart" &&
+      staleSeenAuth[1] === "",
+    "fetchWithOAuth clears stale token and succeeds via tokenless retry (200 OK) without SSO redirect loop",
+  );
+}
+
+// 4b. Endpoint probing on /memory/ never falls through to /travel/ or root /api/graph-stats
+{
+  const prevWindow = globalThis.window;
+  try {
+    globalThis.window = { location: { pathname: "/memory/" } };
+    const gBases = graphBases();
+    ok(
+      gBases.includes("/memory/api/graph-stats") &&
+        !gBases.some((b) => b.includes("/travel/")) &&
+        !gBases.includes("/api/graph-stats"),
+      "graphBases() on /memory/ probes only /memory/api/graph-stats (never /travel/ or root /api/graph-stats)",
+    );
+    const gBasesExact = graphBases("/memory");
+    ok(
+      gBasesExact.length === 1 && gBasesExact[0] === "/memory/api/graph-stats",
+      "graphBases('/memory') returns ['/memory/api/graph-stats'] cleanly",
+    );
+    const bUrls = bridgeUrls();
+    const tBases = traceBases();
+    ok(
+      bUrls.includes("/memory/api/memory") &&
+        bridgeEndpoints().includes("/memory/api/memory") &&
+        !bUrls.some((b) => b.includes("/travel/")) &&
+        tBases.includes("/memory/api/trace") &&
+        !tBases.some((b) => b.includes("/travel/")) &&
+        !tBases.includes("/api/trace"),
+      "bridgeUrls() and traceBases() on /memory/ avoid /travel/ and root /api/ spam",
+    );
+  } finally {
+    if (prevWindow === undefined) delete globalThis.window;
+    else globalThis.window = prevWindow;
+  }
 }
 
 // 5. End-to-End Project Wiring & Empty Scope Handling
@@ -385,6 +466,27 @@ function jsonResp(status, obj, headers = {}) {
   );
   setTheme("light", { storage });
   ok(storage.getItem(KNOTGATE_THEME_KEY) === "light", "setTheme persists to knotgate:theme");
+
+  // Nord Cosmos constellation & Arctic light palette invariants
+  const darkHexes = new Set(Object.values(FAMILY_COLORS).map((c) => c.toUpperCase()));
+  for (const want of ["#88C0D0", "#8FBCBB", "#81A1C1", "#5E81AC", "#A3BE8C", "#EBCB8B", "#B48EAD", "#D08770"]) {
+    ok(darkHexes.has(want), `Nord Dark Cosmos FAMILY_COLORS includes ${want}`);
+  }
+  const lightHexes = new Set(Object.values(FAMILY_COLORS_LIGHT).map((c) => c.toLowerCase()));
+  for (const want of ["#2e3440", "#3b4252", "#5e81ac", "#0f6d8c", "#4f7a5b", "#8f5685"]) {
+    ok(lightHexes.has(want), `Nord Light Arctic Cosmos FAMILY_COLORS_LIGHT includes ${want}`);
+  }
+  ok(
+    colorForType("component", "dark") !== colorForType("component", "light"),
+    "colorForType differentiates Nord Dark vs Nord Light Arctic star colors",
+  );
+  ok(
+    Math.abs(INK.vector[0] - 0.533) < 0.01 &&
+      Math.abs(INK.bm25[1] - 0.745) < 0.01 &&
+      Math.abs(INK.gold[0] - 0.922) < 0.01 &&
+      Math.abs(INK.violet[0] - 0.706) < 0.01,
+    "INK stage highlights map Vector->Frost Cyan, BM25->Aurora Sage, Walk->Polar Gold + Borealis Violet",
+  );
 }
 
 if (failures) {

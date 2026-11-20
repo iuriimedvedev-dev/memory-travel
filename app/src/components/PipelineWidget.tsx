@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { colorForType } from "../lib/palette";
+import { useTheme } from "../lib/theme";
 import { useI18n } from "../i18n/useI18n";
 import { fmt } from "../i18n/strings";
 import GraphWalkExplainer from "./GraphWalkExplainer";
@@ -23,6 +25,7 @@ export interface PipelineWidgetProps {
   currentStage: number; // 0 to 6
   onSelectStage: (stageIndex: number) => void;
   onFocusNode: (nodeIndex: number) => void;
+  onFocusEntityName?: (entityName: string) => void;
   onFocusChunk: (chunk: ChunkHit) => void;
   onClose: () => void;
   elapsedS: number;
@@ -46,7 +49,7 @@ const STAGES_DEF: StageInfo[] = [
     titleRu: "Эмбеддинг",
     subEn: "Intent vector · Keyword tokens",
     subRu: "Вектор намерения · Токены слов",
-    color: "#ff7bd5",
+    color: "#B48EAD", // Nord Borealis Violet
   },
   {
     id: "vector",
@@ -55,7 +58,7 @@ const STAGES_DEF: StageInfo[] = [
     titleRu: "Векторный поиск",
     subEn: "Dense cosine similarity",
     subRu: "Косинусная близость чанков",
-    color: "#33f3ff",
+    color: "#88C0D0", // Nord Frost Cyan
   },
   {
     id: "bm25",
@@ -64,7 +67,7 @@ const STAGES_DEF: StageInfo[] = [
     titleRu: "BM25 / Ripgrep",
     subEn: "Sparse exact-word retrieval",
     subRu: "Поиск точных ключевых слов",
-    color: "#5cfca5",
+    color: "#A3BE8C", // Nord Aurora Sage
   },
   {
     id: "graph",
@@ -73,7 +76,7 @@ const STAGES_DEF: StageInfo[] = [
     titleRu: "Обход графа",
     subEn: "Question tokens, seeds, neighbours, chunks",
     subRu: "Токены, seeds, соседи, чанки",
-    color: "#ffd166",
+    color: "#EBCB8B", // Nord Polar Gold
   },
   {
     id: "fusion",
@@ -82,7 +85,7 @@ const STAGES_DEF: StageInfo[] = [
     titleRu: "Слияние / LTR",
     subEn: "Reciprocal rank fusion & rerank",
     subRu: "Гибридный ранжир (α=0.50)",
-    color: "#ff9f43",
+    color: "#D08770", // Nord Aurora Coral
   },
   {
     id: "context",
@@ -91,7 +94,7 @@ const STAGES_DEF: StageInfo[] = [
     titleRu: "Сборка контекста",
     subEn: "Prompt budget & facts packaging",
     subRu: "Упаковка фактов в контекст",
-    color: "#a29bfe",
+    color: "#81A1C1", // Nord Glacial Blue
   },
   {
     id: "answer",
@@ -100,7 +103,7 @@ const STAGES_DEF: StageInfo[] = [
     titleRu: "Финальный ответ",
     subEn: "Extractive citations & synthesis",
     subRu: "Цитаты источников и ответ",
-    color: "#ffeaa7",
+    color: "#8FBCBB", // Nord Polar Teal
   },
 ];
 
@@ -113,11 +116,13 @@ export default function PipelineWidget({
   currentStage,
   onSelectStage,
   onFocusNode,
+  onFocusEntityName,
   onFocusChunk,
   onClose,
   elapsedS,
 }: PipelineWidgetProps) {
   const { t, lang } = useI18n();
+  const { theme } = useTheme();
   const [minimized, setMinimized] = useState(false);
   const [expandedStage, setExpandedStage] = useState<number | null>(currentStage);
 
@@ -357,6 +362,8 @@ export default function PipelineWidget({
                       question={question}
                       onFocusChunk={onFocusChunk}
                       onFocusNode={onFocusNode}
+                      onFocusEntityName={onFocusEntityName}
+                      theme={theme}
                       lang={lang}
                       t={t}
                     />
@@ -397,6 +404,8 @@ function StageDetailView({
   question: _question,
   onFocusChunk,
   onFocusNode,
+  onFocusEntityName,
+  theme,
   lang,
   t,
 }: {
@@ -405,6 +414,8 @@ function StageDetailView({
   question?: string;
   onFocusChunk: (chunk: ChunkHit) => void;
   onFocusNode: (nodeIndex: number) => void;
+  onFocusEntityName?: (entityName: string) => void;
+  theme: "dark" | "light";
   lang: "en" | "ru";
   t: ReturnType<typeof useI18n>["t"];
 }) {
@@ -475,7 +486,7 @@ function StageDetailView({
                 <div className="pw-chunk-bar">
                   <div
                     className="pw-chunk-bar-fill"
-                    style={{ width: `${Math.round((h.dense / max) * 100)}%`, background: "#33f3ff" }}
+                    style={{ width: `${Math.round((h.dense / max) * 100)}%`, background: "#88C0D0" }}
                   />
                 </div>
                 {h.entities.length > 0 && (
@@ -520,7 +531,7 @@ function StageDetailView({
                 <div className="pw-chunk-bar">
                   <div
                     className="pw-chunk-bar-fill"
-                    style={{ width: `${Math.round((h.sparse / max) * 100)}%`, background: "#5cfca5" }}
+                    style={{ width: `${Math.round((h.sparse / max) * 100)}%`, background: "#A3BE8C" }}
                   />
                 </div>
               </button>
@@ -560,7 +571,7 @@ function StageDetailView({
             <li key={h.chunk_id} className="pw-chunk-item">
               <button className="pw-chunk-btn" onClick={() => onFocusChunk(h)}>
                 <div className="pw-chunk-top">
-                  <span className="pw-chunk-rank" style={{ color: "#ff9f43" }}>
+                  <span className="pw-chunk-rank" style={{ color: "#D08770" }}>
                     #{i + 1}
                   </span>
                   <span className="pw-chunk-doc">{h.doc}</span>
@@ -594,12 +605,31 @@ function StageDetailView({
           </div>
         </div>
         <div className="pw-ctx-entities-list">
-          {cb.entities.slice(0, 6).map((e) => (
-            <div key={e.entity} className="pw-ctx-ent-row">
-              <span className="pw-ctx-ent-name">{e.entity}</span>
-              {e.description && <span className="pw-ctx-ent-fact">{e.description.slice(0, 90)}…</span>}
-            </div>
-          ))}
+          {cb.entities.slice(0, 8).map((e) => {
+            const matchedNode = trace.graph.nodes.find((n) => n.name === e.entity);
+            const entType = e.type || matchedNode?.type || "concept";
+            return (
+              <button
+                key={e.entity}
+                type="button"
+                className="pw-ctx-ent-row clickable"
+                onClick={() => {
+                  if (matchedNode && matchedNode.i >= 0) onFocusNode(matchedNode.i);
+                  else onFocusEntityName?.(e.entity);
+                }}
+                title={lang === "ru" ? "Полететь к сущности в космосе" : "Fly to entity in cosmos"}
+              >
+                <span className="pw-ctx-ent-head">
+                  <span className="pw-ctx-ent-name">{e.entity}</span>
+                  <span className="entity-type-pill">
+                    <i className="swatch" style={{ background: colorForType(entType, theme) }} />
+                    <span>{entType}</span>
+                  </span>
+                </span>
+                {e.description && <span className="pw-ctx-ent-fact">{e.description.slice(0, 96)}…</span>}
+              </button>
+            );
+          })}
         </div>
       </div>
     );
@@ -614,17 +644,33 @@ function StageDetailView({
         </span>
       </div>
       <div className="pw-quotes-list">
-        {trace.answer_preview.slice(0, 4).map((b, i) => (
+        {trace.answer_preview.slice(0, 6).map((b, i) => (
           <div key={i} className="pw-quote-card">
             <p className="pw-quote-text">“{b.quote}”</p>
             <div className="pw-quote-footer">
               <span className="pw-quote-ref">[{b.doc}]</span>
               <div className="pw-quote-ents">
-                {b.entities.map((en) => (
-                  <span key={en} className="pw-quote-ent-tag">
-                    {en}
-                  </span>
-                ))}
+                {b.entities.map((en) => {
+                  const matchedNode = trace.graph.nodes.find((n) => n.name === en);
+                  return (
+                    <button
+                      key={en}
+                      type="button"
+                      className="pw-quote-ent-tag clickable"
+                      onClick={() => {
+                        if (matchedNode && matchedNode.i >= 0) onFocusNode(matchedNode.i);
+                        else onFocusEntityName?.(en);
+                      }}
+                      title={lang === "ru" ? "Полететь к узлу" : "Fly to node"}
+                    >
+                      <i
+                        className="swatch"
+                        style={{ background: colorForType(matchedNode?.type ?? "concept", theme) }}
+                      />
+                      <span>{en}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>

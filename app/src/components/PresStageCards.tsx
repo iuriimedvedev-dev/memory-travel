@@ -226,7 +226,7 @@ function stripFor(
                 <span className="prebarline" key={h.chunk_id}>
                   <span className="prebarnum">{i + 1}</span>
                   <span className="prebar">
-                    <i style={{ width: `${Math.max(4, (h.fused / max) * 100)}%`, background: "#ff9d4d" }} />
+                    <i style={{ width: `${Math.max(4, (h.fused / max) * 100)}%`, background: "#D08770" }} />
                   </span>
                 </span>
               ))}
@@ -371,7 +371,7 @@ function detailCardsFor(chapterId: string, trace: TravelTrace, t: Dict, lang: La
               <Row k={t.cardBm25Chunks} v={int(m.bm25_chunks)} />
               <Bars
                 items={topBy(trace.bm25_hits, "sparse", 5).map((h) => ({ label: shortDoc(h).slice(0, 18), v: h.sparse }))}
-                color="#59ff8c"
+                color="#A3BE8C"
                 digits={2}
               />
             </>
@@ -413,7 +413,7 @@ function detailCardsFor(chapterId: string, trace: TravelTrace, t: Dict, lang: La
           size: "lg",
           body: (
             <>
-              <Bars items={top.map((h, i) => ({ label: `${i + 1} ${shortDoc(h).slice(0, 20)}`, v: h.fused }))} color="#ff9d4d" />
+              <Bars items={top.map((h, i) => ({ label: `${i + 1} ${shortDoc(h).slice(0, 20)}`, v: h.fused }))} color="#D08770" />
               <div className="cmix">
                 {top.map((h, i) => (
                   <div className="cmixrow" key={h.chunk_id}>
@@ -422,7 +422,7 @@ function detailCardsFor(chapterId: string, trace: TravelTrace, t: Dict, lang: La
                       <i style={{ width: `${(h.dense / maxDense) * 100}%`, background: "var(--accent)" }} />
                     </span>
                     <span className="cmbar" title={`${t.scoreSparse} ${n1(h.sparse, 2)}`}>
-                      <i style={{ width: `${(h.sparse / maxSparse) * 100}%`, background: "#59ff8c" }} />
+                      <i style={{ width: `${(h.sparse / maxSparse) * 100}%`, background: "#A3BE8C" }} />
                     </span>
                     <span className="cmr dim">
                       {h.dense_rank ?? "—"}/{h.sparse_rank ?? "—"}

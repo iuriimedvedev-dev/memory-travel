@@ -158,6 +158,37 @@ export async function computeCodeChallengeS256(verifier: string): Promise<string
   return base64UrlEncode(new Uint8Array(digest));
 }
 
+/** Upgrade same-host `http://` metadata URLs to `https://` when running on an `https:` page. */
+function upgradeSameHostHttpMetadataUrl(rawUrl: string, fallbackOrigin?: string): string {
+  if (!/^http:\/\//i.test(rawUrl)) return rawUrl;
+  let pageProtocol = "";
+  let pageHost = "";
+  if (typeof window !== "undefined" && window.location) {
+    pageProtocol = window.location.protocol ?? "";
+    pageHost = window.location.host ?? "";
+  }
+  if ((!pageProtocol || !pageHost) && fallbackOrigin && /^https:\/\//i.test(fallbackOrigin)) {
+    try {
+      const fb = new URL(fallbackOrigin);
+      pageProtocol = fb.protocol;
+      pageHost = fb.host;
+    } catch {
+      /* ignore malformed fallbackOrigin */
+    }
+  }
+  if (pageProtocol === "https:" && pageHost) {
+    try {
+      const parsed = new URL(rawUrl);
+      if (parsed.protocol === "http:" && parsed.host.toLowerCase() === pageHost.toLowerCase()) {
+        return rawUrl.replace(/^http:\/\//i, "https://");
+      }
+    } catch {
+      /* ignore malformed metadata URL */
+    }
+  }
+  return rawUrl;
+}
+
 /** Extract RFC 9728 `resource_metadata` URL from WWW-Authenticate header or 401 JSON body. */
 export function extractResourceMetadataUrl(
   wwwAuthenticateHeader: string | null,
@@ -166,23 +197,24 @@ export function extractResourceMetadataUrl(
 ): string | null {
   if (wwwAuthenticateHeader) {
     const quoted = wwwAuthenticateHeader.match(/resource_metadata\s*=\s*"([^"]+)"/i);
-    if (quoted?.[1]) return quoted[1].trim();
+    if (quoted?.[1]) return upgradeSameHostHttpMetadataUrl(quoted[1].trim(), fallbackOrigin);
     const unquoted = wwwAuthenticateHeader.match(/resource_metadata\s*=\s*([^\s,]+)/i);
-    if (unquoted?.[1]) return unquoted[1].trim();
+    if (unquoted?.[1]) return upgradeSameHostHttpMetadataUrl(unquoted[1].trim(), fallbackOrigin);
   }
   const trimmed = responseBodyText.trim();
   if (trimmed.startsWith("{")) {
     try {
       const parsed = JSON.parse(trimmed) as { resource_metadata?: unknown };
       if (typeof parsed.resource_metadata === "string" && parsed.resource_metadata.trim()) {
-        return parsed.resource_metadata.trim();
+        return upgradeSameHostHttpMetadataUrl(parsed.resource_metadata.trim(), fallbackOrigin);
       }
     } catch {
       /* ignore non-JSON 401 bodies */
     }
   }
   if (fallbackOrigin && /^https?:\/\//i.test(fallbackOrigin)) {
-    return `${fallbackOrigin.replace(/\/+$/, "")}${DEFAULT_PRM_PATH}`;
+    const normalizedOrigin = upgradeSameHostHttpMetadataUrl(fallbackOrigin.replace(/\/+$/, ""), fallbackOrigin);
+    return `${normalizedOrigin}${DEFAULT_PRM_PATH}`;
   }
   return null;
 }
@@ -496,6 +528,16 @@ export async function processOAuthCallback(
   return { handled: true };
 }
 
+/** Clear cached OAuth tokens from localStorage (e.g., when a pod restart invalidates tokens). */
+export function clearStoredTokens(env: OAuthEnvironment = defaultEnv()): void {
+  removeKey(env.localStorage, OAUTH_TOKENS_STORAGE_KEY);
+}
+
+/** Reset the SSO redirect loop-guard counter once a token is successfully used or refreshed. */
+export function clearLoopGuard(env: OAuthEnvironment = defaultEnv()): void {
+  removeKey(env.sessionStorage, OAUTH_LOOP_GUARD_SESSION_KEY);
+}
+
 /** Exchange stored refresh_token for a fresh access_token (+ rotated refresh_token). */
 export async function refreshStoredTokens(
   env: OAuthEnvironment = defaultEnv(),
@@ -554,6 +596,7 @@ export async function refreshStoredTokens(
       scope: typeof data.scope === "string" ? data.scope : current.scope,
     };
     writeJson(env.localStorage, OAUTH_TOKENS_STORAGE_KEY, updated);
+    clearLoopGuard(env);
     return updated;
   } catch {
     return null;
@@ -653,9 +696,13 @@ export function ensureOAuthCallbackHandled(): Promise<{ handled: boolean; error?
 }
 
 /** Return a valid Bearer access token if stored (proactively refreshing via refresh_token). */
-export async function getBridgeAccessToken(opts: { forceRefresh?: boolean } = {}): Promise<string | null> {
-  await ensureOAuthCallbackHandled();
-  const env = defaultEnv();
+export async function getBridgeAccessToken(
+  opts: { forceRefresh?: boolean; env?: OAuthEnvironment } = {},
+): Promise<string | null> {
+  const env = opts.env ?? defaultEnv();
+  if (!opts.env) {
+    await ensureOAuthCallbackHandled();
+  }
   const stored = readJson<StoredOAuthTokens>(env.localStorage, OAUTH_TOKENS_STORAGE_KEY);
   if (!stored) return null;
 
@@ -669,6 +716,11 @@ export async function getBridgeAccessToken(opts: { forceRefresh?: boolean } = {}
       return null;
     }
     return stored.access_token;
+  }
+
+  if (opts.env) {
+    const refreshed = await refreshStoredTokens(env);
+    return refreshed?.access_token ?? null;
   }
 
   if (!inflightRefreshPromise) {
@@ -689,13 +741,23 @@ export async function recoverFromBridge401(opts: {
   wwwAuthenticate: string | null;
   bodyText: string;
   hadBearer: boolean;
+  env?: OAuthEnvironment;
 }): Promise<string> {
   if (opts.hadBearer) {
-    const refreshed = await getBridgeAccessToken({ forceRefresh: true });
+    const refreshed = await getBridgeAccessToken({ forceRefresh: true, env: opts.env });
     if (refreshed) return refreshed;
   } else {
-    const existing = await getBridgeAccessToken();
+    const existing = await getBridgeAccessToken({ env: opts.env });
     if (existing) return existing;
+  }
+
+  if (opts.env) {
+    const url = await initiateSsoPkceRedirect({
+      wwwAuthenticate: opts.wwwAuthenticate,
+      bodyText: opts.bodyText,
+      env: opts.env,
+    });
+    throw new OAuthRedirectInProgressError(url);
   }
 
   if (!inflightRedirectPromise) {
@@ -711,6 +773,14 @@ export async function recoverFromBridge401(opts: {
     });
   }
   return inflightRedirectPromise;
+}
+
+function stripAuthHeader(initHeaders: HeadersInit | undefined): Record<string, string> {
+  const out = mergeBearerHeader(initHeaders, null);
+  for (const k of Object.keys(out)) {
+    if (k.toLowerCase() === "authorization") delete out[k];
+  }
+  return out;
 }
 
 function mergeBearerHeader(initHeaders: HeadersInit | undefined, bearerToken: string | null): Record<string, string> {
@@ -737,47 +807,114 @@ function mergeBearerHeader(initHeaders: HeadersInit | undefined, bearerToken: st
  * Authenticated fetch wrapper for HARS / KnotGate Memory endpoints
  * (`/memory/api/graph-stats/*`, `/memory/api/trace/*`, `/memory/api/memory`):
  *   - Attaches stored OAuth 2.1 Bearer token if present (proactively refreshed).
- *   - On HTTP 401, runs refresh-token rotation or seamless PKCE S256 SSO redirect,
- *     and retries once when a fresh token is obtained.
+ *   - On HTTP 401 when a Bearer token was sent (`hadBearer === true`):
+ *       1. Attempts `refreshStoredTokens`.
+ *       2. If refresh fails (`null`), clears the stale stored token AND retries
+ *          once WITHOUT `Authorization` header (so public `PIER KB` `/stats`, `/graph`,
+ *          `/coords` succeed immediately with 200 OK instead of looping SSO!).
+ *       3. Only if that clean tokenless retry STILL returns 401 (private scope or
+ *          MCP call), invokes `recover401` to run PKCE S256 SSO!
+ *   - Resets the redirect loop-guard counter whenever a token is successfully used or refreshed.
  */
 export async function fetchWithOAuth(
   input: string,
   init: RequestInit = {},
   deps: {
+    env?: OAuthEnvironment;
     fetchFn?: typeof fetch;
     getToken?: (opts?: { forceRefresh?: boolean }) => Promise<string | null>;
+    refreshTokens?: () => Promise<StoredOAuthTokens | null>;
+    clearTokens?: () => void;
+    resetLoopGuard?: () => void;
     recover401?: typeof recoverFromBridge401;
   } = {},
 ): Promise<Response> {
-  const fetchFn = deps.fetchFn ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
-  const getToken = deps.getToken ?? getBridgeAccessToken;
-  const recover401 = deps.recover401 ?? recoverFromBridge401;
+  const env = deps.env ?? defaultEnv();
+  const fetchFn = deps.fetchFn ?? (deps.env ? deps.env.fetchFn : (...args: Parameters<typeof fetch>) => fetch(...args));
+  const getToken = deps.getToken ?? ((opts?: { forceRefresh?: boolean }) => getBridgeAccessToken({ ...opts, env: deps.env }));
+  const doRefresh = deps.refreshTokens ?? (() => refreshStoredTokens(env));
+  const doClearTokens = deps.clearTokens ?? (() => clearStoredTokens(env));
+  const doResetLoopGuard = deps.resetLoopGuard ?? (() => clearLoopGuard(env));
+  const recover401 =
+    deps.recover401 ?? ((opts: Parameters<typeof recoverFromBridge401>[0]) => recoverFromBridge401({ ...opts, env: deps.env }));
 
   const initialToken = await getToken();
+  const hadBearer = Boolean(initialToken);
   const headers = mergeBearerHeader(init.headers, initialToken);
   let resp = await fetchFn(input, { ...init, headers });
 
-  if (resp.status === 401) {
-    const bodyText = await resp.text();
-    const freshToken = await recover401({
-      wwwAuthenticate: resp.headers.get("www-authenticate"),
-      bodyText,
-      hadBearer: Boolean(initialToken),
-    });
-    const retryHeaders = mergeBearerHeader(init.headers, null);
-    for (const k of Object.keys(retryHeaders)) {
-      if (k.toLowerCase() === "authorization") delete retryHeaders[k];
+  if (resp.status !== 401) {
+    if (hadBearer && resp.ok) {
+      doResetLoopGuard();
     }
-    retryHeaders["Authorization"] = `Bearer ${freshToken}`;
+    return resp;
+  }
+
+  const firstBodyText = await resp.text();
+  const firstWwwAuth = resp.headers.get("www-authenticate");
+  const cleanHeaders = stripAuthHeader(init.headers);
+  const initWithoutAuth: RequestInit = { ...init, headers: cleanHeaders };
+
+  if (hadBearer) {
+    const refreshed = await doRefresh();
+    if (refreshed?.access_token) {
+      doResetLoopGuard();
+      const refreshedHeaders = { ...cleanHeaders, Authorization: `Bearer ${refreshed.access_token}` };
+      resp = await fetchFn(input, { ...init, headers: refreshedHeaders });
+      if (resp.status !== 401) {
+        if (resp.ok) doResetLoopGuard();
+        return resp;
+      }
+      await resp.text();
+    }
+
+    // Stale token could not be refreshed (or refreshed token was rejected):
+    // clear stale stored token and immediately retry ONCE without Authorization header
+    // BEFORE triggering a full-page PKCE SSO redirect!
+    doClearTokens();
+    resp = await fetchFn(input, initWithoutAuth);
+    if (resp.status !== 401) {
+      return resp;
+    }
+
+    const cleanRetryBody = await resp.text();
+    const cleanRetryWww = resp.headers.get("www-authenticate") ?? firstWwwAuth;
+    const recoveredToken = await recover401({
+      wwwAuthenticate: cleanRetryWww,
+      bodyText: cleanRetryBody || firstBodyText,
+      hadBearer: false,
+    });
+    const retryHeaders = { ...cleanHeaders, Authorization: `Bearer ${recoveredToken}` };
     resp = await fetchFn(input, { ...init, headers: retryHeaders });
     if (resp.status === 401) {
-      const retryText = await resp.text();
+      const finalBody = await resp.text();
       await recover401({
-        wwwAuthenticate: resp.headers.get("www-authenticate"),
-        bodyText: retryText,
+        wwwAuthenticate: resp.headers.get("www-authenticate") ?? cleanRetryWww,
+        bodyText: finalBody,
         hadBearer: false,
       });
+    } else if (resp.ok) {
+      doResetLoopGuard();
     }
+    return resp;
+  }
+
+  const freshToken = await recover401({
+    wwwAuthenticate: firstWwwAuth,
+    bodyText: firstBodyText,
+    hadBearer: false,
+  });
+  const retryHeaders = { ...cleanHeaders, Authorization: `Bearer ${freshToken}` };
+  resp = await fetchFn(input, { ...init, headers: retryHeaders });
+  if (resp.status === 401) {
+    const retryText = await resp.text();
+    await recover401({
+      wwwAuthenticate: resp.headers.get("www-authenticate") ?? firstWwwAuth,
+      bodyText: retryText,
+      hadBearer: false,
+    });
+  } else if (resp.ok) {
+    doResetLoopGuard();
   }
 
   return resp;

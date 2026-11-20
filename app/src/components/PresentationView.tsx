@@ -689,7 +689,7 @@ export default function PresentationView({
           if (j3d) {
             const hullPoints = ctxPoints.length >= 1 ? ctxPoints : (wQ ? [wQ] : []);
             if (hullPoints.length >= 1) j3d.setClusterHull(hullPoints, INK.gold);
-            if (wQ && ctxPoints.length) j3d.setContextLines(wQ, ctxPoints, [1.0, 0.8, 0.25, 0.7]);
+            if (wQ && ctxPoints.length) j3d.setContextLines(wQ, ctxPoints, [0.922, 0.796, 0.545, 0.72]);
           }
           flyCameraToPoints(j3d, wQ ? [wQ, ...ctxPoints] : ctxPoints, { minDist: 26, padFactor: 1.9, duration: 1400 });
         });
@@ -756,7 +756,7 @@ export default function PresentationView({
           cosmos.setHalos(halos);
           setPinDefs(citationPins);
           if (j3d) {
-            j3d.setTrail(trail, [1.0, 0.35, 0.65, 1.0]);
+            j3d.setTrail(trail, INK.violet);
             if (beamItems.length) j3d.setCitationBeams(beamItems);
           }
           flyCameraToPoints(j3d, citedPoints.length ? citedPoints : trail, { minDist: 26, padFactor: 2.0, duration: 1400 });
@@ -1164,8 +1164,8 @@ export default function PresentationView({
 function legendFor(id: string, t: Dict): { color: string; label: string }[] {
   const base = [
     { color: "#88C0D0", label: t.presLegendVector },
-    { color: "#EBCB8B", label: t.presLegendBm25 },
-    { color: "#A3BE8C", label: t.presLegendBoth },
+    { color: "#A3BE8C", label: t.presLegendBm25 },
+    { color: "#8FBCBB", label: t.presLegendBoth },
   ];
   switch (id) {
     case "embed":

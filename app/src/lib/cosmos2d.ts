@@ -37,8 +37,8 @@ interface Marker {
   color: RGBA;
 }
 
-const BG_DARK = "#181d26";
-const BG_LIGHT = "#e8edf4";
+const BG_DARK = "#0d121b";
+const BG_LIGHT = "#e7edf5";
 /** World-unit -> px factor for node rects. Tuned so base nodes are 1-2px at fit zoom. */
 const NODE_K = 0.06;
 /** Above this many edges, skip edges while a pan/zoom gesture is active. */
@@ -624,8 +624,10 @@ export class Cosmos2D implements CosmosLike {
     const h = c.clientHeight || 1;
     const isLight = this.theme === "light";
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    ctx.fillStyle = isLight ? BG_LIGHT : BG_DARK;
-    ctx.fillRect(0, 0, w, h);
+    // Clear transparently so the Nord Cosmos CSS radial aurora / glacial mist backdrop shines behind the canvas
+    void BG_LIGHT;
+    void BG_DARK;
+    ctx.clearRect(0, 0, w, h);
     if (this.n === 0) return;
 
     const base = this.edgeEnabled
@@ -635,10 +637,10 @@ export class Cosmos2D implements CosmosLike {
     const showEdges = base > 0.001 && !(this.interacting && this.edges.length > EDGE_INTERACTION_CUTOFF);
     if (showEdges && this.edges.length > 0) {
       const dim = highlights ? EDGE2D_DIM : 1;
-      const edgeMult = isLight ? 1.45 : 1;
+      const edgeMult = isLight ? 1.55 : 1.05;
       ctx.strokeStyle = isLight
-        ? `rgba(76,86,106,${Math.min(0.75, base * dim * edgeMult).toFixed(4)})`
-        : `rgba(136,192,208,${(base * dim).toFixed(4)})`;
+        ? `rgba(59,66,82,${Math.min(0.76, base * dim * edgeMult).toFixed(4)})`
+        : `rgba(129,161,193,${(base * dim * edgeMult).toFixed(4)})`;
       ctx.lineWidth = 1;
       ctx.beginPath();
       for (let k = 0; k < this.edges.length; k++) {
@@ -682,8 +684,8 @@ export class Cosmos2D implements CosmosLike {
 
     // Nodes, batched by fill color: one fillStyle per group, fillRect each.
     const groups = new Map<string, number[]>();
-    const dim = isLight ? "rgba(186,196,212,0.72)" : "rgba(46,52,64,0.88)";
-    const ghost = isLight ? "rgba(186,196,212,0.22)" : "rgba(59,66,82,0.22)";
+    const dim = isLight ? "rgba(180,192,210,0.68)" : "rgba(46,52,64,0.82)";
+    const ghost = isLight ? "rgba(180,192,210,0.22)" : "rgba(59,66,82,0.22)";
     const push = (color: string, i: number) => {
       const g = groups.get(color);
       if (g) g.push(i);
@@ -719,14 +721,14 @@ export class Cosmos2D implements CosmosLike {
       }
     }
 
-    // selection ring: thin animated halo around the selected star
+    // selection ring: thin animated Nord Frost halo around the selected star
     if (this.selIdx >= 0 && this.selIdx < this.n) {
       const x = (this.wx[this.selIdx] - this.cx) * this.scale + w / 2;
       const y = (this.wy[this.selIdx] - this.cy) * this.scale + h / 2;
       const t = (performance.now() % 2400) / 2400;
       const r = 10 + 2 * Math.sin((performance.now() / 1000) * 2.6);
       ctx.save();
-      ctx.strokeStyle = "rgba(125, 243, 255, 0.9)";
+      ctx.strokeStyle = isLight ? "rgba(15, 109, 140, 0.92)" : "rgba(136, 192, 208, 0.92)";
       ctx.lineWidth = 1.5;
       ctx.setLineDash([6, 5]);
       ctx.lineDashOffset = -t * 44;
@@ -736,7 +738,7 @@ export class Cosmos2D implements CosmosLike {
       ctx.restore();
     }
 
-    // Markers (query point, chunk hits): glowing-ish dot via layered circles + label.
+    // Markers (query point, chunk hits): glowing-ish dot via layered circles + Nord glass pill label.
     for (const m of this.markers.values()) {
       const [sx, sy] = this.toScreen(m.x, m.y);
       if (sx < -60 || sy < -60 || sx > w + 60 || sy > h + 60) continue;
@@ -753,23 +755,23 @@ export class Cosmos2D implements CosmosLike {
       ctx.beginPath();
       ctx.arc(sx, sy, r * 0.8, 0, Math.PI * 2);
       ctx.fill();
-      // label on a dark pill so it stays crisp over the starfield
+      // label on a Nord frost/polar pill so it stays crisp over the starfield
       if (!m.label.trim()) continue;
-      ctx.font = `${Math.max(10, Math.min(14, r + 4))}px system-ui, sans-serif`;
+      ctx.font = `600 ${Math.max(10, Math.min(13, r + 4))}px Inter, system-ui, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       const tw = ctx.measureText(m.label).width;
       const ly = sy - r - 10;
-      ctx.fillStyle = "rgba(3,4,12,0.78)";
+      ctx.fillStyle = isLight ? "rgba(242, 245, 250, 0.94)" : "rgba(13, 18, 27, 0.88)";
       ctx.beginPath();
-      ctx.roundRect(sx - tw / 2 - 5, ly - 8, tw + 10, 16, 8);
+      ctx.roundRect(sx - tw / 2 - 6, ly - 8, tw + 12, 16, 8);
       ctx.fill();
       ctx.strokeStyle = col;
-      ctx.globalAlpha = 0.55;
+      ctx.globalAlpha = 0.65;
       ctx.lineWidth = 1;
       ctx.stroke();
       ctx.globalAlpha = 1;
-      ctx.fillStyle = "#eef4ff";
+      ctx.fillStyle = isLight ? "#2e3440" : "#eceff4";
       ctx.fillText(m.label, sx, ly);
     }
   }
