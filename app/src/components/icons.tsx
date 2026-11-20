@@ -234,3 +234,105 @@ export function NodesIcon(p: IconProps) {
     </Base>
   );
 }
+
+export function ArrowLeftIcon(p: IconProps) {
+  return (
+    <Base {...p}>
+      <line x1="19" y1="12" x2="5" y2="12" />
+      <polyline points="11.5 5.5 5 12 11.5 18.5" />
+    </Base>
+  );
+}
+
+export function SunIcon(p: IconProps) {
+  return (
+    <Base {...p}>
+      <circle cx="12" cy="12" r="4.2" />
+      <path d="M12 2.5 v2.2 M12 19.3 v2.2 M4.2 12 H2 M22 12 h-2.2 M5.6 5.6 l1.6 1.6 M16.8 16.8 l1.6 1.6 M18.4 5.6 l-1.6 1.6 M7.2 16.8 l-1.6 1.6" />
+    </Base>
+  );
+}
+
+export function MoonIcon(p: IconProps) {
+  return (
+    <Base {...p}>
+      <path d="M20.4 14.5 A8.5 8.5 0 1 1 9.5 3.6 a6.8 6.8 0 0 0 10.9 10.9 Z" />
+    </Base>
+  );
+}
+
+export function InfoIcon(p: IconProps) {
+  return (
+    <Base {...p}>
+      <circle cx="12" cy="12" r="9" />
+      <line x1="12" y1="11" x2="12" y2="16.5" />
+      <circle cx="12" cy="7.8" r="0.6" fill="currentColor" />
+    </Base>
+  );
+}
+
+export function DatabaseIcon(p: IconProps) {
+  return (
+    <Base {...p}>
+      <ellipse cx="12" cy="5.5" rx="7.5" ry="2.8" />
+      <path d="M4.5 5.5 v6.5 c0 1.55 3.36 2.8 7.5 2.8 s7.5 -1.25 7.5 -2.8 V5.5" />
+      <path d="M4.5 12 v6.5 c0 1.55 3.36 2.8 7.5 2.8 s7.5 -1.25 7.5 -2.8 V12" />
+    </Base>
+  );
+}
+
+export function DialogScopeIcon(p: IconProps) {
+  return (
+    <Base {...p}>
+      <path d="M4 6.5 A2.5 2.5 0 0 1 6.5 4 h11 A2.5 2.5 0 0 1 20 6.5 v7 A2.5 2.5 0 0 1 17.5 16 H10 l-4.2 3.6 V16 H6.5 A2.5 2.5 0 0 1 4 13.5 Z" />
+      <line x1="8" y1="8.8" x2="16" y2="8.8" />
+      <line x1="8" y1="12" x2="13" y2="12" />
+    </Base>
+  );
+}
+
+export function DeptScopeIcon(p: IconProps) {
+  return (
+    <Base {...p}>
+      <rect x="3.5" y="3.5" width="7" height="7" rx="1.6" />
+      <rect x="13.5" y="3.5" width="7" height="7" rx="1.6" />
+      <rect x="3.5" y="13.5" width="7" height="7" rx="1.6" />
+      <rect x="13.5" y="13.5" width="7" height="7" rx="1.6" />
+    </Base>
+  );
+}
+
+export function KnotGateLogoMark({ size = 24, className }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 28 28"
+      className={className ?? "kg-logo-mark"}
+      fill="none"
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id="kg-nord-grad" x1="0" y1="0" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#88C0D0" />
+          <stop offset="52%" stopColor="#81A1C1" />
+          <stop offset="100%" stopColor="#B48EAD" />
+        </linearGradient>
+      </defs>
+      <rect x="1" y="1" width="26" height="26" rx="7.5" fill="url(#kg-nord-grad)" />
+      <rect x="1.5" y="1.5" width="25" height="25" rx="7" stroke="rgba(236, 239, 244, 0.36)" strokeWidth="1" />
+      <path
+        d="M9.5 9.5 L18.5 18.5 M18.5 9.5 L9.5 18.5 M14 7.5 V20.5"
+        stroke="#1E2430"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeOpacity="0.65"
+      />
+      <circle cx="14" cy="14" r="3.1" fill="#ECEFF4" stroke="#2E3440" strokeWidth="1.3" />
+      <circle cx="9.2" cy="9.2" r="2.1" fill="#ECEFF4" />
+      <circle cx="18.8" cy="9.2" r="2.1" fill="#ECEFF4" />
+      <circle cx="9.2" cy="18.8" r="2.1" fill="#ECEFF4" />
+      <circle cx="18.8" cy="18.8" r="2.1" fill="#ECEFF4" />
+    </svg>
+  );
+}

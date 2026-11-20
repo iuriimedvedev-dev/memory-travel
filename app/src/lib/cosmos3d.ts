@@ -40,7 +40,8 @@ import type { CosmosGraph } from "./types";
 
 export type { SelectedNode } from "./cosmos";
 
-const BG = 0x03040c;
+const BG_DARK = 0x181d26;
+const BG_LIGHT = 0xe8edf4;
 /** Spotlight dim factor: non-matching stars drop to ~20% brightness. */
 const SPOT_DIM = 0.18;
 
@@ -147,6 +148,7 @@ const POINT_VERT = /* glsl */ `
   uniform float uTime;    // seconds, for the gentle twinkle
   uniform float uFog;     // fog density (depth cue)
   uniform float uFogRef;  // reference distance (fit distance)
+  uniform float uLightMode; // 1.0 in Nord Light mode, 0.0 in Nord Dark
   varying vec3 vColor;
   varying float vAlpha;
   void main() {
@@ -157,14 +159,17 @@ const POINT_VERT = /* glsl */ `
     // …and slightly dimmer (exponential fog) — subtle depth cue
     float fog = exp(-uFog * (dist - uFogRef) / max(1.0, uFogRef));
     float tw = 0.92 + 0.08 * sin(uTime * (0.6 + aTwinkle * 1.7) + aTwinkle * 40.0);
-    vColor = aColor + vec3(1.0) * aSel * 0.35; // emissive push toward white
+    vColor = uLightMode > 0.5
+      ? mix(aColor, vec3(0.06, 0.43, 0.55), aSel * 0.72)
+      : aColor + vec3(1.0) * aSel * 0.35;
     vAlpha = aAlpha * tw * clamp(fog, 0.55, 1.0) * (1.0 + aSel * 0.9);
-    gl_PointSize = clamp(px, 1.0, 90.0);
+    gl_PointSize = clamp(px * (uLightMode > 0.5 ? 1.15 : 1.0), 1.2, 90.0);
     gl_Position = projectionMatrix * mv;
   }
 `;
 
 const POINT_FRAG = /* glsl */ `
+  uniform float uLightMode;
   varying vec3 vColor;
   varying float vAlpha;
   void main() {
@@ -173,11 +178,17 @@ const POINT_FRAG = /* glsl */ `
     if (d > 1.0) discard;                 // round sprite, never a square
     float core = smoothstep(0.42, 0.0, d);   // hot centre
     float halo = smoothstep(1.0, 0.3, d);    // soft radial falloff
-    // Small per-star contribution: with 47k stars the GLOW comes from
-    // additive overlap in dense clusters — vivid cores wash to white if
-    // each sprite contributes too much.
-    float a = (core * 0.28 + halo * 0.10) * vAlpha;
-    gl_FragColor = vec4(vColor * (0.72 + core * 0.55), a);
+    if (uLightMode > 0.5) {
+      float a = clamp((core * 0.88 + halo * 0.24) * vAlpha, 0.0, 0.96);
+      vec3 inkCol = vColor * mix(0.68, 0.44, core);
+      gl_FragColor = vec4(inkCol, a);
+    } else {
+      // Small per-star contribution: with 47k stars the GLOW comes from
+      // additive overlap in dense clusters — vivid cores wash to white if
+      // each sprite contributes too much.
+      float a = (core * 0.28 + halo * 0.10) * vAlpha;
+      gl_FragColor = vec4(vColor * (0.72 + core * 0.55), a);
+    }
   }
 `;
 
@@ -208,20 +219,25 @@ const EDGE_FRAG = /* glsl */ `
   uniform float uHovDim;  // unrelated-edge factor while hovered
   uniform float uSelBoost; // incident-edge boost while selected
   uniform float uHovBoost; // incident-edge boost while hovered
+  uniform float uLightMode; // 1.0 in Nord Light mode, 0.0 in Nord Dark
   varying vec3 vColor;
   varying float vRingA;
   varying float vFocus;
   varying float vHover;
   void main() {
-    // Selection weight; hover folded in multiplicatively so an inactive focus
-    // is exactly 1.0 (no residue). Both are per-vertex attributes — the dim /
-    // highlight is pure attribute math, still one draw call.
     float selW = mix(1.0, uSelDim + (uSelBoost - uSelDim) * vFocus, uFocus);
     float hovW = mix(1.0, uHovDim + (uHovBoost - uHovDim) * vHover, uHover);
     float w = min(selW * hovW, 1.35);
-    // focused/hovered edges glow: push colour toward white a touch
-    vec3 col = vColor * (1.0 + (vFocus * uFocus + vHover * uHover) * 0.6);
-    gl_FragColor = vec4(col, uOpacity * vRingA * w);
+    if (uLightMode > 0.5) {
+      float emph = clamp(vFocus * uFocus + vHover * uHover, 0.0, 1.0);
+      vec3 lCol = mix(vec3(0.30, 0.36, 0.46), vec3(0.06, 0.43, 0.55), emph);
+      float lAlpha = clamp(uOpacity * 2.2 * vRingA * w, 0.0, 0.82);
+      gl_FragColor = vec4(lCol, lAlpha);
+    } else {
+      // focused/hovered edges glow: push colour toward white a touch
+      vec3 col = vColor * (1.0 + (vFocus * uFocus + vHover * uHover) * 0.6);
+      gl_FragColor = vec4(col, uOpacity * vRingA * w);
+    }
   }
 `;
 
@@ -301,6 +317,8 @@ export class Cosmos3D implements CosmosLike, Journey3D {
   private controls: OrbitControls | null = null;
   private ro: ResizeObserver | null = null;
   private dpr = 1;
+  private theme: "dark" | "light" =
+    typeof document !== "undefined" && document.documentElement.dataset.theme === "light" ? "light" : "dark";
 
   // graph data
   private n = 0;
@@ -431,7 +449,7 @@ export class Cosmos3D implements CosmosLike, Journey3D {
     // points; 1.5 keeps real-GPU sharpness while staying fast in software.
     this.dpr = Math.min(1.5, window.devicePixelRatio || 1);
     renderer.setPixelRatio(this.dpr);
-    renderer.setClearColor(BG, 1);
+    renderer.setClearColor(this.theme === "light" ? BG_LIGHT : BG_DARK, 1);
     this.camera = new THREE.PerspectiveCamera(55, 1, 0.1, 4000);
     this.camera.position.set(0, 90, this.fitDist);
     const controls = new OrbitControls(this.camera, canvas);
@@ -478,14 +496,71 @@ export class Cosmos3D implements CosmosLike, Journey3D {
     canvas.style.cursor = "grab";
   }
 
-  /** Load the graph at 3D positions. Same role as the old Cosmos.load. */
+  private blendMode(): THREE.Blending {
+    return this.theme === "light" ? THREE.NormalBlending : THREE.AdditiveBlending;
+  }
+
+  setTheme(theme: "dark" | "light"): void {
+    this.theme = theme;
+    const isLight = theme === "light";
+    if (this.renderer) {
+      this.renderer.setClearColor(isLight ? BG_LIGHT : BG_DARK, 1);
+    }
+    const blend = this.blendMode();
+    if (this.ptsMat) {
+      this.ptsMat.uniforms.uLightMode.value = isLight ? 1.0 : 0.0;
+      this.ptsMat.blending = blend;
+      this.ptsMat.needsUpdate = true;
+    }
+    if (this.edgeMat) {
+      this.edgeMat.uniforms.uLightMode.value = isLight ? 1.0 : 0.0;
+      this.edgeMat.blending = blend;
+      this.edgeMat.needsUpdate = true;
+    }
+    if (this.selRing) {
+      const m = this.selRing.material as THREE.MeshBasicMaterial;
+      m.color.setHex(isLight ? 0x0f6d8c : 0x88c0d0);
+      m.blending = blend;
+      m.needsUpdate = true;
+    }
+    for (const h of this.halos) {
+      const m = h.mesh.material as THREE.MeshBasicMaterial;
+      m.blending = blend;
+      m.needsUpdate = true;
+    }
+    for (const m of this.markers.values()) {
+      if (m.mat.uniforms.uLightMode) m.mat.uniforms.uLightMode.value = isLight ? 1.0 : 0.0;
+      m.mat.blending = blend;
+      m.mat.needsUpdate = true;
+    }
+    if (this.colAttr && this.types.length === this.n && this.n > 0) {
+      for (let i = 0; i < this.n; i++) {
+        const c = hexToRGBA(colorForType(this.types[i], theme));
+        this.baseCol[i * 3] = c[0];
+        this.baseCol[i * 3 + 1] = c[1];
+        this.baseCol[i * 3 + 2] = c[2];
+        const painted = this.paints.get(i);
+        if (!painted) {
+          this.colAttr.setXYZ(i, c[0], c[1], c[2]);
+        }
+      }
+      this.colAttr.needsUpdate = true;
+    }
+  }
+
+  /** Load the graph at 3D positions. Clears any previous scope's geometry first. */
   async load(
     graph: CosmosGraph,
     posByIdx: (XYZ | null)[],
     onProgress?: (done: number, total: number) => void,
   ): Promise<void> {
     if (!this.renderer) throw new Error("cosmos3d not initialised");
+    this.clear();
     const n = graph.nodes.length;
+    if (n === 0) {
+      onProgress?.(0, 0);
+      return;
+    }
     this.n = n;
     this.names = graph.nodes.map((nd) => nd.id);
     this.types = graph.nodes.map((nd) => nd.t);
@@ -515,7 +590,7 @@ export class Cosmos3D implements CosmosLike, Journey3D {
         this.pos[i * 3 + 2] = r * Math.cos(ph) * 0.6;
       }
       // colour IS the entity family (legend parity)
-      const c = hexToRGBA(colorForType(nd.t));
+      const c = hexToRGBA(colorForType(nd.t, this.theme));
       colors[i * 3] = c[0];
       colors[i * 3 + 1] = c[1];
       colors[i * 3 + 2] = c[2];
@@ -556,10 +631,11 @@ export class Cosmos3D implements CosmosLike, Journey3D {
         uTime: { value: 0 },
         uFog: { value: 0.4 },
         uFogRef: { value: this.fitDist },
+        uLightMode: { value: this.theme === "light" ? 1.0 : 0.0 },
       },
       transparent: true,
       depthWrite: false,
-      blending: THREE.AdditiveBlending,
+      blending: this.blendMode(),
     });
     this.points = new THREE.Points(geo, this.ptsMat);
     this.points.frustumCulled = false; // all 47k visible, skip the bounds check
@@ -616,10 +692,11 @@ export class Cosmos3D implements CosmosLike, Journey3D {
           uHovDim: { value: EDGE_HOV_DIM },
           uSelBoost: { value: EDGE_SEL_BOOST },
           uHovBoost: { value: EDGE_HOV_BOOST },
+          uLightMode: { value: this.theme === "light" ? 1.0 : 0.0 },
         },
         transparent: true,
         depthWrite: false,
-        blending: THREE.AdditiveBlending,
+        blending: this.blendMode(),
       });
       this.edgeOpacity = this.edgeEnabled ? this.edgeFixed : 0;
       this.focusIdx = -1;
@@ -687,6 +764,10 @@ export class Cosmos3D implements CosmosLike, Journey3D {
     this.clearHalos();
     this.clearContextLines();
     this.clearTrail();
+    this.clearQueryBeacon();
+    this.clearGraphWalkEdges();
+    this.clearClusterHull();
+    this.clearCitationBeams();
   }
 
   setHiddenTypes(types: Set<string>): void {
@@ -715,11 +796,12 @@ export class Cosmos3D implements CosmosLike, Journey3D {
         uTime: { value: 0 },
         uFog: { value: 0 },
         uFogRef: { value: this.fitDist },
+        uLightMode: { value: this.theme === "light" ? 1.0 : 0.0 },
         uPulse: { value: 0 },
       },
       transparent: true,
       depthWrite: false,
-      blending: THREE.AdditiveBlending,
+      blending: this.blendMode(),
     });
     const obj = new THREE.Points(g, mat);
     obj.frustumCulled = false;
@@ -1337,10 +1419,10 @@ export class Cosmos3D implements CosmosLike, Journey3D {
     // thin judged-on-screen annulus: thickness is a fraction of the radius
     const g = new THREE.RingGeometry(0.8, 1.0, 64);
     const m = new THREE.MeshBasicMaterial({
-      color: new THREE.Color(0.49, 0.95, 1.0),
+      color: new THREE.Color(this.theme === "light" ? 0x0f6d8c : 0x88c0d0),
       transparent: true,
       opacity: 0.85,
-      blending: THREE.AdditiveBlending,
+      blending: this.blendMode(),
       side: THREE.DoubleSide,
       depthWrite: false,
       depthTest: false,
@@ -1387,7 +1469,7 @@ export class Cosmos3D implements CosmosLike, Journey3D {
         color: new THREE.Color(col[0], col[1], col[2]),
         transparent: true,
         opacity: 0.85,
-        blending: THREE.AdditiveBlending,
+        blending: this.blendMode(),
         side: THREE.DoubleSide,
         depthWrite: false,
         depthTest: false,

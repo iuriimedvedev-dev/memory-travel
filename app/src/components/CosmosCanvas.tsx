@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef } from "react";
 import { Cosmos3D, type SelectedNode } from "../lib/cosmos3d";
 import { Cosmos2D, type AnyCosmos } from "../lib/cosmos2d";
+import { getTheme, subscribeTheme } from "../lib/theme";
 
 export type RenderMode = "webgl2" | "canvas2d";
 
@@ -37,8 +38,12 @@ function CosmosCanvas({ onCosmos, onSelect, onHover, onError, onMode, label }: P
   useEffect(() => {
     let dead = false;
     let renderer: AnyCosmos | null = null;
+    const unsubTheme = subscribeTheme(() => {
+      renderer?.setTheme?.(getTheme());
+    });
     const wire = (r: AnyCosmos) => {
       renderer = r;
+      r.setTheme?.(getTheme());
       r.onSelect = (s) => selectRef.current(s);
       r.onHover = (s) => hoverRef.current(s);
     };
@@ -49,6 +54,7 @@ function CosmosCanvas({ onCosmos, onSelect, onHover, onError, onMode, label }: P
       try {
         wire(c3d);
         await c3d.init(canvas);
+        c3d.setTheme(getTheme());
         if (!dead) {
           modeRef.current?.("webgl2");
           cbRef.current(c3d);
@@ -66,6 +72,7 @@ function CosmosCanvas({ onCosmos, onSelect, onHover, onError, onMode, label }: P
       try {
         wire(fallback);
         await fallback.init(canvas);
+        fallback.setTheme(getTheme());
         if (!dead) {
           modeRef.current?.("canvas2d");
           cbRef.current(fallback);
@@ -81,6 +88,7 @@ function CosmosCanvas({ onCosmos, onSelect, onHover, onError, onMode, label }: P
     })();
     return () => {
       dead = true;
+      unsubTheme();
       cbRef.current(null);
       try {
         renderer?.destroy();

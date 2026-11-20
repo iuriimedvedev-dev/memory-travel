@@ -16,15 +16,17 @@
 import {
   OAuthLoopGuardError,
   OAuthRedirectInProgressError,
+  fetchWithOAuth,
   getBridgeAccessToken,
   isOAuthRedirectInProgress,
   recoverFromBridge401,
-} from "./oauth";
+} from "./oauth.ts";
+import { DEFAULT_PROJECT_ID } from "./projects.ts";
 
 declare const __MEMORY_BRIDGE_URL__: string;
 export const BRIDGE_DIRECT_URL =
   typeof __MEMORY_BRIDGE_URL__ === "string" ? __MEMORY_BRIDGE_URL__ : "";
-const API_BASE = (import.meta.env.BASE_URL ?? "").replace(/\/+$/, "");
+const API_BASE = (import.meta.env?.BASE_URL ?? "").replace(/\/+$/, "");
 export const BRIDGE_PROXY_PATH = `${API_BASE}/api/memory`;
 
 /** Ordered bridge proxy/direct endpoints for both `/memory` and `/travel` mounts. */
@@ -97,46 +99,22 @@ export function unwrapBody(body: string): unknown {
   return JSON.parse(chunks.join("\n"));
 }
 
-async function postJSON(url: string, payload: unknown, headers: Record<string, string>, signal: AbortSignal) {
-  const initialToken = await getBridgeAccessToken();
-  const reqHeaders: Record<string, string> = { ...headers };
-  if (initialToken && !reqHeaders["Authorization"]) {
-    reqHeaders["Authorization"] = `Bearer ${initialToken}`;
-  }
-  let r = await fetch(url, {
+async function postJSON(
+  url: string,
+  payload: unknown,
+  headers: Record<string, string>,
+  signal: AbortSignal,
+  oauthFetch: (input: string, init?: RequestInit) => Promise<Response> = (input, init) => fetchWithOAuth(input, init),
+) {
+  void getBridgeAccessToken;
+  void recoverFromBridge401;
+  const r = await oauthFetch(url, {
     method: "POST",
-    headers: reqHeaders,
+    headers,
     body: JSON.stringify(payload),
     signal,
   });
-  let text = await r.text();
-
-  if (r.status === 401) {
-    const freshToken = await recoverFromBridge401({
-      wwwAuthenticate: r.headers.get("www-authenticate"),
-      bodyText: text,
-      hadBearer: Boolean(initialToken),
-    });
-    const retryHeaders: Record<string, string> = {
-      ...headers,
-      Authorization: `Bearer ${freshToken}`,
-    };
-    r = await fetch(url, {
-      method: "POST",
-      headers: retryHeaders,
-      body: JSON.stringify(payload),
-      signal,
-    });
-    text = await r.text();
-    if (r.status === 401) {
-      await recoverFromBridge401({
-        wwwAuthenticate: r.headers.get("www-authenticate"),
-        bodyText: text,
-        hadBearer: false,
-      });
-    }
-  }
-
+  const text = await r.text();
   const sid = r.headers.get("mcp-session-id");
   if (!r.ok && r.status !== 202) {
     throw new Error(`bridge HTTP ${r.status} at ${url}: ${text.slice(0, 200)}`);
@@ -144,7 +122,13 @@ async function postJSON(url: string, payload: unknown, headers: Record<string, s
   return { sid, text };
 }
 
-async function recallVia(question: string, url: string, signal: AbortSignal): Promise<LiveRecall> {
+async function recallVia(
+  question: string,
+  url: string,
+  signal: AbortSignal,
+  projectId: string = DEFAULT_PROJECT_ID,
+  oauthFetch?: (input: string, init?: RequestInit) => Promise<Response>,
+): Promise<LiveRecall> {
   const t0 = performance.now();
   // 1. initialize
   const init = await postJSON(
@@ -153,40 +137,42 @@ async function recallVia(question: string, url: string, signal: AbortSignal): Pr
       jsonrpc: "2.0",
       id: 1,
       method: "initialize",
-      params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "memory-travel", version: "1.0" } },
+      params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "knotgate-memory", version: "1.0" } },
     },
     { ...JSON_HEADERS },
     signal,
+    oauthFetch,
   );
   const session = init.sid;
   if (!session) throw new Error(`bridge at ${url} omitted the mcp-session-id header on initialize`);
   const h = { ...JSON_HEADERS, "mcp-session-id": session };
   // 2. notifications/initialized (a notification: 202/empty is fine)
   try {
-    await postJSON(url, { jsonrpc: "2.0", method: "notifications/initialized" }, h, signal);
+    await postJSON(url, { jsonrpc: "2.0", method: "notifications/initialized" }, h, signal, oauthFetch);
   } catch (e) {
     // Some transports 4xx notifications while sessions still work; keep going
     // only on HTTP errors, not on aborts / network death.
     if (e instanceof DOMException && e.name === "AbortError") throw e;
+    if (e instanceof OAuthRedirectInProgressError || e instanceof OAuthLoopGuardError) throw e;
     if (e instanceof TypeError) throw e;
   }
-  // 3. tools/call memory_recall (context_only: the service returns context,
-  //    the app renders an extractive preview like the fixtures do).
-  //    Keywords are required for graph-aware retrieval (see keywordsFor).
+  // 3. tools/call memory_recall scoped to `projectId`
   const kws = keywordsFor(question);
   const args = {
     question,
     ll_keywords: kws,
     hl_keywords: kws.slice(0, 3),
     mode: "hybrid",
-    context_only: true,
     top_k: 10,
+    context_only: false,
+    project: (projectId || DEFAULT_PROJECT_ID).trim(),
   };
   const call = await postJSON(
     url,
     { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "memory_recall", arguments: args } },
     h,
     signal,
+    oauthFetch,
   );
   const rpc = unwrapBody(call.text) as {
     result?: { content?: { text?: string }[] };
@@ -198,14 +184,26 @@ async function recallVia(question: string, url: string, signal: AbortSignal): Pr
   return { result: JSON.parse(text) as Record<string, unknown>, clientLatencyS: (performance.now() - t0) / 1000, endpoint: url };
 }
 
+export interface MemoryRecallOptions {
+  signal?: AbortSignal;
+  timeoutMs?: number;
+  project?: string;
+  urls?: string[];
+  oauthFetch?: (input: string, init?: RequestInit) => Promise<Response>;
+}
+
 /**
- * Ask the live bridge. Tries the dev proxy first, then the direct URL.
- * Aborts (timeout or caller signal) reject with a DOMException AbortError.
+ * Ask the live bridge for `projectId`. Tries same-origin `/memory/api/memory` proxy first.
+ * Supports both `memoryRecallLive(question, projectId, opts)` and `memoryRecallLive(question, opts)`.
  */
 export async function memoryRecallLive(
   question: string,
-  opts: { signal?: AbortSignal; timeoutMs?: number } = {},
+  projectIdOrOpts: string | MemoryRecallOptions = DEFAULT_PROJECT_ID,
+  maybeOpts: MemoryRecallOptions = {},
 ): Promise<LiveRecall> {
+  const opts: MemoryRecallOptions = typeof projectIdOrOpts === "string" ? maybeOpts : projectIdOrOpts;
+  const projectId =
+    typeof projectIdOrOpts === "string" ? projectIdOrOpts : (opts.project ?? DEFAULT_PROJECT_ID);
   const q = question.trim();
   if (!q) throw new Error("empty question");
   if (q.length > MAX_QUESTION_CHARS) throw new Error(`question too long (${q.length} > ${MAX_QUESTION_CHARS} chars)`);
@@ -221,10 +219,10 @@ export async function memoryRecallLive(
   }
   try {
     const failures: string[] = [];
-    const urls = bridgeUrls();
+    const urls = opts.urls ?? bridgeUrls();
     for (const url of urls) {
       try {
-        return await recallVia(q, url, ctrl.signal);
+        return await recallVia(q, url, ctrl.signal, projectId, opts.oauthFetch);
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") throw e;
         if (e instanceof OAuthRedirectInProgressError || e instanceof OAuthLoopGuardError || isOAuthRedirectInProgress()) {
@@ -309,18 +307,31 @@ export function bridgeInfoFromStatus(s: Record<string, unknown>, endpoint: strin
   };
 }
 
+export interface MemoryStatusOptions {
+  timeoutMs?: number;
+  project?: string;
+  urls?: string[];
+  oauthFetch?: (input: string, init?: RequestInit) => Promise<Response>;
+}
+
 /**
- * Ask the bridge for its identity via the `memory_status` tool (same transport
- * as memoryRecallLive: proxy first, then direct). Throws one readable Error
- * when no endpoint answers — the caller renders the offline/fixtures state.
+ * Ask the bridge for its identity via the `memory_status` tool for `projectId`.
+ * Supports both `memoryStatusLive(projectId, opts)` and `memoryStatusLive(opts)`.
  */
-export async function memoryStatusLive(opts: { timeoutMs?: number } = {}): Promise<BridgeInfo> {
+export async function memoryStatusLive(
+  projectIdOrOpts: string | MemoryStatusOptions = DEFAULT_PROJECT_ID,
+  maybeOpts: MemoryStatusOptions = {},
+): Promise<BridgeInfo> {
+  const opts: MemoryStatusOptions = typeof projectIdOrOpts === "string" ? maybeOpts : projectIdOrOpts;
+  const projectId = (
+    typeof projectIdOrOpts === "string" ? projectIdOrOpts : (opts.project ?? DEFAULT_PROJECT_ID)
+  ).trim() || DEFAULT_PROJECT_ID;
   const timeoutMs = opts.timeoutMs ?? 15_000;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(new DOMException(`memory bridge timed out after ${timeoutMs / 1000}s`, "AbortError")), timeoutMs);
   try {
     const failures: string[] = [];
-    const urls = bridgeUrls();
+    const urls = opts.urls ?? bridgeUrls();
     for (const url of urls) {
       try {
         const init = await postJSON(
@@ -329,16 +340,17 @@ export async function memoryStatusLive(opts: { timeoutMs?: number } = {}): Promi
             jsonrpc: "2.0",
             id: 1,
             method: "initialize",
-            params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "memory-travel", version: "1.0" } },
+            params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "knotgate-memory", version: "1.0" } },
           },
           { ...JSON_HEADERS },
           ctrl.signal,
+          opts.oauthFetch,
         );
         const session = init.sid;
         if (!session) throw new Error(`bridge at ${url} omitted the mcp-session-id header on initialize`);
         const h = { ...JSON_HEADERS, "mcp-session-id": session };
         try {
-          await postJSON(url, { jsonrpc: "2.0", method: "notifications/initialized" }, h, ctrl.signal);
+          await postJSON(url, { jsonrpc: "2.0", method: "notifications/initialized" }, h, ctrl.signal, opts.oauthFetch);
         } catch (e) {
           if (e instanceof DOMException && e.name === "AbortError") throw e;
           if (e instanceof OAuthRedirectInProgressError || e instanceof OAuthLoopGuardError) throw e;
@@ -346,9 +358,15 @@ export async function memoryStatusLive(opts: { timeoutMs?: number } = {}): Promi
         }
         const call = await postJSON(
           url,
-          { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "memory_status", arguments: {} } },
+          {
+            jsonrpc: "2.0",
+            id: 2,
+            method: "tools/call",
+            params: { name: "memory_status", arguments: { project: projectId } },
+          },
           h,
           ctrl.signal,
+          opts.oauthFetch,
         );
         const rpc = unwrapBody(call.text) as {
           result?: { content?: { text?: string }[]; isError?: boolean };
@@ -671,18 +689,26 @@ export const CANONICAL_QUESTION = "How does HARS memory combine vector and graph
 export const CANONICAL_KEYWORDS = ["hars", "memory", "vector", "graph", "retrieval"];
 
 /**
- * Fetch a complete JSON trace for a question via GET /trace?format=json.
- * Uses traceBases() (same-origin /travel/api/trace proxy, /api/trace, direct URL, localhost).
+ * Fetch a complete JSON trace for a question via GET /trace?project=...&format=json.
+ * Uses traceBases() (`/memory/api/trace`, `/travel/api/trace`, `/api/trace`, direct URL, localhost).
  */
 export async function fetchLiveTraceJson(
   question = CANONICAL_QUESTION,
-  opts: { keywords?: string[]; signal?: AbortSignal; timeoutMs?: number } = {},
+  opts: {
+    keywords?: string[];
+    signal?: AbortSignal;
+    timeoutMs?: number;
+    project?: string;
+    bases?: string[];
+    oauthFetch?: (input: string, init?: RequestInit) => Promise<Response>;
+  } = {},
 ): Promise<{ result: Record<string, unknown>; events: TraceEvent[]; clientLatencyS: number }> {
   const timeoutMs = opts.timeoutMs ?? 15_000;
+  const projectId = (opts.project ?? DEFAULT_PROJECT_ID).trim() || DEFAULT_PROJECT_ID;
   const kws = opts.keywords ?? (question === CANONICAL_QUESTION ? CANONICAL_KEYWORDS : keywordsFor(question));
   const q = encodeURIComponent(question.trim());
   const query =
-    `question=${q}&mode=hybrid&top_k=6&format=json` +
+    `project=${encodeURIComponent(projectId)}&question=${q}&mode=hybrid&top_k=6&format=json` +
     `&ll_keywords=${encodeURIComponent(kws.join(","))}` +
     `&hl_keywords=${encodeURIComponent(kws.slice(0, 3).join(","))}`;
 
@@ -697,14 +723,13 @@ export async function fetchLiveTraceJson(
     opts.signal.addEventListener("abort", () => ctrl.abort(opts.signal!.reason), { once: true });
   }
 
+  const oauthFetch = opts.oauthFetch ?? ((input: string, init?: RequestInit) => fetchWithOAuth(input, init));
   try {
     const failures: string[] = [];
-    const token = await getBridgeAccessToken();
-    const traceHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-    for (const base of traceBases()) {
+    for (const base of opts.bases ?? traceBases()) {
       try {
         const url = `${base}/trace?${query}`;
-        const r = await fetch(url, { headers: traceHeaders, signal: ctrl.signal });
+        const r = await oauthFetch(url, { headers: { Accept: "application/json" }, signal: ctrl.signal });
         if (!r.ok) {
           failures.push(`${url}: HTTP ${r.status}`);
           continue;
@@ -730,6 +755,9 @@ export async function fetchLiveTraceJson(
         };
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") throw e;
+        if (e instanceof OAuthRedirectInProgressError || e instanceof OAuthLoopGuardError || isOAuthRedirectInProgress()) {
+          throw e;
+        }
         failures.push(`${base}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
@@ -799,28 +827,44 @@ function normalizeTraceResult(data: Record<string, unknown>): Record<string, unk
   return null;
 }
 
+export interface StreamTraceOptions {
+  signal?: AbortSignal;
+  firstFrameMs?: number;
+  gapMs?: number;
+  timeoutMs?: number;
+  project?: string;
+  bases?: string[];
+  oauthFetch?: (input: string, init?: RequestInit) => Promise<Response>;
+}
+
 /**
- * Stream a recall trace. Returns the final `memory_recall` JSON when the
- * endpoint yields one; `null` when the endpoint is absent/incomplete so the
- * caller falls back to the one-shot path. Stage frames are pushed to
- * `onEvent` as they arrive. Aborts only on the caller's signal (or timeout).
+ * Stream a recall trace scoped to `projectId`. Returns the final `memory_recall`
+ * JSON when the endpoint yields one; `null` when the endpoint is absent/incomplete
+ * so the caller falls back to the one-shot path.
  */
 export async function streamRecallTrace(
   question: string,
   onEvent: (ev: TraceEvent) => void,
-  opts: { signal?: AbortSignal; firstFrameMs?: number; gapMs?: number; timeoutMs?: number } = {},
+  optsOrProjectId: StreamTraceOptions | string = {},
+  maybeProjectId?: string,
 ): Promise<Record<string, unknown> | null> {
+  const opts: StreamTraceOptions = typeof optsOrProjectId === "string" ? {} : optsOrProjectId;
+  const projectId = (
+    typeof optsOrProjectId === "string"
+      ? optsOrProjectId
+      : (maybeProjectId ?? opts.project ?? DEFAULT_PROJECT_ID)
+  ).trim() || DEFAULT_PROJECT_ID;
   const firstFrameMs = opts.firstFrameMs ?? 5000;
   const gapMs = opts.gapMs ?? 20000;
   const timeoutMs = opts.timeoutMs ?? LIVE_TIMEOUT_MS;
   const q = encodeURIComponent(question.trim());
   const kws = keywordsFor(question);
   const query =
-    `question=${q}&context_only=true&mode=hybrid&top_k=10` +
+    `project=${encodeURIComponent(projectId)}&question=${q}&context_only=false&mode=hybrid&top_k=10` +
     `&ll_keywords=${encodeURIComponent(kws.join(","))}` +
     `&hl_keywords=${encodeURIComponent(kws.slice(0, 3).join(","))}`;
-  const token = await getBridgeAccessToken();
-  for (const base of traceBases()) {
+  const oauthFetch = opts.oauthFetch ?? ((input: string, init?: RequestInit) => fetchWithOAuth(input, init));
+  for (const base of opts.bases ?? traceBases()) {
     const ctrl = new AbortController();
     const forward = () => ctrl.abort(opts.signal?.reason as Error | undefined);
     if (opts.signal) {
@@ -828,10 +872,8 @@ export async function streamRecallTrace(
       opts.signal.addEventListener("abort", forward, { once: true });
     }
     try {
-      const headers: Record<string, string> = { Accept: "text/event-stream" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-      const r = await fetch(`${base}/trace?${query}`, {
-        headers,
+      const r = await oauthFetch(`${base}/trace?${query}`, {
+        headers: { Accept: "text/event-stream" },
         signal: ctrl.signal,
       });
       if (!r.ok || !r.body) continue;
@@ -866,6 +908,9 @@ export async function streamRecallTrace(
       if (result) return result;
       if (sawFrame) return null; // streamed stages but no final result -> one-shot
     } catch (e) {
+      if (e instanceof OAuthRedirectInProgressError || e instanceof OAuthLoopGuardError || isOAuthRedirectInProgress()) {
+        throw e;
+      }
       if (opts.signal?.aborted) throw opts.signal.reason ?? e;
     } finally {
       opts.signal?.removeEventListener("abort", forward);

@@ -11,7 +11,12 @@ import './presentation-layout.css'
 import './ui-scale.css'
 import App from './App.tsx'
 import { ensureOAuthCallbackHandled } from './lib/oauth'
+import { initTheme } from './lib/theme'
 import { initUiScale } from './lib/uiScale'
+
+// Sync shared KnotGate theme (`knotgate:theme`) before first paint so switching
+// between `/chat`, `/home`, and `/memory` never flashes an inverted background.
+initTheme()
 
 // Resolve and apply the UI scale (saved preference, else the big-screen default
 // for this viewport) BEFORE the first paint, so a 4K screen never flashes the

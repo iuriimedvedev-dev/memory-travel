@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { CosmosGraph } from "../lib/types";
 import type { AnyCosmos } from "../lib/cosmos2d";
 import { INK } from "../lib/cosmos";
-import { FAMILY_COLORS, FAMILY_LABEL, LEGEND_ORDER, colorForType, familyOf } from "../lib/palette";
+import { FAMILY_COLORS, FAMILY_COLORS_LIGHT, FAMILY_LABEL, LEGEND_ORDER, colorForType, familyOf } from "../lib/palette";
+import { useTheme } from "../lib/theme";
 import { fmt } from "../i18n/strings";
 import { useI18n } from "../i18n/useI18n";
 import type { ConnState } from "../lib/live";
@@ -43,6 +44,8 @@ function readEdgesPref(): boolean {
 
 export default function CosmosView({ cosmos, graph, names, loading, focusNode, mode, conn }: Props) {
   const { t } = useI18n();
+  const { theme } = useTheme();
+  const familyPalette = theme === "light" ? FAMILY_COLORS_LIGHT : FAMILY_COLORS;
   const [q, setQ] = useState("");
   const [hi, setHi] = useState(0);
   const [sel, setSel] = useState<number | null>(null);
@@ -237,7 +240,7 @@ export default function CosmosView({ cosmos, graph, names, loading, focusNode, m
         <div className="hovertip" style={{ left: hover.x + 14, top: hover.y + 14 }}>
           <b>{hover.name}</b>
           <span className="tipsub">
-            <i className="swatch" style={{ background: colorForType(hover.type) }} />
+            <i className="swatch" style={{ background: colorForType(hover.type, theme) }} />
             {hover.type} · {hover.deg} {t.linksWord}
           </span>
         </div>
@@ -339,7 +342,7 @@ export default function CosmosView({ cosmos, graph, names, loading, focusNode, m
                     onMouseEnter={() => setHi(ri)}
                     onClick={() => select(i)}
                   >
-                    <i className="swatch" style={{ background: colorForType(graph!.nodes[i].t) }} />
+                    <i className="swatch" style={{ background: colorForType(graph!.nodes[i].t, theme) }} />
                     <b>
                       {at >= 0 ? (
                         <>
@@ -362,7 +365,7 @@ export default function CosmosView({ cosmos, graph, names, loading, focusNode, m
         {node && (
           <div className="nodecard">
             <div className="cardhead">
-              <i className="swatch big" style={{ background: colorForType(node.t) }} />
+              <i className="swatch big" style={{ background: colorForType(node.t, theme) }} />
               <h3>{node.id}</h3>
               <button className="ghostbtn" onClick={() => select(null)} title={t.inspectClose}>
                 <XIcon size={11} />
@@ -418,7 +421,7 @@ export default function CosmosView({ cosmos, graph, names, loading, focusNode, m
                   onClick={() => toggleFamily(family)}
                   title={hidden.has(family) ? t.legendShowFamily : t.legendHideFamily}
                 >
-                  <i className="swatch" style={{ background: FAMILY_COLORS[family] }} />
+                  <i className="swatch" style={{ background: familyPalette[family] }} />
                   <span className="leglabel">{FAMILY_LABEL[family] ?? family}</span>
                   <span className="dim legcount">{count.toLocaleString("en-US")}</span>
                 </button>
@@ -459,6 +462,7 @@ function SelectionTooltip({
   onClose: () => void;
 }) {
   const { t } = useI18n();
+  const { theme } = useTheme();
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   useEffect(() => {
     if (sel === null) {
@@ -496,7 +500,7 @@ function SelectionTooltip({
       }}
     >
       <div className="seltiprow">
-        <i className="swatch" style={{ background: colorForType(node.t) }} />
+        <i className="swatch" style={{ background: colorForType(node.t, theme) }} />
         <span>{node.t}</span>
         <span className="dim">· {node.deg === 1 ? t.degreeLinks1 : fmt(t.degreeLinksN, { n: node.deg })}</span>
       </div>

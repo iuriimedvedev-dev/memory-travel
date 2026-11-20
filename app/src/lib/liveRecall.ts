@@ -22,6 +22,7 @@ import {
   streamRecallTrace,
   type RecallStep,
 } from "./live";
+import { DEFAULT_PROJECT_ID } from "./projects";
 import type { TravelTrace } from "./types";
 
 /** Fallback question when the presenter has not asked anything yet. */
@@ -38,6 +39,7 @@ export interface LiveRecallRun {
 
 export interface LiveRecallOpts {
   signal?: AbortSignal;
+  project?: string;
   /** Called on every streamed frame with the updated step rows. */
   onSteps?: (steps: RecallStep[]) => void;
 }
@@ -63,6 +65,7 @@ export async function runLiveRecall(
 ): Promise<LiveRecallRun> {
   const q = question.trim();
   if (!q) throw new Error("empty question");
+  const projectId = opts.project ?? (data.source === "live" ? data.projectId : DEFAULT_PROJECT_ID);
   const aux = compileAux(data);
   const kws = keywordsFor(q);
 
@@ -81,7 +84,8 @@ export async function runLiveRecall(
           steps = applyTraceEvent(steps, ev);
           opts.onSteps?.(steps);
         },
-        { signal: opts.signal },
+        { signal: opts.signal, project: projectId },
+        projectId,
       );
       if (result) {
         viaStream = true;
@@ -94,7 +98,7 @@ export async function runLiveRecall(
   }
 
   if (!result) {
-    const one = await memoryRecallLive(q, { signal: opts.signal });
+    const one = await memoryRecallLive(q, projectId, { signal: opts.signal });
     result = one.result;
     clientLatencyS = one.clientLatencyS;
     endpoint = one.endpoint;

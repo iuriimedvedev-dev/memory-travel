@@ -712,3 +712,73 @@ export async function recoverFromBridge401(opts: {
   }
   return inflightRedirectPromise;
 }
+
+function mergeBearerHeader(initHeaders: HeadersInit | undefined, bearerToken: string | null): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (initHeaders) {
+    if (initHeaders instanceof Headers) {
+      initHeaders.forEach((v, k) => {
+        out[k] = v;
+      });
+    } else if (Array.isArray(initHeaders)) {
+      for (const [k, v] of initHeaders) out[k] = v;
+    } else {
+      Object.assign(out, initHeaders);
+    }
+  }
+  const hasAuth = Object.keys(out).some((k) => k.toLowerCase() === "authorization");
+  if (bearerToken && !hasAuth) {
+    out["Authorization"] = `Bearer ${bearerToken}`;
+  }
+  return out;
+}
+
+/**
+ * Authenticated fetch wrapper for HARS / KnotGate Memory endpoints
+ * (`/memory/api/graph-stats/*`, `/memory/api/trace/*`, `/memory/api/memory`):
+ *   - Attaches stored OAuth 2.1 Bearer token if present (proactively refreshed).
+ *   - On HTTP 401, runs refresh-token rotation or seamless PKCE S256 SSO redirect,
+ *     and retries once when a fresh token is obtained.
+ */
+export async function fetchWithOAuth(
+  input: string,
+  init: RequestInit = {},
+  deps: {
+    fetchFn?: typeof fetch;
+    getToken?: (opts?: { forceRefresh?: boolean }) => Promise<string | null>;
+    recover401?: typeof recoverFromBridge401;
+  } = {},
+): Promise<Response> {
+  const fetchFn = deps.fetchFn ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
+  const getToken = deps.getToken ?? getBridgeAccessToken;
+  const recover401 = deps.recover401 ?? recoverFromBridge401;
+
+  const initialToken = await getToken();
+  const headers = mergeBearerHeader(init.headers, initialToken);
+  let resp = await fetchFn(input, { ...init, headers });
+
+  if (resp.status === 401) {
+    const bodyText = await resp.text();
+    const freshToken = await recover401({
+      wwwAuthenticate: resp.headers.get("www-authenticate"),
+      bodyText,
+      hadBearer: Boolean(initialToken),
+    });
+    const retryHeaders = mergeBearerHeader(init.headers, null);
+    for (const k of Object.keys(retryHeaders)) {
+      if (k.toLowerCase() === "authorization") delete retryHeaders[k];
+    }
+    retryHeaders["Authorization"] = `Bearer ${freshToken}`;
+    resp = await fetchFn(input, { ...init, headers: retryHeaders });
+    if (resp.status === 401) {
+      const retryText = await resp.text();
+      await recover401({
+        wwwAuthenticate: resp.headers.get("www-authenticate"),
+        bodyText: retryText,
+        hadBearer: false,
+      });
+    }
+  }
+
+  return resp;
+}

@@ -17,7 +17,7 @@ COPY scripts/ ./scripts/
 COPY app/ ./app/
 
 # Build arguments for base path and optional baked fallback URLs
-ARG VITE_BASE=/travel/
+ARG VITE_BASE=/memory/
 ARG MEMORY_BRIDGE_URL=
 ARG MEMORY_TRACE_URL=
 

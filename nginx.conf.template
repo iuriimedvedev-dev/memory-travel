@@ -47,8 +47,7 @@ server {
         proxy_cache off;
     }
 
-    # Same-origin host under /memory/ (used when embedded by the HARS GUI, which
-    # proxies this prefix over HTTPS so the iframe is not blocked as mixed content).
+    # Same-origin native host under /memory/ for KnotGate Memory surface.
     location /memory/api/memory {
         set $backend_mem "${BACKEND_MEMORY_URL}";
         rewrite ^/memory/api/memory/?(.*)$ ${BACKEND_MEMORY_PATH}$1 break;
@@ -60,6 +59,7 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
         proxy_connect_timeout 5s;
         proxy_read_timeout 120s;
         proxy_send_timeout 120s;
@@ -135,7 +135,7 @@ server {
     }
 
     # -------------------------------------------------------------------------
-    # Graph & Stats Export Proxies (/stats, /graph, /coords)
+    # Graph & Stats Export Proxies (/stats, /graph, /coords, /projects)
     # Read-only cosmos starfield data source served by trace server on port 8098.
     # -------------------------------------------------------------------------
     location /travel/api/graph-stats {
@@ -144,7 +144,12 @@ server {
         proxy_pass $backend_trace;
         proxy_http_version 1.1;
         proxy_set_header Connection "";
+        proxy_set_header Authorization $final_auth;
         proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
         proxy_connect_timeout 10s;
         proxy_read_timeout 120s;
         proxy_send_timeout 120s;
@@ -159,7 +164,12 @@ server {
         proxy_pass $backend_trace;
         proxy_http_version 1.1;
         proxy_set_header Connection "";
+        proxy_set_header Authorization $final_auth;
         proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
         proxy_connect_timeout 10s;
         proxy_read_timeout 120s;
         proxy_send_timeout 120s;
@@ -174,7 +184,12 @@ server {
         proxy_pass $backend_trace;
         proxy_http_version 1.1;
         proxy_set_header Connection "";
+        proxy_set_header Authorization $final_auth;
         proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
         proxy_connect_timeout 10s;
         proxy_read_timeout 120s;
         proxy_send_timeout 120s;
@@ -185,8 +200,17 @@ server {
 
     # -------------------------------------------------------------------------
     # Static Assets & SPA Routing
-    # Supports both sub-path (/travel/) and root (/) hosting seamlessly.
+    # Supports native /memory/, legacy /travel/ bookmarks, and root (/) hosting.
     # -------------------------------------------------------------------------
+    location = /memory {
+        return 301 /memory/;
+    }
+
+    location /memory/ {
+        alias /usr/share/nginx/html/;
+        try_files $uri $uri/ /memory/index.html;
+    }
+
     location = /travel {
         return 301 /travel/;
     }
@@ -194,13 +218,6 @@ server {
     location /travel/ {
         alias /usr/share/nginx/html/;
         try_files $uri $uri/ /travel/index.html;
-    }
-
-    # Same-origin hosting for the HARS GUI: index.html here is built with
-    # VITE_BASE=/memory/, so /memory/assets/* and /memory/api/* resolve below.
-    location /memory/ {
-        alias /usr/share/nginx/html/;
-        try_files $uri $uri/ /memory/index.html;
     }
 
     location / {

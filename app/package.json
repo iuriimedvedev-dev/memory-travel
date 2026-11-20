@@ -7,7 +7,7 @@
     "dev": "vite",
     "prebuild": "node ../scripts/no-emoji-check.mjs && node ../scripts/check-deck-is-live.mjs",
     "build": "tsc -b && vite build",
-    "test": "node ../scripts/oauth.test.mjs && node ../scripts/flyto-pose.test.mjs",
+    "test": "node ../scripts/oauth.test.mjs && node ../scripts/flyto-pose.test.mjs && node ../scripts/knotgate-projects-theme.test.mjs",
     "lint": "oxlint",
     "lint:no-emoji": "node ../scripts/no-emoji-check.mjs",
     "lint:deck-live": "node ../scripts/check-deck-is-live.mjs",

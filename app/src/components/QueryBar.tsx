@@ -20,6 +20,8 @@ interface Props {
   history: HistoryEntry[];
   /** Per-stage rows for the pipeline list (estimated in flight, measured after). */
   steps: RecallStep[];
+  /** Optional initial question prefilled from `?q=` URL deep-link. */
+  initialQuestion?: string | null;
   onAsk: (question: string) => void;
   onCancel: () => void;
   onPickHistory: (q: string) => void;
@@ -57,10 +59,10 @@ const COPY = {
 };
 
 export default function QueryBar({
-  asking, error, note, ready, elapsedS, history, steps, onAsk, onCancel, onPickHistory, onClearHistory,
+  asking, error, note, ready, elapsedS, history, steps, initialQuestion, onAsk, onCancel, onPickHistory, onClearHistory,
 }: Props) {
   const { t, lang } = useI18n();
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(() => initialQuestion ?? "");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const c = <K extends keyof typeof COPY>(k: K): string => COPY[k][lang];

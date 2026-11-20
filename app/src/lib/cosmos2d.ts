@@ -37,7 +37,8 @@ interface Marker {
   color: RGBA;
 }
 
-const BG = "#03040c";
+const BG_DARK = "#181d26";
+const BG_LIGHT = "#e8edf4";
 /** World-unit -> px factor for node rects. Tuned so base nodes are 1-2px at fit zoom. */
 const NODE_K = 0.06;
 /** Above this many edges, skip edges while a pan/zoom gesture is active. */
@@ -70,6 +71,8 @@ export class Cosmos2D implements CosmosLike {
   private ctx: CanvasRenderingContext2D | null = null;
   private ro: ResizeObserver | null = null;
   private dpr = 1;
+  private theme: "dark" | "light" =
+    typeof document !== "undefined" && document.documentElement.dataset.theme === "light" ? "light" : "dark";
 
   // graph data (world coords)
   private n = 0;
@@ -151,6 +154,14 @@ export class Cosmos2D implements CosmosLike {
     this.requestDraw();
   }
 
+  setTheme(theme: "dark" | "light"): void {
+    this.theme = theme;
+    for (let i = 0; i < this.n; i++) {
+      this.baseCss[i] = colorForType(this.types[i], theme);
+    }
+    this.requestDraw();
+  }
+
   /** Load the graph at 3D positions, flattened to the 2D plane (z dropped). */
   async load(
     graph: CosmosGraph,
@@ -158,7 +169,12 @@ export class Cosmos2D implements CosmosLike {
     onProgress?: (done: number, total: number) => void,
   ): Promise<void> {
     if (!this.canvas) throw new Error("cosmos2d not initialised");
+    this.clear();
     const n = graph.nodes.length;
+    if (n === 0) {
+      onProgress?.(0, 0);
+      return;
+    }
     this.n = n;
     this.wx = new Float32Array(n);
     this.wy = new Float32Array(n);
@@ -176,7 +192,7 @@ export class Cosmos2D implements CosmosLike {
       this.wy[i] = y;
       const size = 3.2 + Math.min(9, Math.sqrt(nd.deg) * 1.6);
       this.baseSize[i] = size;
-      this.baseCss[i] = colorForType(nd.t); // colour IS the entity family (legend parity)
+      this.baseCss[i] = colorForType(nd.t, this.theme); // colour IS the entity family (legend parity)
       this.types[i] = nd.t;
       if (onProgress && i % 8000 === 0) {
         onProgress(i, n);
@@ -606,8 +622,9 @@ export class Cosmos2D implements CosmosLike {
     if (!c || !ctx) return;
     const w = c.clientWidth || 1;
     const h = c.clientHeight || 1;
+    const isLight = this.theme === "light";
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    ctx.fillStyle = BG;
+    ctx.fillStyle = isLight ? BG_LIGHT : BG_DARK;
     ctx.fillRect(0, 0, w, h);
     if (this.n === 0) return;
 
@@ -617,18 +634,17 @@ export class Cosmos2D implements CosmosLike {
     const highlights = this.edgeHighlights();
     const showEdges = base > 0.001 && !(this.interacting && this.edges.length > EDGE_INTERACTION_CUTOFF);
     if (showEdges && this.edges.length > 0) {
-      // pass 1: every edge at the (possibly dimmed) base alpha — ONE stroked
-      // path for all 54k segments; the raster is only repainted on idle static
-      // frames, so a pan/zoom gesture never re-strokes them (see draw()).
       const dim = highlights ? EDGE2D_DIM : 1;
-      ctx.strokeStyle = `rgba(120,150,255,${(base * dim).toFixed(4)})`;
+      const edgeMult = isLight ? 1.45 : 1;
+      ctx.strokeStyle = isLight
+        ? `rgba(76,86,106,${Math.min(0.75, base * dim * edgeMult).toFixed(4)})`
+        : `rgba(136,192,208,${(base * dim).toFixed(4)})`;
       ctx.lineWidth = 1;
       ctx.beginPath();
       for (let k = 0; k < this.edges.length; k++) {
         const [s, t] = this.edges[k];
         const ax = (this.wx[s] - this.cx) * this.scale + w / 2;
         const ay = (this.wy[s] - this.cy) * this.scale + h / 2;
-        // cheap viewport cull on the segment start (ends may still cross in)
         if (ax < -50 || ay < -50 || ax > w + 50 || ay > h + 50) {
           const bx = (this.wx[t] - this.cx) * this.scale + w / 2;
           const by = (this.wy[t] - this.cy) * this.scale + h / 2;
@@ -641,15 +657,15 @@ export class Cosmos2D implements CosmosLike {
         }
       }
       ctx.stroke();
-      // pass 2: focused/hovered subset over-stroked brighter (incident bright,
-      // 1-hop medium). Small subset — never the full 54k during a gesture.
       if (highlights) {
         const incident: number[] = [];
         const hop: number[] = [];
         for (const [k, wt] of highlights) (wt >= 1 ? incident : hop).push(k);
         const stroke = (ids: number[], alpha: number) => {
           if (!ids.length) return;
-          ctx.strokeStyle = `rgba(188,210,255,${Math.min(0.92, alpha).toFixed(4)})`;
+          ctx.strokeStyle = isLight
+            ? `rgba(15,109,140,${Math.min(0.92, alpha * 1.35).toFixed(4)})`
+            : `rgba(136,192,208,${Math.min(0.92, alpha).toFixed(4)})`;
           ctx.beginPath();
           for (const k of ids) {
             const s = this.edgeS[k];
@@ -666,8 +682,8 @@ export class Cosmos2D implements CosmosLike {
 
     // Nodes, batched by fill color: one fillStyle per group, fillRect each.
     const groups = new Map<string, number[]>();
-    const dim = "rgba(18,23,42,1)";
-    const ghost = "rgba(30,36,58,0.18)"; // legend-hidden family: barely-there ghost
+    const dim = isLight ? "rgba(186,196,212,0.72)" : "rgba(46,52,64,0.88)";
+    const ghost = isLight ? "rgba(186,196,212,0.22)" : "rgba(59,66,82,0.22)";
     const push = (color: string, i: number) => {
       const g = groups.get(color);
       if (g) g.push(i);

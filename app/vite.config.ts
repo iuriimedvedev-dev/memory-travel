@@ -17,7 +17,7 @@ const DEV_TRACE_ORIGIN = process.env.MEMORY_TRACE_URL?.trim()
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: process.env.VITE_BASE ?? '/travel/',
+  base: process.env.VITE_BASE ?? '/memory/',
   plugins: [react()],
   define: {
     // baked into the client bundle as the DIRECT fallback URLs (used only when
@@ -27,6 +27,21 @@ export default defineConfig({
   },
   server: {
     proxy: {
+      '/memory/api/memory': {
+        target: devBridgeOrigin.origin,
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/memory\/api\/memory/, DEV_BRIDGE_PATH),
+      },
+      '/memory/api/trace': {
+        target: DEV_TRACE_ORIGIN,
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/memory\/api\/trace/, ''),
+      },
+      '/memory/api/graph-stats': {
+        target: DEV_TRACE_ORIGIN,
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/memory\/api\/graph-stats/, ''),
+      },
       '/travel/api/memory': {
         target: devBridgeOrigin.origin,
         changeOrigin: true,

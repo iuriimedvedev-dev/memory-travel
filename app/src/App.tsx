@@ -1,13 +1,25 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CosmosCanvas, { type RenderMode } from "./components/CosmosCanvas";
 import CosmosView from "./components/CosmosView";
 import AboutModal from "./components/AboutModal";
 import ErrorOverlay from "./components/ErrorOverlay";
 import PresentationView from "./components/PresentationView";
+import ProjectSelector from "./components/ProjectSelector";
 import QueryBar, { type HistoryEntry } from "./components/QueryBar";
 import PipelineWidget from "./components/PipelineWidget";
 import UiScaleSlider from "./components/UiScaleSlider";
-import { SparkIcon, XIcon } from "./components/icons";
+import {
+  ArrowLeftIcon,
+  DatabaseIcon,
+  DialogScopeIcon,
+  InfoIcon,
+  KnotGateLogoMark,
+  MoonIcon,
+  NodesIcon,
+  RouteIcon,
+  SunIcon,
+  XIcon,
+} from "./components/icons";
 import { INK, toWorld3, type XYZ } from "./lib/cosmos";
 import type { AnyCosmos } from "./lib/cosmos2d";
 import { asJourney3D } from "./lib/cosmos3d";
@@ -19,8 +31,37 @@ import {
   type LoadedCosmos,
   type SourcePhase,
 } from "./lib/cosmosSource";
-import { memoryRecallLive, keywordsFor, estimateSteps, emptySteps, markStepsError, parseRecallTelemetry, stepsFromTelemetry, probeTraceSupport, streamRecallTrace, applyTraceEvent, mergeTraceStart, memoryStatusLive, emptyBridgeInfo, BRIDGE_PROXY_PATH, type ConnState, type RecallStep } from "./lib/live";
+import {
+  BRIDGE_PROXY_PATH,
+  applyTraceEvent,
+  emptyBridgeInfo,
+  emptySteps,
+  estimateSteps,
+  keywordsFor,
+  markStepsError,
+  memoryRecallLive,
+  memoryStatusLive,
+  mergeTraceStart,
+  parseRecallTelemetry,
+  probeTraceSupport,
+  stepsFromTelemetry,
+  streamRecallTrace,
+  type ConnState,
+  type RecallStep,
+} from "./lib/live";
 import { OAuthRedirectInProgressError, isOAuthRedirectInProgress } from "./lib/oauth";
+import {
+  DEFAULT_PROJECT_ID,
+  defaultProjectEntry,
+  fetchMemoryProjects,
+  readInitialProjectFromUrl,
+  readInitialQuestionFromUrl,
+  resolveActiveProject,
+  resolveSafeReturnTo,
+  syncProjectInUrl,
+  type MemoryProject,
+} from "./lib/projects";
+import { useTheme } from "./lib/theme";
 import type { CosmosGraph, TravelTrace } from "./lib/types";
 import { fmt } from "./i18n/strings";
 import { useI18n } from "./i18n/useI18n";
@@ -41,11 +82,23 @@ function loadHistory(): HistoryEntry[] {
 function saveHistory(h: HistoryEntry[]): void {
   try {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, HISTORY_MAX)));
-  } catch { /* private mode etc — history just won't persist */ }
+  } catch {
+    /* private mode etc — history just won't persist */
+  }
 }
 
 export default function App() {
   const { t, lang, setLangL10n } = useI18n();
+  const { theme, toggleTheme } = useTheme();
+
+  // Deep-link URL parameters (?project=..., ?returnTo=..., ?q=...)
+  const [projectId, setProjectId] = useState<string>(() => readInitialProjectFromUrl());
+  const [projects, setProjects] = useState<MemoryProject[]>(() => [defaultProjectEntry()]);
+  const [projectsLoading, setProjectsLoading] = useState<boolean>(true);
+  const returnToHref = useMemo(() => resolveSafeReturnTo(), []);
+  const initialUrlQuestion = useMemo(() => readInitialQuestionFromUrl(), []);
+  const initialQuestionRanRef = useRef(false);
+
   const [presenting, setPresenting] = useState(false);
   const [cosmosFull, setCosmosFull] = useState<AnyCosmos | null>(null);
   const [graph, setGraph] = useState<CosmosGraph | null>(null);
@@ -71,40 +124,61 @@ export default function App() {
   const [about, setAbout] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const startedAtRef = useRef(0);
-  /** Lock for the in-flight step ESTIMATOR: true once streaming frames arrive
-   *  or the recall has finished/errored, so the ticker can't overwrite measured
-   *  rows with estimates in the completion race. */
   const tracingRef = useRef(false);
 
-  // Connection identity: what the bridge actually serves (index id/dir, live
-  // counts, last ingest). Read via memory_status on mount; the About card and
-  // the HUD chip render it. Never hardcoded — an unreachable bridge renders
-  // the honest offline/fixtures state instead.
-  const [conn, setConn] = useState<ConnState>({ kind: "connecting" });
+  const activeProject = useMemo(
+    () => resolveActiveProject(projects, projectId),
+    [projects, projectId],
+  );
 
-  const refreshConn = useCallback(() => {
-    // async only: the previous identity (or the initial "connecting") stays
-    // rendered until the fresh memory_status answer lands
-    memoryStatusLive()
-      .then((info) => setConn({ kind: "connected", info }))
-      .catch((e: unknown) => {
-        if (e instanceof OAuthRedirectInProgressError || isOAuthRedirectInProgress()) {
-          setConn({ kind: "connecting" });
-          return;
+  // Discover available projects (/memory/api/graph-stats/projects -> MCP fallback)
+  useEffect(() => {
+    let cancelled = false;
+    setProjectsLoading(true);
+    fetchMemoryProjects()
+      .then((res) => {
+        if (!cancelled) {
+          setProjects(res.projects);
         }
-        setConn({ kind: "offline", error: e instanceof Error ? e.message : String(e) });
+      })
+      .catch(() => {
+        /* fallback already guarantees PIER KB */
+      })
+      .finally(() => {
+        if (!cancelled) setProjectsLoading(false);
       });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
+  // Connection identity for the selected scope
+  const [conn, setConn] = useState<ConnState>({ kind: "connecting" });
+
+  const refreshConn = useCallback(
+    (targetProject?: string) => {
+      const scope = targetProject ?? projectId;
+      memoryStatusLive(scope)
+        .then((info) => setConn({ kind: "connected", info }))
+        .catch((e: unknown) => {
+          if (e instanceof OAuthRedirectInProgressError || isOAuthRedirectInProgress()) {
+            setConn({ kind: "connecting" });
+            return;
+          }
+          setConn({ kind: "offline", error: e instanceof Error ? e.message : String(e) });
+        });
+    },
+    [projectId],
+  );
+
   useEffect(() => {
-    refreshConn();
-  }, [refreshConn]);
+    refreshConn(projectId);
+  }, [projectId, refreshConn]);
 
   const highlightStageInCosmos = useCallback(
     (stageIdx: number, tr: TravelTrace | null, qText: string) => {
       if (!cosmosFull || !graph || !names) return;
       if (stageIdx === 1) {
-        // Stage 2 (Vector hits): cyan glow & halos on candidate chunks
         let hitIdxs: number[] = [];
         if (tr && tr.vector_hits.length) {
           const entNames = new Set(tr.vector_hits.flatMap((h) => h.entities));
@@ -130,7 +204,6 @@ export default function App() {
           cosmosFull.pulseCluster(hitIdxs, INK.cyan, true);
         }
       } else if (stageIdx === 2) {
-        // Stage 3 (BM25): emerald green
         let hitIdxs: number[] = [];
         if (tr && tr.bm25_hits.length) {
           const entNames = new Set(tr.bm25_hits.flatMap((h) => h.entities));
@@ -149,7 +222,6 @@ export default function App() {
           cosmosFull.pulseCluster(hitIdxs, INK.green, true);
         }
       } else if (stageIdx === 3) {
-        // Stage 4 (Graph walk): gold seeds + magenta 1-hop neighbours
         let allGraphIdxs: number[] = [];
         if (tr && tr.graph.nodes.length) {
           allGraphIdxs = tr.graph.nodes.map((n) => n.i);
@@ -172,7 +244,6 @@ export default function App() {
           cosmosFull.pulseCluster(allGraphIdxs, INK.gold, true);
         }
       } else if (stageIdx === 4) {
-        // Stage 5 (Fusion / LTR): vivid orange
         let hitIdxs: number[] = [];
         if (tr && tr.fusion.length) {
           const entNames = new Set(tr.fusion.flatMap((h) => h.entities));
@@ -184,7 +255,6 @@ export default function App() {
           cosmosFull.pulseCluster(hitIdxs, INK.orange, true);
         }
       } else if (stageIdx === 6) {
-        // Stage 7 (Grounded Answer): gold answer nodes with trail
         let ansIdxs: number[] = [];
         if (tr && tr.answer_preview.length) {
           const entNames = new Set(tr.answer_preview.flatMap((b) => b.entities));
@@ -206,8 +276,6 @@ export default function App() {
     [cosmosFull, graph, names],
   );
 
-  // elapsed-seconds ticker for the honest phase hints while a recall runs;
-  // also drives the in-flight step estimate (spinner + ticking per row).
   useEffect(() => {
     if (!asking) return;
     setElapsedS(0);
@@ -236,78 +304,105 @@ export default function App() {
     return () => window.clearInterval(id);
   }, [asking, activeQuestion, highlightStageInCosmos, liveTrace]);
 
-  // ---- cosmos data source (data-integrity gate) --------------------------
-  // The starfield renders ONLY the memory this deployment is connected to
-  // (/api/stats -> /api/graph + /api/coords via the trace server). When that
-  // export is unreachable the app shows the honest "not connected" state; the
-  // baked fixtures in public/data are an EXPLICIT demo dataset behind a button,
-  // badged while shown. They are never loaded silently again.
+  // ---- cosmos data source (scoped by projectId) ---------------------------
   const [source, setSource] = useState<SourcePhase>({ phase: "probing" });
   const [cosmosData, setCosmosData] = useState<LoadedCosmos | null>(null);
   const [sourceError, setSourceError] = useState<string | null>(null);
   const [demoNoteDismissed, setDemoNoteDismissed] = useState(false);
-  /** Monotonic load generation: a slow LIVE probe must never overwrite a newer
-   *  demo selection (and vice versa), otherwise the deck could swap datasets
-   *  under the presenter. */
   const loadGenRef = useRef(0);
 
-  /** Fill the render state from one LoadedCosmos (live or demo). */
-  const applyCosmosData = useCallback((data: LoadedCosmos) => {
-    setCosmosData(data);
-    setGraph(data.graph);
-    setNames(data.names);
-    setChunkXyz(data.chunkCoords);
-    // xyz preferred; old coord files (xy only) flatten to z=0
-    const m = new Map<string, XYZ>();
-    data.coords.ids.forEach((id, i) => {
-      const v = data.coords.xyz?.[i];
-      if (v) m.set(id, v);
-      else {
-        const xy = data.coords.xy[i];
-        if (xy) m.set(id, [xy[0], xy[1], 0]);
-      }
-    });
-    let hit = 0;
-    const aligned = data.graph.nodes.map((n) => {
-      const v = m.get(n.id) ?? null;
-      if (v) hit++;
-      // raw UMAP [-1,1] -> world units (shared mapping with markers)
-      return v ? toWorld3(v) : null;
-    });
-    setPosByIdx(aligned);
-    setProgress(
-      fmt(t.coordCoverage, { p: (100 * hit / Math.max(1, data.graph.nodes.length)).toFixed(1) }),
-    );
-  }, [t]);
-
-  const loadLive = useCallback(() => {
-    let dead = false;
-    const gen = ++loadGenRef.current;
-    setSource({ phase: "probing" });
-    setSourceError(null);
-    setProgress(t.srcProbing);
-    probeGraphStats()
-      .then((stats) => {
-        if (dead || gen !== loadGenRef.current) return;
-        setProgress(t.loadingIndex);
-        return loadLiveCosmos(stats);
-      })
-      .then((data) => {
-        if (dead || !data || gen !== loadGenRef.current) return;
-        applyCosmosData(data);
-        setSource({ phase: "live" });
-      })
-      .catch((e: unknown) => {
-        if (dead || gen !== loadGenRef.current) return;
-        const msg = e instanceof Error ? e.message : String(e);
-        setSourceError(msg);
-        setSource({ phase: "unreachable", error: msg });
+  const applyCosmosData = useCallback(
+    (data: LoadedCosmos) => {
+      setCosmosData(data);
+      setGraph(data.graph);
+      setNames(data.names);
+      setChunkXyz(data.chunkCoords);
+      if (data.empty || data.graph.nodes.length === 0) {
+        setPosByIdx([]);
         setProgress(null);
+        cosmosFull?.clear();
+        return;
+      }
+      const m = new Map<string, XYZ>();
+      data.coords.ids.forEach((id, i) => {
+        const v = data.coords.xyz?.[i];
+        if (v) m.set(id, v);
+        else {
+          const xy = data.coords.xy[i];
+          if (xy) m.set(id, [xy[0], xy[1], 0]);
+        }
       });
-    return () => {
-      dead = true;
-    };
-  }, [applyCosmosData, t]);
+      let hit = 0;
+      const aligned = data.graph.nodes.map((n) => {
+        const v = m.get(n.id) ?? null;
+        if (v) hit++;
+        return v ? toWorld3(v) : null;
+      });
+      setPosByIdx(aligned);
+      setProgress(
+        fmt(t.coordCoverage, { p: ((100 * hit) / Math.max(1, data.graph.nodes.length)).toFixed(1) }),
+      );
+    },
+    [cosmosFull, t],
+  );
+
+  const loadLive = useCallback(
+    (targetProject?: string) => {
+      const scope = targetProject ?? projectId;
+      let dead = false;
+      const gen = ++loadGenRef.current;
+      setSource({ phase: "probing" });
+      setSourceError(null);
+      setDataError(null);
+      setProgress(t.srcProbing);
+      probeGraphStats(scope)
+        .then((stats) => {
+          if (dead || gen !== loadGenRef.current) return;
+          setProgress(t.loadingIndex);
+          return loadLiveCosmos(stats, scope);
+        })
+        .then((data) => {
+          if (dead || !data || gen !== loadGenRef.current) return;
+          applyCosmosData(data);
+          setSource({ phase: "live" });
+        })
+        .catch((e: unknown) => {
+          if (dead || gen !== loadGenRef.current) return;
+          if (e instanceof OAuthRedirectInProgressError || isOAuthRedirectInProgress()) {
+            setSource({ phase: "probing" });
+            return;
+          }
+          const msg = e instanceof Error ? e.message : String(e);
+          setSourceError(msg);
+          setSource({ phase: "unreachable", error: msg });
+          setProgress(null);
+        });
+      return () => {
+        dead = true;
+      };
+    },
+    [applyCosmosData, projectId, t],
+  );
+
+  const handleSelectProject = useCallback(
+    (nextProjectId: string) => {
+      abortRef.current?.abort();
+      setAsking(false);
+      setActiveQuestion(null);
+      setLiveTrace(null);
+      setAskError(null);
+      setAskNote(null);
+      setSteps([]);
+      setCosmosData(null);
+      setGraph(null);
+      setNames(null);
+      setPosByIdx(null);
+      cosmosFull?.clear();
+      syncProjectInUrl(nextProjectId);
+      setProjectId(nextProjectId);
+    },
+    [cosmosFull],
+  );
 
   const openDemo = useCallback(() => {
     const gen = ++loadGenRef.current;
@@ -327,33 +422,30 @@ export default function App() {
       });
   }, [applyCosmosData, t]);
 
-  /** Enter the how-it-works deck. The deck is live-first: it runs a real recall
-   *  on the connected index, so make sure that index is loaded (the synthetic
-   *  snapshot stays behind the deck's explicit DEMO button). */
   const enterPresentation = useCallback(() => {
     setPresenting(true);
-    if (source.phase !== "live") loadLive();
-  }, [source.phase, loadLive]);
-
-  // The how-it-works deck runs its own live recall on the connected index (see
-  // PresentationView). The baked fixtures are reachable only through the deck's
-  // explicit DEMO button, which calls openDemo().
+    if (source.phase !== "live") loadLive(projectId);
+  }, [source.phase, loadLive, projectId]);
 
   useEffect(() => {
-    const cleanup = loadLive();
+    const cleanup = loadLive(projectId);
     return cleanup;
-    // mount-only: the initial source decision. Reconnects go through
-    // retryConnection / backToLive below.
+    // Reload whenever `projectId` changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [projectId]);
 
   useEffect(() => {
     if (!cosmosFull || !graph || !posByIdx) return;
+    if (graph.nodes.length === 0) {
+      cosmosFull.clear();
+      setProgress(null);
+      return;
+    }
     let dead = false;
     setProgress(t.loadingStars);
     cosmosFull
       .load(graph, posByIdx, (done, total) => {
-        if (!dead) setProgress(`${t.loadingStars} ${((done / total) * 100).toFixed(0)}%`);
+        if (!dead && total > 0) setProgress(`${t.loadingStars} ${((done / total) * 100).toFixed(0)}%`);
       })
       .then(() => !dead && setProgress(null))
       .catch((e: unknown) => {
@@ -365,7 +457,7 @@ export default function App() {
     return () => {
       dead = true;
     };
-  }, [cosmosFull, graph, posByIdx]);
+  }, [cosmosFull, graph, posByIdx, t]);
 
   const focusNode = useCallback(
     (idx: number) => {
@@ -374,13 +466,8 @@ export default function App() {
       if (!p) return;
       const j = asJourney3D(cosmosFull);
       if (j) {
-        // posByIdx already holds WORLD coords (toWorld3 applied at load);
-        // focus = target tweens onto the node, camera ends 9.5 units away
-        // (3x closer than the old 28 — the star fills the frame with its
-        // selection ring and the node card beside it).
         j.flyToNode(p, 9.5, 850);
       } else {
-        // 2D fallback: z doesn't exist there, plain eased zoom.
         cosmosFull.flyTo(p[0], p[1], cosmosFull.currentZoom() * 3.2, 1400);
       }
     },
@@ -395,12 +482,14 @@ export default function App() {
     setRenderMode(m);
   }, []);
 
-  // ---- live question: recall -> compile (same path as fixtures) -> play + highlight
-  const liveReady = graph !== null && names !== null && posByIdx !== null;
+  const isEmptyScope = Boolean(
+    source.phase === "live" && (cosmosData?.empty || (graph !== null && graph.nodes.length === 0)),
+  );
+  const liveReady = graph !== null && graph.nodes.length > 0 && names !== null && posByIdx !== null;
 
   const askLive = useCallback(
     async (question: string) => {
-      if (!graph || !names || !posByIdx) return;
+      if (!graph || !names || !posByIdx || graph.nodes.length === 0) return;
       abortRef.current?.abort();
       const ctrl = new AbortController();
       abortRef.current = ctrl;
@@ -416,9 +505,6 @@ export default function App() {
       try {
         const t0 = performance.now();
         const kws = keywordsFor(question);
-        // Optional streaming trace (docs/trace-api.md): probe once, consume SSE
-        // stage frames when present, otherwise fall back to the one-shot recall.
-        // Never blocks — short probe timeout + first-frame grace.
         let result: Record<string, unknown> | null = null;
         let clientLatencyS = 0;
         let endpoint = BRIDGE_PROXY_PATH;
@@ -428,27 +514,25 @@ export default function App() {
               question,
               (ev) => {
                 tracingRef.current = true;
-                // trace_start carries the live index identity — keep the
-                // About card / HUD chip truthful about what we talk to.
                 if (ev.event === "trace_start") setConn((prev) => mergeTraceStart(prev, ev.data));
                 setSteps((prev) => applyTraceEvent(prev, ev));
               },
-              { signal: ctrl.signal },
+              { signal: ctrl.signal, project: projectId },
+              projectId,
             );
             if (result) clientLatencyS = (performance.now() - t0) / 1000;
           } catch (e) {
             if (e instanceof DOMException && e.name === "AbortError") throw e;
-            result = null; // any stream error -> one-shot fallback
+            if (e instanceof OAuthRedirectInProgressError || isOAuthRedirectInProgress()) throw e;
+            result = null;
           }
         }
         if (!result) {
-          const one = await memoryRecallLive(question, { signal: ctrl.signal });
+          const one = await memoryRecallLive(question, projectId, { signal: ctrl.signal });
           result = one.result;
           clientLatencyS = one.clientLatencyS;
           endpoint = one.endpoint;
         }
-        // A completed recall proves the bridge is reachable even if
-        // memory_status was down at load: upgrade to (minimal) connected.
         setConn((prev) =>
           prev.kind === "connected" ? prev : { kind: "connected", info: { ...emptyBridgeInfo(), endpoint } },
         );
@@ -470,8 +554,7 @@ export default function App() {
           chunkXyz,
         });
         setLiveTrace(trace);
-        // measured per-stage rows (graph counts come from the compiled subgraph)
-        tracingRef.current = true; // stop the estimator before it can race
+        tracingRef.current = true;
         const measured = stepsFromTelemetry(
           parseRecallTelemetry(result, clientLatencyS, kws, {
             seeds: trace.graph.nodes.filter((n) => n.seed).length,
@@ -479,11 +562,11 @@ export default function App() {
             edges: trace.graph.edges.length,
           }),
         );
-        // keep rows the stream already filled with real per-stage values; fill
-        // any row the stream did not reach from the response telemetry.
         setSteps((prev) =>
           prev.length === measured.length
-            ? prev.map((r, i) => (r.estimated || r.status === "pending" || r.status === "active" ? measured[i] : r))
+            ? prev.map((r, i) =>
+                r.estimated || r.status === "pending" || r.status === "active" ? measured[i] : r,
+              )
             : measured,
         );
         setCurrentStage(6);
@@ -500,7 +583,7 @@ export default function App() {
           setAskNote(
             fmt(t.askNoteHits, {
               s: tookS.toFixed(1),
-              via: endpoint === "/api/memory" ? t.askViaProxy : t.askViaDirect,
+              via: endpoint.includes("/api/memory") ? t.askViaProxy : t.askViaDirect,
               n: hits.length,
             }),
           );
@@ -510,7 +593,7 @@ export default function App() {
           setAskNote(fmt(t.askNoteNoHits, { s: tookS.toFixed(1) }));
         }
       } catch (e) {
-        tracingRef.current = true; // lock the estimator: keep the error state
+        tracingRef.current = true;
         if (e instanceof OAuthRedirectInProgressError || isOAuthRedirectInProgress()) {
           return;
         }
@@ -527,20 +610,25 @@ export default function App() {
         setAsking(false);
       }
     },
-    [graph, names, posByIdx, chunkXyz, cosmosFull, focusNode, t],
+    [graph, names, posByIdx, chunkXyz, cosmosFull, focusNode, highlightStageInCosmos, projectId, t],
   );
+
+  // If `?q=<question>` was deep-linked from a KnotGate dialog, run it once when live graph is ready
+  useEffect(() => {
+    if (!initialUrlQuestion || initialQuestionRanRef.current || !liveReady || asking) return;
+    initialQuestionRanRef.current = true;
+    void askLive(initialUrlQuestion);
+  }, [initialUrlQuestion, liveReady, asking, askLive]);
 
   const cancelAsk = useCallback(() => {
     abortRef.current?.abort();
   }, []);
 
-  // ---- data-source badge facts (never hardcoded: identity comes from the
-  // /api/stats answer; the demo label names the baked snapshot).
   const identity = cosmosData?.identity ?? null;
   const sampled = cosmosData?.sampled ?? null;
   const badgeLabel =
     source.phase === "live" && identity
-      ? fmt(t.srcLiveBadge, { id: identity.index_id })
+      ? fmt(t.srcLiveBadge, { id: activeProject.name })
       : source.phase === "demo"
         ? t.srcDemoBadge
         : source.phase === "probing"
@@ -550,62 +638,141 @@ export default function App() {
     source.phase === "live" && identity
       ? [
           fmt(t.srcLiveTitle, {
-            id: identity.index_id,
+            id: `${activeProject.name} (${identity.index_id})`,
             docs: identity.docs ?? "?",
             n: identity.nodes != null ? identity.nodes.toLocaleString("en-US") : "?",
             m: identity.edges != null ? identity.edges.toLocaleString("en-US") : "?",
             ts: identity.last_ingest ?? "?",
           }),
           sampled
-            ? fmt(t.srcSampled, { n: sampled.nodes.toLocaleString("en-US"), total: sampled.fullNodes.toLocaleString("en-US") })
+            ? fmt(t.srcSampled, {
+                n: sampled.nodes.toLocaleString("en-US"),
+                total: sampled.fullNodes.toLocaleString("en-US"),
+              })
             : "",
-        ].filter(Boolean).join("\n")
+        ]
+          .filter(Boolean)
+          .join("\n")
       : source.phase === "demo"
         ? t.srcDemoTitle
         : t.srcBadgeTitle;
 
   return (
-    <div className="app">
+    <div className={`app theme-${theme}`} data-theme={theme}>
+      {/* Unified KnotGate Nord Frozen Glass Header Bar */}
+      <header className="topbar">
+        <div className="topbar-left">
+          <a
+            className="kg-back-link"
+            href={returnToHref}
+            title={t.backToKnotGateTitle}
+            aria-label={t.backToKnotGateTitle}
+          >
+            <span className="kg-back-arrow">
+              <ArrowLeftIcon size={14} />
+            </span>
+            <KnotGateLogoMark size={24} />
+            <span className="kg-wordmark">
+              KnotGate <span className="kg-wordmark-accent">Memory</span>
+            </span>
+          </a>
+
+          <ProjectSelector
+            projects={projects}
+            activeProjectId={projectId}
+            onSelectProject={handleSelectProject}
+            loading={projectsLoading || source.phase === "probing"}
+          />
+        </div>
+
+        <nav className="topbar-right" aria-label="KnotGate Memory Controls">
+          <div className="kg-segmented" role="tablist" aria-label="Memory View Mode">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={!presenting}
+              className={!presenting ? "seg-btn on" : "seg-btn"}
+              onClick={() => setPresenting(false)}
+            >
+              <NodesIcon size={13} />
+              <span className="seg-label">{t.modeGraph}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={presenting}
+              className={presenting ? "seg-btn on" : "seg-btn"}
+              onClick={enterPresentation}
+              title={t.howItWorksTitle}
+            >
+              <RouteIcon size={13} />
+              <span className="seg-label">{t.modeWalkthrough}</span>
+            </button>
+          </div>
+
+          <UiScaleSlider />
+
+          <button
+            type="button"
+            className="kg-icon-pill langtoggle"
+            onClick={() => setLangL10n(lang === "ru" ? "en" : "ru")}
+            title={t.langSwitch}
+          >
+            {lang.toUpperCase()}
+          </button>
+
+          <button
+            type="button"
+            className="kg-icon-btn theme-toggle"
+            onClick={() => toggleTheme()}
+            title={theme === "dark" ? t.themeSwitchToLight : t.themeSwitchToDark}
+            aria-label={theme === "dark" ? t.themeSwitchToLight : t.themeSwitchToDark}
+          >
+            {theme === "dark" ? <SunIcon size={15} /> : <MoonIcon size={15} />}
+          </button>
+
+          <button
+            type="button"
+            className="kg-icon-btn info-toggle"
+            onClick={() => setAbout(true)}
+            title={t.infoTitle}
+            aria-label={t.infoTitle}
+          >
+            <InfoIcon size={15} />
+          </button>
+        </nav>
+      </header>
+
       {presenting ? (
         <PresentationView
           onExit={() => setPresenting(false)}
           data={cosmosData}
           source={source}
-          preferredQuestion={activeQuestion ?? history[0]?.q ?? null}
-          onRetryLive={loadLive}
+          projectId={projectId}
+          preferredQuestion={activeQuestion ?? initialUrlQuestion ?? history[0]?.q ?? null}
+          onRetryLive={() => loadLive(projectId)}
+          onSwitchToDefault={() => handleSelectProject(DEFAULT_PROJECT_ID)}
         />
       ) : (
         <>
           <div className="canvaswrap">
-            <CosmosCanvas label="cosmos" onCosmos={setCosmosFull} onSelect={() => {}} onHover={() => {}} onError={onCanvasError} onMode={onMode} />
+            <CosmosCanvas
+              label="cosmos"
+              onCosmos={setCosmosFull}
+              onSelect={() => {}}
+              onHover={() => {}}
+              onError={onCanvasError}
+              onMode={onMode}
+            />
           </div>
 
-          <header className="topbar">
-            <span className="brand">
-              <SparkIcon size={13} /> MEMORY TRAVEL <span className="dim">{t.brandSub}</span>
-            </span>
-            <nav>
-              <button className={!presenting ? "on" : ""} onClick={() => setPresenting(false)}>{t.tabCosmos}</button>
-              <button className={presenting ? "on" : ""} onClick={enterPresentation} title={t.howItWorksTitle}>{t.tabHowItWorks}</button>
-              <a className="doclink" href="/travel/presentation.html" target="_blank" rel="noopener">{t.tabPresentation}</a>
-              <a className="doclink" href="/evals/" target="_blank" rel="noopener" title={t.evalsTitle}>{t.tabEvals}</a>
-              <UiScaleSlider />
-              <button className="langtoggle" onClick={() => setLangL10n(lang === "ru" ? "en" : "ru")} title={t.langSwitch}>
-                {lang.toUpperCase()}
-              </button>
-              <button className="doclink" onClick={() => setAbout(true)}>
-                {t.aboutLink}
-              </button>
-            </nav>
-          </header>
-
-          {/* data-source badge: WHICH memory the starfield renders. In live mode
-              clicking re-probes; in demo mode it offers the way back to live. */}
+          {/* Data-source status chip (bottom-left, zero overlap with header) */}
           <button
+            type="button"
             className={`srcbadge ${source.phase}`}
             title={badgeTitle}
             onClick={() => {
-              if (source.phase !== "probing") loadLive();
+              if (source.phase !== "probing") loadLive(projectId);
             }}
           >
             <i className="srcdot" aria-hidden="true" />
@@ -620,6 +787,7 @@ export default function App() {
             elapsedS={elapsedS}
             history={history}
             steps={steps}
+            initialQuestion={initialUrlQuestion}
             onAsk={askLive}
             onCancel={cancelAsk}
             onPickHistory={askLive}
@@ -657,21 +825,58 @@ export default function App() {
             elapsedS={elapsedS}
           />
 
-          <CosmosView
-            cosmos={cosmosFull}
-            graph={graph}
-            names={names}
-            loading={progress}
-            focusNode={focusNode}
-            mode={renderMode}
-            conn={conn}
-          />
+          {!isEmptyScope && (
+            <CosmosView
+              cosmos={cosmosFull}
+              graph={graph}
+              names={names}
+              loading={progress}
+              focusNode={focusNode}
+              mode={renderMode}
+              conn={conn}
+            />
+          )}
 
-          {/* demo-mode note: the snapshot is explicit, but it must stay obvious */}
+          {/* Calm Nord Frozen Glass Empty Scope State */}
+          {isEmptyScope && !dataError && !canvasError && (
+            <div className="empty-scope-wrap" role="status" aria-live="polite">
+              <div className="empty-scope-card">
+                <div className="empty-scope-badge">
+                  {activeProject.kind === "dialog" || activeProject.kind === "personal" ? (
+                    <DialogScopeIcon size={16} />
+                  ) : (
+                    <DatabaseIcon size={16} />
+                  )}
+                  <span>{activeProject.name}</span>
+                  {projectId !== DEFAULT_PROJECT_ID && projectId !== activeProject.name && (
+                    <code>{projectId}</code>
+                  )}
+                </div>
+                <h2 className="empty-scope-title">{t.emptyScopeTitle}</h2>
+                <p className="empty-scope-body">{t.emptyScopeBody}</p>
+                <div className="empty-scope-actions">
+                  {projectId !== DEFAULT_PROJECT_ID && (
+                    <button
+                      type="button"
+                      className="primary"
+                      onClick={() => handleSelectProject(DEFAULT_PROJECT_ID)}
+                    >
+                      <DatabaseIcon size={14} />
+                      <span>{t.switchToPierKb}</span>
+                    </button>
+                  )}
+                  <button type="button" onClick={() => loadLive(projectId)}>
+                    {t.retryConnection}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {source.phase === "demo" && !demoNoteDismissed && (
             <div className="demonote" role="status">
               <span>{t.demoLoadedNote}</span>
-              <button className="ghostbtn" onClick={loadLive} title={t.backToLive}>
+              <button className="ghostbtn" onClick={() => loadLive(projectId)} title={t.backToLive}>
                 {t.backToLive}
               </button>
               <button className="ghostbtn" onClick={() => setDemoNoteDismissed(true)} title={t.commonDismiss}>
@@ -682,9 +887,18 @@ export default function App() {
         </>
       )}
 
-      {about && <AboutModal onClose={() => setAbout(false)} conn={conn} onRefreshConn={refreshConn} identity={identity} sourcePhase={source.phase} />}
-      {/* the honest not-connected state: NO foreign data renders, the baked
-          snapshot exists only behind the explicit demo button below */}
+      {about && (
+        <AboutModal
+          onClose={() => setAbout(false)}
+          conn={conn}
+          onRefreshConn={() => refreshConn(projectId)}
+          identity={identity}
+          sourcePhase={source.phase}
+          projectLabel={activeProject.name}
+          projectId={projectId}
+        />
+      )}
+
       {source.phase === "unreachable" && !dataError && (
         <ErrorOverlay
           title={t.notConnectedTitle}
@@ -692,25 +906,17 @@ export default function App() {
           detail={sourceError}
           actions={
             <>
-              <button className="primary" onClick={openDemo}>{t.openDemo}</button>
-              <button onClick={loadLive}>{t.retryConnection}</button>
+              <button className="primary" onClick={openDemo}>
+                {t.openDemo}
+              </button>
+              <button onClick={() => loadLive(projectId)}>{t.retryConnection}</button>
             </>
           }
         />
       )}
-      {dataError && (
-        <ErrorOverlay
-          title={t.errIndexTitle}
-          body={t.errIndexBody}
-          detail={dataError}
-        />
-      )}
+      {dataError && <ErrorOverlay title={t.errIndexTitle} body={t.errIndexBody} detail={dataError} />}
       {!dataError && canvasError && (
-        <ErrorOverlay
-          title={t.errCanvasTitle}
-          body={t.errCanvasBody}
-          detail={canvasError}
-        />
+        <ErrorOverlay title={t.errCanvasTitle} body={t.errCanvasBody} detail={canvasError} />
       )}
       {!dataError && !canvasError && renderMode === "canvas2d" && !modeDismissed && (
         <div className="modebadge" role="status">
@@ -723,5 +929,3 @@ export default function App() {
     </div>
   );
 }
-
-// re-transform nudge

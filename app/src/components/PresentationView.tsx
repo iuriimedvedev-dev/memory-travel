@@ -97,9 +97,11 @@ interface PresProps {
    *  synthetic snapshot: it always recalls against the live index. */
   data: LoadedCosmos | null;
   source: SourcePhase;
+  projectId: string;
   /** Only used to pre-fill the question input (e.g. the last query-bar ask). */
   preferredQuestion: string | null;
   onRetryLive: () => void;
+  onSwitchToDefault?: () => void;
 }
 
 /** One streamed stage row, lit as its SSE frame arrives. */
@@ -114,7 +116,15 @@ const STEP_LABEL: Record<StepId, { en: string; ru: string }> = {
   total: { en: "total", ru: "итого" },
 };
 
-export default function PresentationView({ onExit, data, source, preferredQuestion, onRetryLive }: PresProps) {
+export default function PresentationView({
+  onExit,
+  data,
+  source,
+  projectId,
+  preferredQuestion,
+  onRetryLive,
+  onSwitchToDefault,
+}: PresProps) {
   const { t, lang, setLangL10n } = useI18n();
   const [chapter, setChapter] = useState(0);
   const [playing, setPlaying] = useState(true);
@@ -180,9 +190,14 @@ export default function PresentationView({ onExit, data, source, preferredQuesti
   // ---- data: the app-level LoadedCosmos (live OR explicitly-opened demo).
   // The presentation loads NO data of its own: whatever the app is connected
   // to (or the explicit demo snapshot) is what renders here too.
-  const dataKey = `${data?.source ?? "none"}:${data?.identity?.index_id ?? "-"}`;
+  const dataKey = `${data?.source ?? "none"}:${projectId}:${data?.identity?.index_id ?? "-"}:${data?.graph.nodes.length ?? 0}`;
   useEffect(() => {
-    if (!data) return;
+    if (!data) {
+      setGraph(null);
+      setPosByIdx(null);
+      cosmosFull?.clear();
+      return;
+    }
     setGraph(data.graph);
     const m = new Map<string, XYZ>();
     data.coords.ids.forEach((id, i) => {
@@ -199,13 +214,10 @@ export default function PresentationView({ onExit, data, source, preferredQuesti
         return v ? toWorld3(v) : null;
       }),
     );
-  }, [dataKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [dataKey, cosmosFull]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ---- The deck is query-driven: NOTHING is replayed until the presenter
-  // types a question. Each submission runs a real `memory_recall` on the
-  // connected index and consumes its trace SSE, so every stage/chapter value
-  // comes from that query. There is no fixture path and no default question.
-  const liveReady = source.phase === "live" && data?.source === "live";
+  const isEmptyScope = Boolean(source.phase === "live" && data?.empty);
+  const liveReady = source.phase === "live" && data?.source === "live" && !isEmptyScope;
   const [draft, setDraft] = useState<string>(preferredQuestion ?? "");
   /** The submitted question; null = the ask screen is showing. */
   const [question, setQuestion] = useState<string | null>(null);
@@ -214,6 +226,21 @@ export default function PresentationView({ onExit, data, source, preferredQuesti
   const [steps, setSteps] = useState<RecallStep[]>(emptySteps);
   const [attempt, setAttempt] = useState(0);
   const recallKeyRef = useRef<string | null>(null);
+
+  // Reset active trace when switching projects
+  const prevProjectRef = useRef(projectId);
+  useEffect(() => {
+    if (prevProjectRef.current !== projectId) {
+      prevProjectRef.current = projectId;
+      recallKeyRef.current = null;
+      setQuestion(null);
+      setTrace(null);
+      setRecall("idle");
+      setRecallError(null);
+      setSteps(emptySteps());
+      cosmosTrace?.clear();
+    }
+  }, [projectId, cosmosTrace]);
 
   const submitQuestion = useCallback(() => {
     const q = draft.trim().slice(0, 500);
@@ -236,7 +263,7 @@ export default function PresentationView({ onExit, data, source, preferredQuesti
 
   useEffect(() => {
     if (!question || !liveReady || !data) return;
-    const key = `${data.identity?.index_id ?? "-"}::${question}::${attempt}`;
+    const key = `${projectId}::${data.identity?.index_id ?? "-"}::${question}::${attempt}`;
     if (recallKeyRef.current === key) return;
     recallKeyRef.current = key;
     const ctrl = new AbortController();
@@ -245,7 +272,7 @@ export default function PresentationView({ onExit, data, source, preferredQuesti
     setTrace(null);
     setSteps(emptySteps());
     const startedAt = performance.now();
-    runLiveRecall(question, data, { signal: ctrl.signal, onSteps: setSteps })
+    runLiveRecall(question, data, { signal: ctrl.signal, project: projectId, onSteps: setSteps })
       .then(async (run) => {
         // Keep the streamed rows on screen long enough to read: a ~1s recall
         // otherwise flashes the progress panel away before a frame is legible.
@@ -619,7 +646,7 @@ export default function PresentationView({ onExit, data, source, preferredQuesti
               rank,
               name,
               idx,
-              color: rank === 1 ? "#ffc83b" : rank === 2 ? "#ffa726" : "#ff7043",
+              color: rank === 1 ? "#EBCB8B" : rank === 2 ? "#D08770" : "#88C0D0",
             });
           });
         });
@@ -717,7 +744,7 @@ export default function PresentationView({ onExit, data, source, preferredQuesti
                 citation: cNum,
                 name,
                 idx,
-                color: "#ffd54f",
+                color: "#EBCB8B",
               });
             }
           });
@@ -860,37 +887,6 @@ export default function PresentationView({ onExit, data, source, preferredQuesti
         ))}
       </div>
 
-      <div className="pres-top">
-        <span className="pres-brand">MEMORY TRAVEL · {t.presLaunch}</span>
-        <span
-          className={`pres-src ${source.phase === "live" ? "live" : source.phase === "demo" ? "demo" : "probing"}`}
-          title={isLive ? t.presSrcLiveTitle : t.presSrcDemoTitle}
-        >
-          <i aria-hidden="true" />
-          {source.phase === "live" && data
-            ? fmt(t.presSrcLive, { id: data.identity?.index_id ?? "?" })
-            : source.phase === "demo"
-              ? t.presSrcDemo
-              : source.phase === "unreachable"
-                ? t.srcOfflineBadge
-                : t.srcProbing}
-          {isLive && trace?.meta.client_latency_s != null && (
-            <b className="pres-src-lat">{trace.meta.client_latency_s.toFixed(2)}s</b>
-          )}
-        </span>
-        {question !== null && (
-          <button className="ghostbtn" onClick={askAgain}>{t.presAskNew}</button>
-        )}
-        {source.phase !== "live" && (
-          <button className="ghostbtn" onClick={onRetryLive}>{t.retryConnection}</button>
-        )}
-        <a className="doclink" href="/travel/presentation.html" target="_blank" rel="noopener">{t.tabPresentation}</a>
-        <a className="doclink" href="/evals/" target="_blank" rel="noopener" title={t.evalsTitle}>{t.tabEvals}</a>
-        <button onClick={onExit} title={t.presExit}>
-          <XIcon size={11} /> {t.presExit}
-        </button>
-      </div>
-
       <div className={`pres-grid${recall === "running" ? " is-busy" : ""}${question === null ? " is-asking" : ""}`}>
         <PresDataPanel
           chapterId={ch.id}
@@ -975,6 +971,22 @@ export default function PresentationView({ onExit, data, source, preferredQuesti
 
             <div className="pres-stage-bar">
               <span className="pres-kicker">{ch.viz === "trace" ? t.presVizTrace : t.presVizCosmos}</span>
+              <span
+                className={`pres-src ${source.phase === "live" ? "live" : source.phase === "demo" ? "demo" : "probing"}`}
+                title={isLive ? t.presSrcLiveTitle : t.presSrcDemoTitle}
+              >
+                <i aria-hidden="true" />
+                {source.phase === "live" && data
+                  ? fmt(t.presSrcLive, { id: data.identity?.index_id ?? projectId })
+                  : source.phase === "demo"
+                    ? t.presSrcDemo
+                    : source.phase === "unreachable"
+                      ? t.srcOfflineBadge
+                      : t.srcProbing}
+                {isLive && trace?.meta.client_latency_s != null && (
+                  <b className="pres-src-lat">{trace.meta.client_latency_s.toFixed(2)}s</b>
+                )}
+              </span>
               {legend.length > 0 && (
                 <div className="pres-legend" aria-label={t.presGraphLegend}>
                   {legend.map((l) => (
@@ -986,6 +998,11 @@ export default function PresentationView({ onExit, data, source, preferredQuesti
                 </div>
               )}
               <span className="spacer" />
+              {question !== null && (
+                <button type="button" className="pres-stage-detail" onClick={askAgain}>
+                  {t.presAskNew}
+                </button>
+              )}
               {traceCanvasActive && trace && (
                 <button
                   type="button"
@@ -995,6 +1012,9 @@ export default function PresentationView({ onExit, data, source, preferredQuesti
                   {t.inspectOpen}
                 </button>
               )}
+              <button type="button" className="pres-stage-detail" onClick={onExit} title={t.presExit}>
+                <XIcon size={10} /> {t.presExit}
+              </button>
             </div>
 
             {recall === "running" && (
@@ -1021,8 +1041,19 @@ export default function PresentationView({ onExit, data, source, preferredQuesti
             )}
             {!liveReady && (
               <div className="presgate" role="status">
-                <b>{source.phase === "unreachable" ? t.notConnectedTitle : t.srcProbing}</b>
-                <p className="dim">{t.presAskNeedsLive}</p>
+                <b>
+                  {isEmptyScope
+                    ? t.emptyScopeTitle
+                    : source.phase === "unreachable"
+                      ? t.notConnectedTitle
+                      : t.srcProbing}
+                </b>
+                <p className="dim">{isEmptyScope ? t.emptyScopeBody : t.presAskNeedsLive}</p>
+                {isEmptyScope && onSwitchToDefault && projectId !== "default" && (
+                  <div className="overlay-actions">
+                    <button className="primary" onClick={onSwitchToDefault}>{t.switchToPierKb}</button>
+                  </div>
+                )}
                 {source.phase === "unreachable" && (
                   <div className="overlay-actions">
                     <button className="primary" onClick={onRetryLive}>{t.retryConnection}</button>
@@ -1096,12 +1127,21 @@ export default function PresentationView({ onExit, data, source, preferredQuesti
               </button>
             </form>
             <p className="dim pres-ask-hint">
-              {!liveReady
-                ? source.phase === "unreachable"
-                  ? t.notConnectedBody
-                  : t.srcProbing
-                : t.presAskHint}
+              {isEmptyScope
+                ? t.emptyScopeBody
+                : !liveReady
+                  ? source.phase === "unreachable"
+                    ? t.notConnectedBody
+                    : t.srcProbing
+                  : t.presAskHint}
             </p>
+            {isEmptyScope && onSwitchToDefault && projectId !== "default" && (
+              <div className="overlay-actions" style={{ marginTop: 14 }}>
+                <button type="button" className="primary" onClick={onSwitchToDefault}>
+                  {t.switchToPierKb}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1123,32 +1163,32 @@ export default function PresentationView({ onExit, data, source, preferredQuesti
 /** Per-chapter colour legend for the centre graph (same INK palette). */
 function legendFor(id: string, t: Dict): { color: string; label: string }[] {
   const base = [
-    { color: "#7df3ff", label: t.presLegendVector },
-    { color: "#ffb724", label: t.presLegendBm25 },
-    { color: "#38ff94", label: t.presLegendBoth },
+    { color: "#88C0D0", label: t.presLegendVector },
+    { color: "#EBCB8B", label: t.presLegendBm25 },
+    { color: "#A3BE8C", label: t.presLegendBoth },
   ];
   switch (id) {
     case "embed":
       return [
-        { color: "#ff477e", label: t.presLegendQuery },
-        { color: "#7df3ff", label: t.presChainCandidates },
+        { color: "#BF616A", label: t.presLegendQuery },
+        { color: "#88C0D0", label: t.presChainCandidates },
       ];
     case "channels":
       return base;
     case "graph":
       return [
-        { color: "#ffd166", label: t.presLegendSeeds },
-        { color: "#bf66ff", label: t.presLegendNeighbours },
+        { color: "#EBCB8B", label: t.presLegendSeeds },
+        { color: "#B48EAD", label: t.presLegendNeighbours },
       ];
     case "fusion":
       return [
-        { color: "#ffc83b", label: "#1" },
-        { color: "#ffa726", label: "#2" },
-        { color: "#ff7043", label: "#3+" },
+        { color: "#EBCB8B", label: "#1" },
+        { color: "#D08770", label: "#2" },
+        { color: "#88C0D0", label: "#3+" },
       ];
     case "context":
     case "answer":
-      return [{ color: "#ffd166", label: t.presLegendCitations }];
+      return [{ color: "#EBCB8B", label: t.presLegendCitations }];
     default:
       return [];
   }

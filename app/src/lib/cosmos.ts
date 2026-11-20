@@ -28,25 +28,24 @@ export function toWorld3(xyz: XYZ | null | undefined): XYZ {
 }
 
 /**
- * Highlight/semantic palette — deliberately vivid (journey stages, search
- * hits, selection). The BASE node colours live in palette.ts and are muted
- * deep tones; additive blending brightens them naturally.
+ * Nord Frost & Aurora stage highlight palette (journey stages, search hits,
+ * selection). Harmonised with KnotGate's Nord Frozen Glass design language.
  */
 export const INK: Record<string, RGBA> = {
-  base: [0.23, 0.3, 0.48, 1],
-  dim: [0.13, 0.16, 0.28, 1],
-  cyan: [0.0, 0.95, 1.0, 1],
-  vector: [0.0, 0.95, 1.0, 1],
-  gold: [1.0, 0.78, 0.25, 1],
-  amber: [1.0, 0.72, 0.14, 1],
-  bm25: [1.0, 0.72, 0.14, 1],
-  overlap: [0.22, 1.0, 0.58, 1],
-  magenta: [1.0, 0.35, 0.85, 1],
-  violet: [0.75, 0.4, 1.0, 1],
-  green: [0.35, 1.0, 0.55, 1],
-  orange: [1.0, 0.55, 0.2, 1],
-  white: [1.0, 1.0, 1.0, 1],
-  query: [1.0, 0.28, 0.58, 1],
+  base: [0.369, 0.506, 0.675, 1], // Nord Frost #5E81AC
+  dim: [0.231, 0.259, 0.322, 1], // Nord Polar #3B4252
+  cyan: [0.533, 0.753, 0.816, 1], // Nord Frost #88C0D0
+  vector: [0.533, 0.753, 0.816, 1], // Nord Frost #88C0D0
+  gold: [0.922, 0.796, 0.545, 1], // Nord Aurora #EBCB8B
+  amber: [0.922, 0.796, 0.545, 1], // Nord Aurora #EBCB8B
+  bm25: [0.878, 0.722, 0.44, 1], // Warm Nord Gold
+  overlap: [0.639, 0.745, 0.549, 1], // Nord Aurora #A3BE8C
+  magenta: [0.706, 0.557, 0.678, 1], // Nord Aurora #B48EAD
+  violet: [0.706, 0.557, 0.678, 1], // Nord Aurora #B48EAD
+  green: [0.639, 0.745, 0.549, 1], // Nord Aurora #A3BE8C
+  orange: [0.816, 0.529, 0.439, 1], // Nord Aurora #D08770
+  white: [0.925, 0.937, 0.957, 1], // Nord Snow Storm #ECEFF4
+  query: [0.749, 0.38, 0.416, 1], // Nord Aurora #BF616A
 };
 
 export interface SelectedNode {
@@ -118,6 +117,7 @@ export interface CosmosLike {
   flyTo(x: number, y: number, zoom: number, ms?: number): void;
   fit(padding?: number): void;
   currentZoom(): number;
+  setTheme?(theme: "dark" | "light"): void;
   destroy(): void;
   onSelect: ((s: SelectedNode | null) => void) | null;
   onHover: ((s: SelectedNode | null) => void) | null;

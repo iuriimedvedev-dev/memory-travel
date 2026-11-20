@@ -4,7 +4,7 @@ import type { GraphStats } from "../lib/cosmosSource";
 import { fieldOwnsKey } from "../lib/keys";
 import { fmt } from "../i18n/strings";
 import { useI18n } from "../i18n/useI18n";
-import { SparkIcon, XIcon } from "./icons";
+import { KnotGateLogoMark, XIcon } from "./icons";
 
 interface Props {
   onClose: () => void;
@@ -15,6 +15,8 @@ interface Props {
   /** Which dataset the starfield is actually rendering, from /api/stats. */
   identity: GraphStats | null;
   sourcePhase: "probing" | "live" | "unreachable" | "demo";
+  projectLabel?: string;
+  projectId?: string;
 }
 
 /** What-this-is card: provenance, render modes, controls. Replaces the dead
@@ -23,7 +25,15 @@ interface Props {
  *  The Connected memory block shows what the bridge ACTUALLY serves (index
  *  id/dir, live counts, last ingest, models) — the app carries no hardcoded
  *  deployment identity. */
-export default function AboutModal({ onClose, conn, onRefreshConn, identity, sourcePhase }: Props) {
+export default function AboutModal({
+  onClose,
+  conn,
+  onRefreshConn,
+  identity,
+  sourcePhase,
+  projectLabel,
+  projectId,
+}: Props) {
   const { t, lang } = useI18n();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -53,7 +63,7 @@ export default function AboutModal({ onClose, conn, onRefreshConn, identity, sou
     <div className="errwrap" role="dialog" aria-label={t.aboutAria} onClick={onClose}>
       <div className="errcard about" onClick={(e) => e.stopPropagation()}>
         <h2>
-          <SparkIcon size={16} /> Memory Travel
+          <KnotGateLogoMark size={20} /> KnotGate Memory
           <button className="ghostbtn" onClick={onClose} title={t.aboutClose}>
             <XIcon size={13} />
           </button>
@@ -61,7 +71,10 @@ export default function AboutModal({ onClose, conn, onRefreshConn, identity, sou
         <p>{t.aboutIntro}</p>
 
         <section className="connblock">
-          <h3>{t.aboutConnTitle}</h3>
+          <h3>
+            {t.aboutConnTitle}
+            {projectLabel ? ` · ${projectLabel}${projectId && projectId !== "default" ? ` (${projectId})` : ""}` : ""}
+          </h3>
           {info ? (
             <table className="conntable">
               <tbody>
@@ -135,8 +148,18 @@ export default function AboutModal({ onClose, conn, onRefreshConn, identity, sou
         <p className="dim">{t.aboutRendering}</p>
         <p className="dim">
           {bridgeBefore}
-          <code>{BRIDGE_DIRECT_URL}</code>
+          <code>{BRIDGE_DIRECT_URL || "/memory/api/memory"}</code>
           {bridgeAfter}
+        </p>
+        <p className="dim">
+          <a
+            className="doclink"
+            href={`${import.meta.env.BASE_URL}presentation.html`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {t.tabPresentation}
+          </a>
         </p>
         <p className="dim">{t.aboutRepo}</p>
       </div>

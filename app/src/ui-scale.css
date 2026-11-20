@@ -136,7 +136,7 @@
   padding: 2px 7px;
   border-radius: 20px;
   color: var(--dim);
-  background: rgba(20, 28, 60, 0.85);
+  background: var(--surface-soft);
   border: 1px solid var(--line);
   cursor: pointer;
 }
